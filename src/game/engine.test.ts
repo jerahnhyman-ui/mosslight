@@ -173,6 +173,52 @@ describe("Mosslight simulation", () => {
     expect(held.player.y).toBe(392);
   });
 
+  it("accelerates promptly and stops within half a body width after release", () => {
+    const game = new Game();
+    advance(game, 0.1);
+    advance(game, 0.1, { ...idle, right: true });
+    expect(game.player.vx).toBeGreaterThanOrEqual(280);
+    const releasedAt = game.player.x;
+    advance(game, 0.1);
+    expect(game.player.vx).toBe(0);
+    expect(game.player.x - releasedAt).toBeLessThan(game.player.w / 2);
+  });
+
+  it("turns back within a short thumb reversal instead of continuing to slide", () => {
+    const game = new Game();
+    advance(game, 0.1);
+    advance(game, 0.25, { ...idle, right: true });
+    advance(game, 0.075, { ...idle, left: true });
+    expect(game.player.facing).toBe(-1);
+    expect(game.player.vx).toBeLessThan(0);
+  });
+
+  it("lets the player correct horizontal direction while rising", () => {
+    const game = new Game();
+    advance(game, 0.1);
+    game.update(1 / 120, { ...idle, jump: true, jumpPressed: true });
+    advance(game, 0.12, { ...idle, right: true, jump: true });
+    expect(game.player.vx).toBeGreaterThan(250);
+    advance(game, 0.1, { ...idle, left: true, jump: true });
+    expect(game.player.vx).toBeLessThan(0);
+    expect(game.player.vy).toBeLessThan(0);
+  });
+
+  it("gives a quick jump tap enough height to clear a beetle", () => {
+    const game = new Game();
+    advance(game, 0.1);
+    const groundY = game.player.y;
+    let top = groundY;
+    game.update(1 / 120, { ...idle, jump: true, jumpPressed: true });
+    for (let i = 0; i < 120; i++) {
+      top = Math.min(top, game.player.y);
+      game.update(1 / 120, idle);
+    }
+    expect(groundY - top).toBeGreaterThan(44);
+    expect(groundY - top).toBeLessThan(75);
+    expect(game.player.grounded).toBe(true);
+  });
+
   it("permits a jump just after leaving a ledge", () => {
     const game = new Game();
     game.player.x = 809;
@@ -202,6 +248,52 @@ describe("Mosslight simulation", () => {
     }
     expect(jumped).toBe(true);
     expect(game.player.vy).toBeLessThan(-500);
+  });
+
+  it("uses a released buffered tap on the landing tick exactly once", () => {
+    const game = new Game();
+    game.player.y = 386;
+    game.player.vy = 180;
+    game.update(1 / 120, { ...idle, jump: true, jumpPressed: true });
+    let jumps = 0;
+    let landedBeforeJump = false;
+    for (let i = 0; i < 120; i++) {
+      game.update(1 / 120, idle);
+      if (game.events.includes("jump")) {
+        jumps++;
+        expect(game.player.y).toBe(392);
+        expect(game.player.vy).toBeLessThan(-300);
+        expect(game.player.grounded).toBe(false);
+      }
+      if (jumps === 0 && game.player.grounded) landedBeforeJump = true;
+    }
+    expect(landedBeforeJump).toBe(false);
+    expect(jumps).toBe(1);
+    expect(game.player.grounded).toBe(true);
+  });
+
+  it("does not turn a held jump into automatic jumps after landing", () => {
+    const game = new Game();
+    advance(game, 0.1);
+    game.update(1 / 120, { ...idle, jump: true, jumpPressed: true });
+    let jumps = game.events.filter((event) => event === "jump").length;
+    for (let i = 0; i < 150; i++) {
+      game.update(1 / 120, { ...idle, jump: true });
+      jumps += game.events.filter((event) => event === "jump").length;
+    }
+    expect(jumps).toBe(1);
+    expect(game.player.grounded).toBe(true);
+  });
+
+  it("does not allow an air jump after the ledge grace period expires", () => {
+    const game = new Game();
+    game.player.x = 809;
+    advance(game, 0.01);
+    advance(game, 0.2, { ...idle, right: true });
+    expect(game.player.grounded).toBe(false);
+    game.update(1 / 120, { ...idle, jump: true, jumpPressed: true });
+    expect(game.events).not.toContain("jump");
+    expect(game.player.vy).toBeGreaterThan(0);
   });
 
   it("collects a seed and star only once", () => {
@@ -237,6 +329,40 @@ describe("Mosslight simulation", () => {
     expect(game.player.invulnerable).toBeGreaterThan(1);
     game.update(1 / 60, idle);
     expect(game.health).toBe(2);
+  });
+
+  it("keeps an automatic beetle bounce useful without holding jump", () => {
+    const bounceHeights = [false, true].map((jump) => {
+      const game = new Game();
+      const enemy = game.enemies[0]!;
+      game.player.x = enemy.x;
+      game.player.y = enemy.y - game.player.h - 1;
+      game.player.vy = 200;
+      game.update(1 / 120, { ...idle, jump });
+      expect(game.events).toContain("stomp");
+      const startY = game.player.y;
+      let top = startY;
+      for (let i = 0; i < 60; i++) {
+        game.update(1 / 120, { ...idle, jump });
+        top = Math.min(top, game.player.y);
+      }
+      return startY - top;
+    });
+    expect(bounceHeights[0]).toBeGreaterThan(50);
+    expect(bounceHeights[0]).toBeCloseTo(bounceHeights[1]!, 8);
+  });
+
+  it("does not reuse grounded jump permission during damage knockback", () => {
+    const game = new Game();
+    advance(game, 0.1);
+    game.player.x = game.enemies[0]!.x;
+    game.update(1 / 120, idle);
+    expect(game.events).toContain("hurt");
+    expect(game.player.grounded).toBe(false);
+    game.update(1 / 120, { ...idle, jump: true, jumpPressed: true });
+    expect(game.events).not.toContain("jump");
+    expect(game.player.vy).toBeLessThan(0);
+    expect(game.player.vy).toBeGreaterThan(-350);
   });
 
   it("respawns at an activated checkpoint, keeps collectibles, and ends at zero hearts", () => {

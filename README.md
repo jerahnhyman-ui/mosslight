@@ -14,10 +14,18 @@ npm ci
 npm run dev
 ```
 
-Open the local URL Vite prints. Move with **← / →** or **A / D**; jump with
-**Space**, **W**, or **↑**. Hold jump to go higher. **P / Esc** pauses. Touch
-screens have movement and jump buttons; gamepad left stick/D-pad and A also
-work. The toolbar menu provides worlds, sound, and instructions in landscape.
+Open the local URL Vite prints. The game fills the screen, with a trail picker
+on the title screen and worlds, sound, and instructions in the game menu.
+Move with **← / →** or **A / D**; jump with **Space**, **W**, or **↑**.
+Tap jump for a short hop, or hold it for a higher leap. **P / Esc** pauses.
+On touch screens, slide your left thumb across the direction pad without lifting,
+and use your right thumb to jump. Both touches work at the same time. A gamepad's
+left stick/D-pad and A also work; Start pauses and resumes.
+
+Movement uses quick acceleration and braking, midair steering, a small grace
+period after leaving a ledge, and buffered jumps just before landing. The
+cartoon artwork is drawn locally at the screen's pixel density, with three
+distinct palettes, animated characters, and collectible/landing effects.
 
 Best completion times, stars, and sound preference are saved on the device.
 The game has no accounts, ads, analytics, remote assets, or backend requirement.
@@ -34,8 +42,9 @@ npm run ios:check
 npm run ios:open
 ```
 
-**Mosslight is connected to Xcode Cloud; a successful signed archive and
-TestFlight upload still need verification.** See [the setup guide](docs/TESTFLIGHT.md)
+**Mosslight is connected to Xcode Cloud with internal TestFlight distribution
+enabled.** Each update still needs a successful native archive and Apple's
+processing before testing. See [the setup guide](docs/TESTFLIGHT.md)
 for the Apple team, bundle identifier, repository authorization, and Archive →
 TestFlight workflow steps. No Apple credentials should be committed to Git.
 
@@ -52,8 +61,9 @@ npm run ios:check          # Native repository preflight; not an Xcode compilati
 Browser tests use `/usr/bin/chromium` when installed, or Playwright's Chromium
 (`npx playwright install chromium`). Set `CHROMIUM_PATH` to use another local
 Chromium binary. Screenshots are written to the ignored `artifacts/` folder.
-The browser smoke suite exercises real keyboard and touch input, pause/restart,
-collectibles, world switching, sound persistence, and landscape navigation.
+The browser smoke suite exercises real keyboard and simultaneous touch input,
+thumb sliding, pause/restart, collectibles, world switching, sound persistence,
+phone safe areas, portrait/tablet layouts, and game timing at 15 FPS.
 
 GitHub Actions runs tests, builds the production bundle, and checks the native
 project. Xcode Cloud runs the same unit tests and web build before resolving the
@@ -64,8 +74,9 @@ be performed through Xcode Cloud and TestFlight.
 
 - `src/game/engine.ts` — fixed-step simulation, collision, and game rules.
 - `src/game/levels.ts` — three authored trails.
-- `src/game/renderer.ts` — responsive pixel-art canvas and camera.
-- `src/main.ts` — controls, menus, HUD, progress, and game loop.
+- `src/game/renderer.ts` — crisp cartoon canvas, camera, and animated effects.
+- `src/main.ts` — menus, HUD, progress, and game loop.
+- `src/controls.ts` — touch capture/dragging, keyboard, and gamepad input.
 - `src/audio.ts` / `src/storage.ts` — synthesized effects and local saves.
 - `ios/App/` — native Xcode project and Xcode Cloud hooks.
 

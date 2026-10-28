@@ -23,8 +23,12 @@ export type Enemy = Rect & {
 
 const STEP = 1 / 120;
 const GRAVITY = 1450;
+const FALL_GRAVITY = 1850;
 const JUMP = -635;
-const MAX_SPEED = 276;
+const SHORT_JUMP = -370;
+const MAX_SPEED = 300;
+const COYOTE_TIME = 0.12;
+const JUMP_BUFFER_TIME = 0.16;
 const overlaps = (a: Rect, b: Rect) =>
   a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 const approach = (value: number, target: number, amount: number) =>
@@ -50,6 +54,7 @@ export class Game {
   private accumulator = 0;
   private coyote = 0;
   private jumpBuffer = 0;
+  private jumpCanShorten = false;
   private hurtLock = 0;
 
   constructor(levelIndex = 0) {
@@ -96,6 +101,7 @@ export class Game {
     };
     this.coyote = 0;
     this.jumpBuffer = 0;
+    this.jumpCanShorten = false;
     this.hurtLock = 0;
   }
 
@@ -104,7 +110,7 @@ export class Game {
     if (this.state !== "playing" || !Number.isFinite(dt) || dt <= 0) return;
     // Cap catch-up after tab suspension, retaining normal frame-rate independence.
     this.accumulator += Math.min(dt, 0.1);
-    if (input.jumpPressed) this.jumpBuffer = 0.12;
+    if (input.jumpPressed) this.jumpBuffer = JUMP_BUFFER_TIME;
     while (this.accumulator + 1e-10 >= STEP && this.state === "playing") {
       this.tick(input);
       this.accumulator = Math.max(0, this.accumulator - STEP);
@@ -116,26 +122,26 @@ export class Game {
     this.elapsed += STEP;
     p.invulnerable = Math.max(0, p.invulnerable - STEP);
     this.hurtLock = Math.max(0, this.hurtLock - STEP);
-    this.coyote = p.grounded ? 0.1 : Math.max(0, this.coyote - STEP);
+    this.coyote = p.grounded ? COYOTE_TIME : Math.max(0, this.coyote - STEP);
     this.jumpBuffer = Math.max(0, this.jumpBuffer - STEP);
     const direction = Number(input.right) - Number(input.left);
     if (this.hurtLock === 0) {
-      p.vx = approach(
-        p.vx,
-        direction * MAX_SPEED,
-        (direction ? 1850 : p.grounded ? 2400 : 950) * STEP,
-      );
+      // A thumb reversal should turn immediately, while releasing the pad should
+      // stop the player predictably on a narrow ledge. Keep useful air control.
+      let acceleration = p.grounded ? 3200 : 2600;
+      if (direction === 0) acceleration = p.grounded ? 4200 : 1800;
+      else if (p.vx * direction < 0) acceleration = p.grounded ? 4800 : 3600;
+      p.vx = approach(p.vx, direction * MAX_SPEED, acceleration * STEP);
       if (direction) p.facing = direction;
     }
-    if (this.jumpBuffer > 0 && this.coyote > 0) {
-      p.vy = JUMP;
-      p.grounded = false;
-      this.coyote = 0;
-      this.jumpBuffer = 0;
-      this.events.push("jump");
+    this.tryJump(input);
+    if (this.jumpCanShorten && !input.jump) {
+      p.vy = Math.max(p.vy, SHORT_JUMP);
+      this.jumpCanShorten = false;
     }
-    if (!input.jump && p.vy < -275) p.vy = -275;
-    p.vy = Math.min(900, p.vy + GRAVITY * STEP);
+    if (p.vy >= 0) this.jumpCanShorten = false;
+    // Preserve the reachable jump arc on ascent, then land with less float.
+    p.vy = Math.min(900, p.vy + (p.vy < 0 ? GRAVITY : FALL_GRAVITY) * STEP);
 
     p.x += p.vx * STEP;
     for (const tile of this.level.platforms) {
@@ -154,11 +160,15 @@ export class Game {
         p.y = tile.y - p.h;
         p.vy = 0;
         p.grounded = true;
+        this.jumpCanShorten = false;
       } else if (tile.kind !== "platform" && p.vy < 0) {
         p.y = tile.y + tile.h;
         p.vy = 0;
       }
     }
+    // Consume a buffered tap on the actual landing tick, including a tap that
+    // has already been released. The buffer is consumed once, never auto-jumps.
+    if (p.grounded) this.tryJump(input);
 
     for (const enemy of this.enemies) {
       if (!enemy.alive) continue;
@@ -172,12 +182,19 @@ export class Game {
         enemy.alive = false;
         p.y = enemy.y - p.h;
         p.vy = -440;
+        p.grounded = false;
+        this.coyote = 0;
+        this.jumpCanShorten = false;
         this.events.push("stomp");
       } else if (p.invulnerable <= 0) {
         this.damage(false);
         if (this.state !== "playing") return;
         p.vx = p.x + p.w / 2 < enemy.x + enemy.w / 2 ? -300 : 300;
         p.vy = -290;
+        p.grounded = false;
+        this.coyote = 0;
+        this.jumpBuffer = 0;
+        this.jumpCanShorten = false;
         this.hurtLock = 0.22;
       }
     }
@@ -230,6 +247,21 @@ export class Game {
       p.vx = 0;
       this.events.push("win");
     }
+  }
+
+  private tryJump(input: GameInput) {
+    if (
+      this.jumpBuffer <= 0 ||
+      this.hurtLock > 0 ||
+      (!this.player.grounded && this.coyote <= 0)
+    )
+      return;
+    this.player.vy = input.jump ? JUMP : SHORT_JUMP;
+    this.player.grounded = false;
+    this.coyote = 0;
+    this.jumpBuffer = 0;
+    this.jumpCanShorten = input.jump;
+    this.events.push("jump");
   }
 
   private damage(fall: boolean) {
