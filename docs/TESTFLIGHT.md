@@ -11,6 +11,13 @@ project. A successful signed archive and TestFlight upload still require
 verification in App Store Connect. The account setup below also applies when
 connecting a new Apple team or repository.
 
+The existing App Store Connect app is **MossLight2** (app ID `6827876891`),
+while its Xcode Cloud product and active workflow are named **Mosslight**.
+They share bundle ID `com.mountaineerapps.mosslight`. Internal builds are
+distributed to the existing **Beta** group. Verify the exact uploaded build
+number against the release commit before assigning it; an archive success
+alone does not confirm that testers have access.
+
 ## 1. Register the app and connect the repository
 
 1. Use an active Apple Developer Program membership with access to App Store
@@ -44,15 +51,18 @@ connecting a new Apple team or repository.
 
 | Setting         | Value                                                               |
 | --------------- | ------------------------------------------------------------------- |
-| Workflow name   | Mosslight TestFlight                                                |
-| Repository      | The repository containing this project                              |
+| Workflow name   | Mosslight                                                           |
+| Repository      | `jerahnhyman-ui/mosslight`                                           |
 | Project         | `ios/App/App.xcodeproj`                                             |
 | Scheme          | `App` (shared)                                                      |
 | Xcode           | Xcode 26 or newer, with its compatible macOS image                  |
-| Start condition | Branch changes on your release branch; use manual runs during setup |
+| Start condition | Branch changes on `main`; use manual runs during setup              |
 | Action          | Archive — iOS, Release, Any iOS Device                              |
-| Distribution    | TestFlight and App Store                                            |
-| Post-action     | TestFlight internal testing → your chosen internal tester group     |
+| Distribution    | TestFlight (Internal Testing Only)                                  |
+| Tester group    | Beta — verify each new build is assigned and shows Testing          |
+
+A TestFlight post-action can automate group assignment. The current release
+procedure still verifies the group after processing, regardless of automation.
 
 No App Store Connect API key, `.p12`, or provisioning-profile secret is required
 for Xcode Cloud managed signing. The Apple team authorization is performed in

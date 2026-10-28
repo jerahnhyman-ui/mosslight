@@ -18,6 +18,8 @@ server.stderr.on("data", (chunk) => {
 let browser;
 const errors = [];
 const baseURL = "http://127.0.0.1:4173";
+// Authored Meadow finish marker; browser routes read only visible HUD progress.
+const MEADOW_GOAL_X = 11030;
 const captureErrors = (page) =>
   page.on("pageerror", (error) => errors.push(error.message));
 const screenshot = (page, name) =>
@@ -189,6 +191,57 @@ async function neutralControls(page) {
     );
   }
 }
+async function openSettings(page) {
+  await page.getByRole("button", { name: "Game menu", exact: true }).click();
+  await page.locator(".menu-controls").click();
+  await expect(page.locator("#settings-dialog")).toBeVisible();
+}
+async function closeSettings(page) {
+  await page.locator("#settings-close").click();
+  if (await page.locator("#menu-dialog").isVisible())
+    await page.locator(".menu-close").click();
+}
+async function setRange(page, selector, end) {
+  await page.locator(selector).focus();
+  await page.keyboard.press(end ? "End" : "Home");
+}
+async function settleLayout(page) {
+  // The renderer updates its backing size on the next animation frame after
+  // resize. Wait for that frame before judging the new viewport's sharpness.
+  await page.evaluate(
+    () =>
+      new Promise((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(resolve));
+      }),
+  );
+}
+async function checkControlBounds(page, label, safe = 0, bottomSafe = 0) {
+  const viewport = page.viewportSize();
+  for (const name of ["left", "right", "jump"]) {
+    await controlCenter(page, name, 1);
+    const box = await page.locator(`[data-control="${name}"]`).boundingBox();
+    expect(box.x, `${label}: ${name} left safe area`).toBeGreaterThanOrEqual(
+      safe,
+    );
+    expect(
+      box.x + box.width,
+      `${label}: ${name} right safe area`,
+    ).toBeLessThanOrEqual(viewport.width - safe);
+    expect(box.y, `${label}: ${name} top edge`).toBeGreaterThanOrEqual(0);
+    expect(
+      box.y + box.height,
+      `${label}: ${name} bottom safe area`,
+    ).toBeLessThanOrEqual(viewport.height - bottomSafe);
+  }
+  const pad = await page.locator(".touch-dpad").boundingBox();
+  const jump = await page.locator(".touch-jump").boundingBox();
+  const overlap =
+    Math.min(pad.x + pad.width, jump.x + jump.width) - Math.max(pad.x, jump.x);
+  expect(
+    overlap,
+    `${label}: the two thumb controls remain separate`,
+  ).toBeLessThanOrEqual(0);
+}
 async function advanceUntil(
   page,
   condition,
@@ -204,7 +257,7 @@ async function advanceUntil(
 async function walkToMeadowX(page, targetX) {
   // Read the visible trail-progress indicator, rather than exposing game state.
   for (let frame = 0; frame < 200; frame++) {
-    const x = (await trailProgress(page)) * 3290;
+    const x = (await trailProgress(page)) * MEADOW_GOAL_X;
     if (Math.abs(targetX - x) < 9) {
       await page.keyboard.up("ArrowLeft");
       await page.keyboard.up("ArrowRight");
@@ -317,11 +370,11 @@ try {
   await checkLayout(desktop, "desktop title");
   await screenshot(desktop, "desktop-title");
   await desktop
-    .getByRole("button", { name: "Mute sound", exact: true })
+    .getByRole("button", { name: "Mute sound effects", exact: true })
     .click();
   await desktop.reload();
   await expect(
-    desktop.getByRole("button", { name: "Enable sound", exact: true }),
+    desktop.getByRole("button", { name: "Enable sound effects", exact: true }),
   ).toBeVisible();
   await desktop
     .getByRole("button", { name: "How to play", exact: true })
@@ -492,7 +545,10 @@ try {
   await advanceUntil(
     rules,
     async () => {
-      furthestX = Math.max(furthestX, (await trailProgress(rules)) * 3290);
+      furthestX = Math.max(
+        furthestX,
+        (await trailProgress(rules)) * MEADOW_GOAL_X,
+      );
       return (
         (await rules.locator("#lives").getAttribute("aria-label")) ===
         "1 lives remaining"
@@ -515,7 +571,8 @@ try {
   await walkToMeadowX(stars, 445);
   const notesBeforeStar = audioNotes.length;
   await jumpToMeadowX(stars, 616);
-  await expect(stars.locator("#star-count")).toHaveText("1");
+  await expect(stars.locator("#firefly-count")).toHaveText("0");
+  // A power star must never count as a permanently rescued exploration firefly.
   await expect(stars.locator(".power-state")).toHaveAttribute(
     "data-powered",
     "true",
@@ -580,6 +637,101 @@ try {
     "PASS rules: diamond growth, enemy shrink, small-form life loss, diamond respawn, pit life loss, star countdown/pause/expiry, WebAudio effects",
   );
 
+  const secretNotes = [];
+  const secrets = await rulesPage(browser, secretNotes);
+  await walkToMeadowX(secrets, 230);
+  await jumpToMeadowX(secrets, 386);
+  await walkToMeadowX(secrets, 445);
+  await jumpToMeadowX(secrets, 616);
+  await expect(secrets.locator("#firefly-count")).toHaveText("0");
+  await walkToMeadowX(secrets, 750);
+  await secrets.clock.runFor(400);
+  await walkToMeadowX(secrets, 775);
+  await jumpToMeadowX(secrets, 1000);
+  await walkToMeadowX(secrets, 1020);
+  await jumpToMeadowX(secrets, 1186);
+  await walkToMeadowX(secrets, 1255);
+  await jumpToMeadowX(secrets, 1431);
+  await expect(secrets.locator("#firefly-count")).toHaveText("1");
+  const rescued = await secrets.evaluate(
+    () =>
+      JSON.parse(localStorage.getItem("mosslight-save-v2")).progress[0]
+        .fireflies,
+  );
+  expect(
+    rescued,
+    "the actual firefly pickup is saved before completing the trail",
+  ).toEqual([0]);
+  await secrets.screenshot({
+    path: "artifacts/adventure-firefly-rescue.png",
+    fullPage: true,
+  });
+  // Traverse the original clearing, then use the extension's first mushroom.
+  // These are ordinary keyboard controls and visible HUD/audio observations.
+  for (const [takeoff, target] of [
+    [null, 1555],
+    [1575, 1800],
+    [1810, 1966],
+    [2025, 2201],
+    [null, 2380],
+    [2405, 2630],
+    [2650, 2801],
+    [2855, 3045],
+    [null, 3300],
+  ]) {
+    if (takeoff === null) {
+      await walkToMeadowX(secrets, target);
+      await secrets.clock.runFor(450);
+    } else {
+      await walkToMeadowX(secrets, takeoff);
+      await jumpToMeadowX(secrets, target);
+    }
+  }
+  await walkToMeadowX(secrets, 3630);
+  await expect(secrets.locator("#section-name")).toContainText(
+    "Mushroom Grove",
+  );
+  await expect(secrets.locator("#checkpoint-count")).toContainText("1 / 4");
+  const notesBeforeBounce = secretNotes.length;
+  await secrets.keyboard.down("Space");
+  await walkToMeadowX(secrets, 3740);
+  await advanceUntil(
+    secrets,
+    async () => secretNotes.slice(notesBeforeBounce).includes(620),
+    "landing on the mushroom produces its bounce sound",
+    2000,
+  );
+  await walkToMeadowX(secrets, 3970);
+  await secrets.clock.runFor(400);
+  await secrets.keyboard.up("Space");
+  await expect(secrets.locator("#lives")).toHaveAttribute(
+    "aria-label",
+    "3 lives remaining",
+  );
+  await secrets.screenshot({
+    path: "artifacts/adventure-mushroom-grove.png",
+    fullPage: true,
+  });
+  await secrets.getByRole("button", { name: "Game menu", exact: true }).click();
+  await expect(secrets.locator("#forest-map")).toBeVisible();
+  await expect(secrets.locator("#restoration-count")).toContainText("1");
+  await secrets.screenshot({
+    path: "artifacts/adventure-restored-world-map.png",
+    fullPage: true,
+  });
+  await secrets.locator("#restoration-count").scrollIntoViewIfNeeded();
+  await secrets.screenshot({
+    path: "artifacts/adventure-map-progress.png",
+    fullPage: true,
+  });
+  await secrets.reload();
+  await secrets.locator("#start-button").click();
+  await expect(secrets.locator("#firefly-count")).toHaveText("1");
+  await secrets.close();
+  console.log(
+    "PASS adventure: power stars are separate, real firefly rescue persists, keyboard route reaches extended Mushroom Grove, bounce/checkpoint feedback, restored map and reloaded HUD agree",
+  );
+
   const mobile = await browser.newPage({
     viewport: { width: 844, height: 390 },
     isMobile: true,
@@ -635,7 +787,7 @@ try {
         "sliding the same held thumb left reverses actual player progress",
       timeout: 1500,
     })
-    .toBeLessThan(beforeTurn - 0.005);
+    .toBeLessThan(beforeTurn - 16 / MEADOW_GOAL_X);
   const beforeTurningBack = await trailProgress(mobile);
   await touch("touchMove", [right, jump]);
   await expect(mobile.locator('[data-control="right"]')).toHaveAttribute(
@@ -651,7 +803,7 @@ try {
       message: "sliding back right restores forward movement without lifting",
       timeout: 1500,
     })
-    .toBeGreaterThan(beforeTurningBack + 0.005);
+    .toBeGreaterThan(beforeTurningBack + 16 / MEADOW_GOAL_X);
   await touch("touchCancel");
   await neutralControls(mobile);
   // The pause action must clear captured fingers before hiding the control surface.
@@ -678,9 +830,9 @@ try {
   await mobile.locator('[data-menu-world="2"]').click();
   await expect(mobile.locator("#world-label")).toHaveText("Cloudtop Crossing");
   await mobile.getByRole("button", { name: "Game menu", exact: true }).click();
-  await mobile.getByRole("button", { name: "Sound on", exact: true }).click();
+  await mobile.getByRole("button", { name: "Effects on", exact: true }).click();
   await expect(
-    mobile.getByRole("button", { name: "Sound off", exact: true }),
+    mobile.getByRole("button", { name: "Effects off", exact: true }),
   ).toBeVisible();
   await mobile.locator(".menu-help").click();
   await expect(
@@ -692,6 +844,171 @@ try {
   await screenshot(mobile, "alpine-title");
   console.log(
     "PASS phone landscape: real movement/collection, simultaneous jump, same-finger directional sliding, cancellation and pause release, menu, worlds, sound, help",
+  );
+
+  const settings = await browser.newPage({
+    viewport: { width: 844, height: 390 },
+    isMobile: true,
+    hasTouch: true,
+  });
+  captureErrors(settings);
+  await settings.goto(baseURL);
+  await openSettings(settings);
+  await settings.locator("#control-size").selectOption("1.15");
+  await setRange(settings, "#control-inset", true);
+  await setRange(settings, "#control-height", true);
+  await settings.locator("#control-swap").check();
+  await settings.locator("#music-toggle").uncheck();
+  await settings.locator("#haptics-toggle").uncheck();
+  await settings.locator("#sfx-toggle").uncheck();
+  await settings.locator("#settings-dialog").evaluate((dialog) => {
+    dialog.scrollTop = 0;
+  });
+  await settings.screenshot({
+    path: "artifacts/adventure-control-settings.png",
+    fullPage: true,
+  });
+  await closeSettings(settings);
+  await settings.reload();
+  await openSettings(settings);
+  await expect(settings.locator("#control-size")).toHaveValue("1.15");
+  await expect(settings.locator("#control-inset")).toHaveValue("40");
+  await expect(settings.locator("#control-height")).toHaveValue("40");
+  await expect(settings.locator("#control-swap")).toBeChecked();
+  await expect(settings.locator("#music-toggle")).not.toBeChecked();
+  await expect(settings.locator("#haptics-toggle")).not.toBeChecked();
+  await expect(settings.locator("#sfx-toggle")).not.toBeChecked();
+  await closeSettings(settings);
+  await settings.locator("#start-button").click();
+  const swappedPad = await settings.locator(".touch-dpad").boundingBox();
+  const swappedJump = await settings.locator(".touch-jump").boundingBox();
+  expect(
+    swappedPad.x,
+    "swapping moves the direction pad to the right",
+  ).toBeGreaterThan(swappedJump.x);
+  await checkControlBounds(settings, "customized landscape controls");
+  await settings.screenshot({
+    path: "artifacts/adventure-swapped-controls.png",
+    fullPage: true,
+  });
+  for (const [width, height] of [
+    [568, 320],
+    [390, 844],
+    [844, 390],
+  ]) {
+    await settings.setViewportSize({ width, height });
+    await settings.evaluate(() => {
+      const style = document.documentElement.style;
+      style.setProperty("--safe-left", "44px");
+      style.setProperty("--safe-right", "44px");
+      style.setProperty("--safe-bottom", "21px");
+    });
+    await settleLayout(settings);
+    await checkLayout(settings, `max customized controls ${width}x${height}`);
+    await checkControlBounds(
+      settings,
+      `max customized controls ${width}x${height}`,
+      44,
+      21,
+    );
+  }
+  await openSettings(settings);
+  await settings.locator("#control-size").selectOption("0.85");
+  await setRange(settings, "#control-inset", false);
+  await setRange(settings, "#control-height", false);
+  await settings.locator("#control-swap").uncheck();
+  await closeSettings(settings);
+  // Closing a settings dialog restores the prior paused state, never movement.
+  if (
+    await settings
+      .getByRole("button", { name: "Keep exploring", exact: true })
+      .isVisible()
+  )
+    await settings
+      .getByRole("button", { name: "Keep exploring", exact: true })
+      .click();
+  await settings.setViewportSize({ width: 568, height: 320 });
+  await settleLayout(settings);
+  await checkControlBounds(settings, "smallest customized controls", 44, 21);
+  await neutralControls(settings);
+  await settings.close();
+  console.log(
+    "PASS settings: size, horizontal/vertical placement, swapped sides, independent sound/music/haptics persist and remain usable inside phone safe areas",
+  );
+
+  const music = await browser.newPage({
+    viewport: { width: 844, height: 390 },
+  });
+  captureErrors(music);
+  await music.addInitScript(() => {
+    window.scheduledAudioNotes = 0;
+    const original = AudioContext.prototype.createOscillator;
+    AudioContext.prototype.createOscillator = function (...args) {
+      const oscillator = original.apply(this, args);
+      const start = oscillator.start.bind(oscillator);
+      oscillator.start = (...startArgs) => {
+        window.scheduledAudioNotes++;
+        return start(...startArgs);
+      };
+      return oscillator;
+    };
+  });
+  await music.goto(baseURL);
+  await music.locator("#start-button").click();
+  await music.waitForTimeout(700);
+  const firstNotes = await music.evaluate(() => window.scheduledAudioNotes);
+  expect(
+    firstNotes,
+    "starting a trail starts original background music",
+  ).toBeGreaterThan(0);
+  await music.waitForTimeout(500);
+  expect(
+    await music.evaluate(() => window.scheduledAudioNotes),
+    "music continues while idle in the level",
+  ).toBeGreaterThan(firstNotes);
+  await music.getByRole("button", { name: "Pause game", exact: true }).click();
+  await music.waitForTimeout(300);
+  const pausedNotes = await music.evaluate(() => window.scheduledAudioNotes);
+  await music.waitForTimeout(500);
+  expect(
+    await music.evaluate(() => window.scheduledAudioNotes),
+    "pause stops scheduling background music",
+  ).toBe(pausedNotes);
+  await music
+    .getByRole("button", { name: "Keep exploring", exact: true })
+    .click();
+  await music.waitForTimeout(400);
+  expect(
+    await music.evaluate(() => window.scheduledAudioNotes),
+    "resume restarts music",
+  ).toBeGreaterThan(pausedNotes);
+  await openSettings(music);
+  await music.locator("#music-toggle").uncheck();
+  await closeSettings(music);
+  if (
+    await music
+      .getByRole("button", { name: "Keep exploring", exact: true })
+      .isVisible()
+  )
+    await music
+      .getByRole("button", { name: "Keep exploring", exact: true })
+      .click();
+  await music.waitForTimeout(300);
+  const mutedNotes = await music.evaluate(() => window.scheduledAudioNotes);
+  await music.waitForTimeout(500);
+  expect(
+    await music.evaluate(() => window.scheduledAudioNotes),
+    "music mute does not keep scheduling inaudible notes",
+  ).toBe(mutedNotes);
+  await music.keyboard.press("Space");
+  await music.waitForTimeout(100);
+  expect(
+    await music.evaluate(() => window.scheduledAudioNotes),
+    "jump effects still play with music disabled",
+  ).toBeGreaterThan(mutedNotes);
+  await music.close();
+  console.log(
+    "PASS music: original score starts after gesture, continues in play, pauses/resumes, and mutes independently of effects",
   );
 
   for (const [label, width, height] of [
