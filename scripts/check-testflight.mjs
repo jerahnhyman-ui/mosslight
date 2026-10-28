@@ -61,6 +61,16 @@ check(
       `.package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", exact: "${capacitorVersion}")`,
     ),
 );
+check(
+  "Native haptics plugin is linked and registered",
+  swiftPackage.includes(
+    '.package(name: "CapacitorHaptics", path: "../../../node_modules/@capacitor/haptics")',
+  ) &&
+    swiftPackage.includes(
+      '.product(name: "CapacitorHaptics", package: "CapacitorHaptics")',
+    ) &&
+    config.packageClassList?.includes("HapticsPlugin"),
+);
 check("Web assets are bundled; no development server URL", !config.server?.url);
 check(
   "Bundle ID matches both native configurations",

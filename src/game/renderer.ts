@@ -1,4 +1,5 @@
 import {
+  CRUMBLE_WARNING,
   ENEMY_SQUASH_DURATION,
   STAR_POWER_DURATION,
   type Game,
@@ -105,6 +106,9 @@ export class Renderer {
   private previousCoins: boolean[] = [];
   private previousStars: boolean[] = [];
   private previousDiamonds: boolean[] = [];
+  private previousFireflies: boolean[] = [];
+  private previousBroken: boolean[] = [];
+  private previousCollapsed: boolean[] = [];
   private previousEnemies: boolean[] = [];
   private previousForm: "small" | "big" = "small";
   private previousDeaths = 0;
@@ -114,6 +118,8 @@ export class Renderer {
   private landing = 0;
   private needsResize = true;
   private pixelRatio = 0;
+  private cameraLead = WIDTH * 0.15;
+  private bouncePulse = 0;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -149,7 +155,7 @@ export class Renderer {
     this.needsResize = false;
   }
 
-  render(game: Game, time: number, titleMode = false) {
+  render(game: Game, time: number, titleMode = false, restoration = 0) {
     if (
       this.needsResize ||
       this.pixelRatio !== Math.min(window.devicePixelRatio || 1, 2)
@@ -177,24 +183,42 @@ export class Renderer {
       this.previousCoins = game.coins.map((coin) => coin.collected);
       this.previousStars = game.stars.map((star) => star.collected);
       this.previousDiamonds = game.diamonds.map((diamond) => diamond.collected);
+      this.previousFireflies = game.fireflies.map(
+        (firefly) => firefly.collected,
+      );
+      this.previousBroken = game.platforms.map((platform) => platform.broken);
+      this.previousCollapsed = game.platforms.map(
+        (platform) => platform.crumbleRemaining === 0,
+      );
       this.previousEnemies = game.enemies.map((enemy) => enemy.alive);
       this.previousForm = game.player.form;
       this.previousDeaths = game.deaths;
       this.particles = [];
       this.landing = 0;
       this.formChange = 0;
+      this.bouncePulse = 0;
+      this.cameraLead = WIDTH * 0.15 * game.player.facing;
     } else if (respawned) {
       this.particles = [];
       this.landing = 0;
       this.formChange = 0;
       this.previousForm = game.player.form;
       this.previousGrounded = false;
+      this.cameraLead = WIDTH * 0.15 * game.player.facing;
     }
+    // Ease the lookahead separately from the camera. Turning reveals the path
+    // behind Pip without abruptly dragging the whole world across the screen.
+    const wantedLead = WIDTH * 0.15 * game.player.facing;
+    this.cameraLead +=
+      (wantedLead - this.cameraLead) * (1 - Math.exp(-3.5 * dt));
     const target = titleMode
       ? 0
       : Math.max(
           0,
-          Math.min(game.level.width - WIDTH, game.player.x - WIDTH * 0.35),
+          Math.min(
+            game.level.width - WIDTH,
+            game.player.x - WIDTH * 0.5 + this.cameraLead,
+          ),
         );
     if (
       newGame ||
@@ -212,16 +236,18 @@ export class Renderer {
     const titleX = Math.max(730, (titleFloor?.x ?? 0) + 50);
     this.landing = Math.max(0, this.landing - dt);
     this.formChange = Math.max(0, this.formChange - dt);
+    this.bouncePulse = Math.max(0, this.bouncePulse - dt);
     if (!titleMode && game.elapsed !== this.previousElapsed)
       this.feedback(game);
     this.previousDeaths = game.deaths;
     this.previousElapsed = game.elapsed;
     this.background(p, game.level.theme, time, camera);
+    this.restoredLight(Math.max(0, Math.min(1, restoration)), time, camera);
     c.save();
     c.translate(-camera, 0);
 
     // The trees sit on actual ground sections; no scenery suggests a floor over a pit.
-    for (const platform of game.level.platforms) {
+    for (const platform of game.platforms) {
       if (platform.kind !== "ground") continue;
       for (let i = 0; i < Math.floor(platform.w / 330); i++) {
         const x = platform.x + 205 + i * 330;
@@ -230,8 +256,17 @@ export class Renderer {
         }
       }
     }
+    if (!titleMode) {
+      this.sectionLandmarks(game, time, p);
+      this.treasuryRooms(game, time);
+    }
     if (titleMode) this.tree(titleX + 45, 430, p, 19, time, 1.2);
-    for (const platform of game.level.platforms) {
+    for (const platform of game.platforms) {
+      if (
+        platform.broken ||
+        (platform.kind === "crumble" && platform.crumbleRemaining === 0)
+      )
+        continue;
       if (
         platform.x + platform.w < camera - 30 ||
         platform.x > camera + WIDTH + 30
@@ -241,14 +276,17 @@ export class Renderer {
       this.platform(platform, p, time);
     }
     if (!titleMode) {
-      if (this.visible(game.level.checkpoint.x, 60))
-        this.checkpoint(
-          game.level.checkpoint.x,
-          game.level.checkpoint.y,
-          game.checkpointActive,
-          time,
-          p,
-        );
+      game.level.checkpoints.forEach((checkpoint, index) => {
+        if (this.visible(checkpoint.x, 60))
+          this.checkpoint(
+            checkpoint.x,
+            checkpoint.y,
+            index <= game.activeCheckpointIndex,
+            time,
+            p,
+            index + 1,
+          );
+      });
       if (this.visible(game.level.goal.x, 90))
         this.portal(game.level.goal.x, game.level.goal.y, p, time);
       game.coins.forEach((coin, i) => {
@@ -263,9 +301,13 @@ export class Renderer {
         if (!diamond.collected && this.visible(diamond.x, 30))
           this.diamond(diamond.x, diamond.y, time, i);
       });
+      game.fireflies.forEach((firefly, index) => {
+        if (!firefly.collected && this.visible(firefly.x, 40))
+          this.rescueFirefly(firefly.x, firefly.y, time, index);
+      });
       for (const enemy of game.enemies) {
         if ((enemy.alive || enemy.squashed > 0) && this.visible(enemy.x, 40))
-          this.beetle(enemy, time, enemy.alive ? 0 : enemy.squashed);
+          this.bug(enemy, time, enemy.alive ? 0 : enemy.squashed);
       }
       const player = game.player;
       const center = player.x + player.w / 2;
@@ -289,6 +331,13 @@ export class Renderer {
         time,
         this.landing,
         size,
+        game.state === "won"
+          ? "won"
+          : game.state === "lost"
+            ? "lost"
+            : player.invulnerable > 1.1
+              ? "hurt"
+              : "normal",
       );
       c.restore();
       if (game.starPowerRemaining > 0)
@@ -617,9 +666,245 @@ export class Renderer {
     c.restore();
   }
 
-  private platform(r: Rect & { kind: string }, p: Palette, time: number) {
+  private restoredLight(restoration: number, time: number, camera: number) {
+    if (restoration <= 0) return;
+    const c = this.ctx;
+    c.save();
+    // A recovered forest grows warmer and fills with tiny lights; the terrain
+    // stays high contrast at every progress level.
+    const glow = c.createRadialGradient(720, 100, 12, 720, 100, 370);
+    glow.addColorStop(0, `rgba(255,245,183,${0.18 * restoration})`);
+    glow.addColorStop(1, "rgba(255,245,183,0)");
+    c.fillStyle = glow;
+    c.fillRect(0, 0, WIDTH, 380);
+    for (let i = 0; i < Math.round(restoration * 24); i++) {
+      const x =
+        ((((hash(i + 600) * 1120 - camera * 0.15 + time * 5) % 1120) + 1120) %
+          1120) -
+        80;
+      const y = 145 + hash(i + 690) * 220 + Math.sin(time + i) * 5;
+      this.ellipse(x, y, 5, 5, "rgba(214,255,182,.12)");
+      this.ellipse(x, y, 1.5, 1.5, "#ecffb8");
+    }
+    c.restore();
+  }
+
+  private sectionLandmarks(game: Game, time: number, p: Palette) {
+    const c = this.ctx;
+    game.level.sections.forEach((section, index) => {
+      const signX = section.x + (index === 0 ? 245 : 85);
+      if (!this.visible(signX, 160)) return;
+      const floor = game.platforms.find(
+        (platform) =>
+          platform.kind === "ground" &&
+          signX >= platform.x + 10 &&
+          signX + 100 < platform.x + platform.w,
+      );
+      if (!floor) return;
+      const y = floor.y;
+      c.save();
+      c.globalAlpha = 0.95;
+      const label = `${String(index + 1).padStart(2, "0")}  ${section.name}`;
+      c.font = "700 13px 'DM Sans', sans-serif";
+      const width = Math.min(192, c.measureText(label).width + 28);
+      const pickups = [
+        ...game.level.coins,
+        ...game.level.stars,
+        ...game.level.diamonds,
+        ...game.level.fireflies,
+      ];
+      const top =
+        [y - 92, y - 145, y - 192, y - 242, y - 56].find(
+          (candidate) =>
+            game.platforms.every(
+              (tile) =>
+                tile.kind === "ground" ||
+                tile.x >= signX + width - 10 ||
+                tile.x + tile.w <= signX - 10 ||
+                tile.y >= candidate + 34 ||
+                tile.y + tile.h <= candidate - 5,
+            ) &&
+            pickups.every(
+              (pickup) =>
+                pickup.x + 17 < signX - 10 ||
+                pickup.x - 17 > signX + width - 10 ||
+                pickup.y + 17 < candidate ||
+                pickup.y - 17 > candidate + 30,
+            ),
+        ) ?? y - 56;
+      this.rounded(signX + 41, top + 4, 8, y - top - 4, 3, p.trunk);
+      this.rounded(signX - 10, top, width, 30, 8, "#fff3cf", p.trunk);
+      c.fillStyle = "#355a48";
+      c.textBaseline = "middle";
+      c.fillText(label, signX + 3, top + 15, width - 22);
+      this.leaf(
+        signX + 45,
+        top + 3,
+        12,
+        -0.65 + Math.sin(time + index) * 0.05,
+        p.leafLight,
+      );
+      // Each biome has a recognizable landmark beside its trail signs.
+      if (game.level.theme === "dusk") {
+        this.line(
+          [
+            [signX - 35, y],
+            [signX - 30, y - 135],
+            [signX - 8, y - 140],
+          ],
+          p.trunk,
+          5,
+        );
+        this.ellipse(signX - 9, y - 120, 19, 26, "rgba(197,255,222,.15)");
+        this.rounded(signX - 19, y - 136, 20, 29, 8, "#bdeba7", "#578b7a");
+        this.firefly(signX - 9, y - 122, time, 0.7);
+      } else if (game.level.theme === "alpine") {
+        this.line(
+          [
+            [signX - 28, y],
+            [signX - 28, y - 150],
+          ],
+          "#82949e",
+          5,
+        );
+        const flutter = Math.sin(time * 2 + index) * 5;
+        c.beginPath();
+        c.moveTo(signX - 28, y - 146);
+        c.lineTo(signX + 8, y - 139 + flutter);
+        c.lineTo(signX - 28, y - 127);
+        c.closePath();
+        c.fillStyle = "#ffae8a";
+        c.fill();
+      } else {
+        this.line(
+          [
+            [signX - 27, y],
+            [signX - 23, y - 126],
+          ],
+          "#4a9961",
+          6,
+        );
+        this.leaf(signX - 25, y - 55, 23, -1.1, "#84c866");
+        this.leaf(signX - 25, y - 76, 20, 1.0, "#62ac63");
+        for (let petal = 0; petal < 7; petal++) {
+          const angle = (petal / 7) * Math.PI * 2;
+          this.ellipse(
+            signX - 23 + Math.cos(angle) * 14,
+            y - 127 + Math.sin(angle) * 14,
+            10,
+            10,
+            "#ffe49b",
+          );
+        }
+        this.ellipse(signX - 23, y - 127, 11, 11, "#b7884b");
+      }
+      c.restore();
+    });
+  }
+
+  private treasuryRooms(game: Game, time: number) {
+    const c = this.ctx;
+    for (const room of game.level.rooms ?? []) {
+      if (room.x + room.w < this.cameraX || room.x > this.cameraX + WIDTH)
+        continue;
+      c.save();
+      // This recessed backdrop sits behind the real walls and breakable entry.
+      // It never draws a platform-shaped highlight outside their colliders.
+      this.rounded(
+        room.x + 12,
+        room.y + 12,
+        room.w - 24,
+        room.h - 12,
+        12,
+        "#786a50",
+      );
+      this.rounded(
+        room.x + 20,
+        room.y + 20,
+        room.w - 40,
+        room.h - 20,
+        10,
+        "#a58a59",
+      );
+      for (let i = 0; i < Math.ceil(room.w / 32); i++) {
+        const xx = room.x + 28 + i * 32;
+        if (xx > room.x + room.w - 20) continue;
+        this.line(
+          [
+            [xx, room.y + 22],
+            [xx, room.y + room.h - 7],
+          ],
+          "rgba(83,65,43,.13)",
+          2,
+        );
+      }
+      const glow = c.createRadialGradient(
+        room.x + room.w / 2,
+        room.y + room.h * 0.6,
+        4,
+        room.x + room.w / 2,
+        room.y + room.h * 0.6,
+        room.w * 0.48,
+      );
+      glow.addColorStop(0, "rgba(255,230,136,.25)");
+      glow.addColorStop(1, "rgba(255,230,136,0)");
+      c.fillStyle = glow;
+      c.fillRect(room.x + 20, room.y + 20, room.w - 40, room.h - 20);
+      c.font = "700 13px 'DM Sans', sans-serif";
+      c.textAlign = "center";
+      c.textBaseline = "middle";
+      const width = Math.min(room.w - 70, c.measureText(room.name).width + 22);
+      this.rounded(
+        room.x + (room.w - width) / 2,
+        room.y + 25,
+        width,
+        23,
+        5,
+        "#eed5a0",
+      );
+      c.fillStyle = "#675338";
+      c.fillText(room.name, room.x + room.w / 2, room.y + 37, width - 12);
+      for (const xx of [room.x + 37, room.x + room.w - 37]) {
+        this.line(
+          [
+            [xx, room.y + 20],
+            [xx, room.y + 45],
+          ],
+          "#684f35",
+          2,
+        );
+        this.rounded(xx - 6, room.y + 43, 12, 17, 4, "#e9bf6f", "#866539");
+        this.ellipse(
+          xx,
+          room.y + 51,
+          3,
+          6 + Math.sin(time * 2) * 0.5,
+          "#fff1bd",
+        );
+      }
+      c.restore();
+    }
+  }
+
+  private platform(r: Game["platforms"][number], p: Palette, time: number) {
     const c = this.ctx;
     const { x, y, w, h } = r;
+    if (r.kind === "mushroom") {
+      this.bounceMushroom(r, time);
+      return;
+    }
+    if (r.kind === "moving") {
+      this.movingLeaf(r, time);
+      return;
+    }
+    if (r.kind === "crumble") {
+      this.crumbleCloud(r, time);
+      return;
+    }
+    if (r.kind === "brick") {
+      this.crackedBlock(r);
+      return;
+    }
     // The bright, straight upper edge is exactly the collision surface.
     c.save();
     c.beginPath();
@@ -741,6 +1026,194 @@ export class Renderer {
         const xx = x + 120 + i * 220;
         if (this.visible(xx, 25)) this.mushroom(xx, y, p, i + x);
       }
+    }
+  }
+
+  private bounceMushroom(r: Rect, time: number) {
+    const c = this.ctx;
+    const { x, y, w, h } = r;
+    const pulse =
+      this.bouncePulse > 0
+        ? Math.sin(this.bouncePulse * 24) * this.bouncePulse * 8
+        : 0;
+    // Decorative stem hangs below the solid cap. Its straight upper rim marks
+    // the exact launch surface; the ornamental spots never imply a higher floor.
+    this.rounded(
+      x + w * 0.38,
+      y + 10,
+      w * 0.24,
+      h + 18,
+      8,
+      "#fff0d3",
+      "#be8c68",
+    );
+    this.ellipse(x + w / 2, y + h + 29, w * 0.32, 5, "rgba(43,83,56,.15)");
+    c.save();
+    c.beginPath();
+    c.rect(x, y, w, Math.max(18, h));
+    c.clip();
+    this.rounded(x, y, w, Math.max(18, h + pulse), 9, "#e97472", "#ad505c");
+    this.rounded(x + 3, y + 1, w - 6, 5, 3, "#ffb68e");
+    for (let i = 0; i < Math.max(2, Math.floor(w / 26)); i++)
+      this.ellipse(x + 13 + i * 25, y + 12, 6, 4, "#fff1d5");
+    c.restore();
+    const center = x + w / 2;
+    const lift = Math.sin(time * 2) * 1.5;
+    this.line(
+      [
+        [center - 6, y + 12 + lift],
+        [center, y + 6 + lift],
+        [center + 6, y + 12 + lift],
+      ],
+      "#fff7dc",
+      2.5,
+    );
+  }
+
+  private movingLeaf(r: Rect, time: number) {
+    const c = this.ctx;
+    const { x, y, w, h } = r;
+    c.save();
+    c.beginPath();
+    c.moveTo(x, y + 2);
+    c.lineTo(x + w, y + 2);
+    c.quadraticCurveTo(x + w * 0.73, y + h + 10, x + w / 2, y + h + 5);
+    c.quadraticCurveTo(x + w * 0.18, y + h + 9, x, y + 2);
+    c.closePath();
+    c.fillStyle = "#62be94";
+    c.fill();
+    c.strokeStyle = "#347c72";
+    c.lineWidth = 2;
+    c.stroke();
+    this.line(
+      [
+        [x + 3, y + 1],
+        [x + w - 3, y + 1],
+      ],
+      "#c2edac",
+      4,
+    );
+    this.line(
+      [
+        [x + 12, y + 7],
+        [x + w - 12, y + 7],
+      ],
+      "#3e947c",
+      2,
+    );
+    for (let i = 1; i < 5; i++) {
+      const xx = x + (w * i) / 5;
+      this.line(
+        [
+          [xx, y + 7],
+          [xx - 7, y + h - 1],
+        ],
+        "#a2dbab",
+        1.5,
+      );
+    }
+    this.line(
+      [
+        [x + w / 2, y + h + 3],
+        [x + w / 2 + Math.sin(time * 2) * 4, y + h + 17],
+      ],
+      "#4a947a",
+      2,
+    );
+    c.restore();
+  }
+
+  private crumbleCloud(r: Game["platforms"][number], time: number) {
+    const c = this.ctx;
+    const { x, y, w, h } = r;
+    const warning = r.crumbleRemaining > 0;
+    const urgency = warning
+      ? 1 - Math.min(1, r.crumbleRemaining / CRUMBLE_WARNING)
+      : 0;
+    c.save();
+    c.beginPath();
+    c.rect(x, y, w, h + 22);
+    c.clip();
+    this.rounded(
+      x,
+      y,
+      w,
+      h,
+      10,
+      warning ? "#ffe6bc" : "#f2fcff",
+      warning ? "#c6986a" : "#9fcbd6",
+    );
+    for (let i = 0; i < Math.ceil(w / 25); i++)
+      this.ellipse(
+        x + 12 + i * 25,
+        y + h - 3,
+        16,
+        10,
+        warning ? "#ffe6bc" : "#f2fcff",
+      );
+    this.line(
+      [
+        [x + 5, y + 2],
+        [x + w - 5, y + 2],
+      ],
+      warning ? "#ffcb84" : "#ffffff",
+      4,
+    );
+    if (warning) {
+      const offset = Math.sin(time * 37) * urgency * 2;
+      for (let i = 0; i < 3; i++) {
+        const xx = x + (w * (i + 1)) / 4 + offset;
+        this.line(
+          [
+            [xx, y + 3],
+            [xx - 4, y + 9],
+            [xx + 2, y + 14 + urgency * 6],
+          ],
+          "#cb996e",
+          1.5 + urgency,
+        );
+      }
+      c.fillStyle = "#dc9d61";
+      c.fillRect(x + 7, y + h - 4, (w - 14) * (1 - urgency), 2);
+    }
+    c.restore();
+  }
+
+  private crackedBlock(r: Rect & { rewardCoins?: number }) {
+    const c = this.ctx;
+    const { x, y, w, h } = r;
+    this.rounded(x, y, w, h, 5, "#d7a36c", "#8e6849");
+    this.rounded(x + 3, y + 3, w - 6, Math.max(3, h * 0.28), 3, "#efc58e");
+    this.line(
+      [
+        [x + w * 0.52, y + 1],
+        [x + w * 0.43, y + h * 0.32],
+        [x + w * 0.59, y + h * 0.54],
+        [x + w * 0.41, y + h],
+      ],
+      "#8d654d",
+      2.5,
+    );
+    this.line(
+      [
+        [x + 2, y + h * 0.57],
+        [x + w * 0.34, y + h * 0.57],
+      ],
+      "#b17d54",
+      2,
+    );
+    this.line(
+      [
+        [x + w * 0.66, y + h * 0.57],
+        [x + w - 2, y + h * 0.57],
+      ],
+      "#b17d54",
+      2,
+    );
+    if ((r.rewardCoins ?? 0) > 0 && w >= 30 && h >= 24) {
+      this.ellipse(x + w * 0.24, y + h * 0.42, 5, 7, "#ffdf8c", "#b18448", 1);
+      c.fillStyle = "#9a7342";
+      c.fillRect(x + w * 0.24 - 0.7, y + h * 0.42 - 4, 1.4, 8);
     }
   }
 
@@ -1101,17 +1574,47 @@ export class Renderer {
     c.restore();
   }
 
-  private beetle(enemy: Rect & { vx: number }, time: number, squashed = 0) {
+  private bug(enemy: Game["enemies"][number], time: number, squashed = 0) {
     const c = this.ctx;
     c.save();
     c.translate(enemy.x + enemy.w / 2, enemy.y + enemy.h);
-    c.scale(enemy.vx < 0 ? -1 : 1, 1);
+    c.scale(enemy.facing < 0 ? -1 : 1, 1);
     if (squashed > 0) {
       c.globalAlpha = Math.min(1, squashed / (ENEMY_SQUASH_DURATION * 0.5));
       c.scale(1.24, 0.26);
     }
-    const stride = squashed > 0 ? 0 : Math.sin(time * 15 + enemy.x * 0.05) * 2;
+    if (enemy.kind === "hopper") {
+      this.grasshopper(enemy, time, squashed);
+      c.restore();
+      return;
+    }
+    const charging = enemy.kind === "charger";
+    const warning = charging && enemy.state === "windup" && squashed === 0;
+    const stride =
+      squashed > 0
+        ? 0
+        : Math.sin(
+            time * (enemy.state === "charge" ? 30 : 15) + enemy.x * 0.05,
+          ) * 2;
     this.ellipse(0, -1, 18, 3, "rgba(36,65,53,.17)");
+    if (warning) {
+      // Windup has a static high-contrast tell plus a small pawing motion.
+      this.ellipse(0, -14, 23, 17, "rgba(255,187,98,.22)");
+      this.rounded(-4, -47, 8, 12, 3, "#fff2bd", "#ac6545");
+      this.ellipse(0, -30, 2.5, 2.5, "#ac6545");
+      c.translate(Math.sin(time * 24) * 0.7, 1.5);
+    }
+    if (charging && enemy.state === "charge" && squashed === 0) {
+      for (let i = 0; i < 3; i++)
+        this.line(
+          [
+            [-23 - i * 3, -6 - i * 7],
+            [-34 - i * 4, -6 - i * 7],
+          ],
+          "rgba(239,164,111,.7)",
+          2,
+        );
+    }
     for (let i = 0; i < 3; i++) {
       const x = -11 + i * 9;
       this.line(
@@ -1120,32 +1623,49 @@ export class Renderer {
           [x - 3, -3 + (i % 2 ? stride : -stride)],
           [x + 2, -2],
         ],
-        "#635879",
+        charging ? "#905d48" : "#635879",
         3,
       );
     }
-    this.ellipse(-1, -13, 15, 11, "#967cc7", "#62557f", 2);
-    this.ellipse(-5, -17, 7, 4, "#c1a3e7");
+    this.ellipse(
+      -1,
+      -13,
+      15,
+      11,
+      charging ? "#db8a60" : "#967cc7",
+      charging ? "#905b48" : "#62557f",
+      2,
+    );
+    this.ellipse(-5, -17, 7, 4, charging ? "#ffc389" : "#c1a3e7");
     this.line(
       [
         [0, -22],
         [2, -6],
       ],
-      "#715e99",
+      charging ? "#a46a4d" : "#715e99",
       2,
     );
-    this.ellipse(10, -11, 8, 8, "#75668f");
+    this.ellipse(10, -11, 8, 8, charging ? "#ae7356" : "#75668f");
     this.line(
       [
         [12, -17],
         [15, -26],
       ],
-      "#62557f",
+      charging ? "#905b48" : "#62557f",
       2,
     );
     this.ellipse(15, -26, 2.5, 2.5, "#f3ba78");
     this.ellipse(11, -13, 3.3, 4.3, "#fff8de");
     this.ellipse(12.3, -12.5, 1.5, 2.4, "#453e59");
+    if (warning || (charging && enemy.state === "charge"))
+      this.line(
+        [
+          [8, -18],
+          [15, -15],
+        ],
+        "#714c3f",
+        2.5,
+      );
     this.line(
       [
         [12, -7],
@@ -1155,6 +1675,76 @@ export class Renderer {
       1.5,
     );
     c.restore();
+  }
+
+  private grasshopper(
+    enemy: Game["enemies"][number],
+    time: number,
+    squashed: number,
+  ) {
+    const tucked = !enemy.grounded && squashed === 0;
+    const knee = tucked ? -14 : -4 + Math.sin(time * 8) * 1.5;
+    this.ellipse(0, -1, 17, 3, "rgba(36,65,53,.16)");
+    this.line(
+      [
+        [-8, -16],
+        [-19, -21],
+        [-16, knee],
+        [-5, -2],
+      ],
+      "#3f7955",
+      4,
+    );
+    this.line(
+      [
+        [2, -11],
+        [7, tucked ? -4 : -1],
+        [15, tucked ? -5 : -1],
+      ],
+      "#4e8d59",
+      3,
+    );
+    this.ellipse(-3, -14, 14, 9, "#87bc62", "#3f7955", 2);
+    this.ellipse(-6, -17, 9, 4, "#bedb87");
+    this.line(
+      [
+        [-13, -12],
+        [3, -13],
+      ],
+      "#64a45d",
+      2,
+    );
+    this.ellipse(9, -16, 8, 10, "#a9ce72", "#3f7955", 1.5);
+    this.ellipse(12, -18, 3.5, 4.2, "#fff5cf");
+    this.ellipse(13, -17, 1.5, 2.5, "#375b43");
+    this.line(
+      [
+        [7, -24],
+        [6, -32],
+        [1, -35],
+      ],
+      "#3f7955",
+      1.5,
+    );
+    this.line(
+      [
+        [12, -24],
+        [16, -31],
+        [20, -32],
+      ],
+      "#3f7955",
+      1.5,
+    );
+    this.ellipse(1, -35, 2, 2, "#edcf80");
+    this.ellipse(20, -32, 2, 2, "#edcf80");
+    this.line(
+      [
+        [12, -10],
+        [16, -11],
+      ],
+      "#3f7955",
+      1.5,
+    );
   }
 
   private hero(
@@ -1167,10 +1757,13 @@ export class Renderer {
     time: number,
     landing: number,
     size = 1,
+    pose: "normal" | "hurt" | "won" | "lost" = "normal",
   ) {
     const c = this.ctx;
     const running = grounded && Math.abs(vx) > 15;
     const stride = running ? Math.sin(time * 19) : 0;
+    const celebration = pose === "won";
+    const hurt = pose === "hurt" || pose === "lost";
     const bob = grounded
       ? running
         ? Math.abs(stride) * 1.2
@@ -1181,9 +1774,14 @@ export class Renderer {
     c.scale(size, size);
     if (grounded) this.ellipse(0, -0.5, 17, 3, "rgba(28,80,50,.2)");
     c.scale(facing < 0 ? -1 : 1, 1);
+    // Feet remain anchored while the torso leans into a run or recoils on a hit.
+    c.rotate(hurt ? -0.06 : running ? Math.min(0.075, Math.abs(vx) / 4000) : 0);
+    if (celebration) c.translate(0, -Math.abs(Math.sin(time * 5)) * 3);
     const squash =
       landing > 0 ? Math.sin((landing / 0.14) * Math.PI) * 0.09 : 0;
-    c.scale(1 + squash, 1 - squash);
+    const riseStretch =
+      !grounded && vy < -180 ? Math.min(0.07, -vy / 10000) : 0;
+    c.scale(1 + squash - riseStretch, 1 - squash + riseStretch);
     // A streaming coral scarf makes direction and speed easy to read.
     c.beginPath();
     c.moveTo(-9, -26 + bob);
@@ -1204,29 +1802,73 @@ export class Renderer {
     this.line(
       [
         [-12, -20 + bob],
-        [-17, -12 + stride * 3],
+        [
+          -17,
+          celebration
+            ? -36 + Math.sin(time * 8) * 3
+            : hurt
+              ? -27
+              : !grounded
+                ? -26
+                : -12 + stride * 3,
+        ],
       ],
       "#398258",
       5,
     );
-    this.rounded(-12 - stride * 4, -7, 11, 7, 3, "#386a53");
-    this.rounded(2 + stride * 4, -7, 11, 7, 3, "#386a53");
+    this.rounded(
+      -12 - stride * 4,
+      !grounded && vy < 0 ? -10 : -7,
+      11,
+      7,
+      3,
+      "#386a53",
+    );
+    this.rounded(
+      2 + stride * 4,
+      !grounded && vy < 0 ? -13 : -7,
+      11,
+      7,
+      3,
+      "#386a53",
+    );
     this.ellipse(0, -16 + bob, 12, 14, "#70ba69", "#326d4b", 2);
     this.ellipse(2, -15 + bob, 7, 9, "#b8e6a0");
     this.line(
       [
         [11, -20 + bob],
-        [15, -12 - stride * 3],
+        [
+          15,
+          celebration
+            ? -40 + Math.sin(time * 8) * 3
+            : hurt
+              ? -28
+              : !grounded
+                ? -29
+                : -12 - stride * 3,
+        ],
       ],
       "#70ba69",
       5,
     );
-    this.ellipse(15, -11 - stride * 3, 3.2, 3.7, "#b8e6a0");
+    this.ellipse(
+      15,
+      celebration
+        ? -39 + Math.sin(time * 8) * 3
+        : hurt
+          ? -27
+          : !grounded
+            ? -28
+            : -11 - stride * 3,
+      3.2,
+      3.7,
+      "#b8e6a0",
+    );
     // Cream face, leaf hood, and large eyes read well at phone scale.
     this.ellipse(0, -33 + bob, 16, 14, "#69b86c", "#326d4b", 2);
     this.ellipse(2, -31 + bob, 12.5, 10.5, "#fff1c9");
     this.ellipse(-9, -36 + bob, 3.4, 7.3, "#8cce79");
-    const blink = Math.sin(time * 0.72) > 0.996;
+    const blink = hurt || Math.sin(time * 0.72) > 0.996;
     if (blink) {
       this.line(
         [
@@ -1254,7 +1896,12 @@ export class Renderer {
     this.ellipse(11, -27 + bob, 2.4, 1.4, "#f3b39a");
     c.beginPath();
     c.moveTo(1, -26 + bob);
-    c.quadraticCurveTo(3, -23.3 + bob, 5.5, -26 + bob);
+    c.quadraticCurveTo(
+      3,
+      (hurt ? -29 : celebration ? -21.5 : -23.3) + bob,
+      5.5,
+      -26 + bob,
+    );
     c.strokeStyle = "#7f7655";
     c.lineWidth = 1.3;
     c.lineCap = "round";
@@ -1286,6 +1933,7 @@ export class Renderer {
     active: boolean,
     time: number,
     p: Palette,
+    number: number,
   ) {
     const c = this.ctx;
     this.ellipse(x + 5, y, 21, 4, "rgba(40,80,60,.15)");
@@ -1301,7 +1949,13 @@ export class Renderer {
     c.closePath();
     c.fillStyle = active ? "#ffaf74" : "#f6e0ad";
     c.fill();
-    this.leaf(x + 18, y - 43, 8, 0.6, active ? "#fff5d0" : "#7e9c75");
+    c.save();
+    c.font = "700 15px 'DM Sans', sans-serif";
+    c.textAlign = "center";
+    c.textBaseline = "middle";
+    c.fillStyle = active ? "#fff7dc" : "#567c61";
+    c.fillText(String(number), x + 18, y - 49);
+    c.restore();
     if (active) {
       this.ellipse(
         x,
@@ -1382,6 +2036,50 @@ export class Renderer {
     c.restore();
   }
 
+  private rescueFirefly(x: number, y: number, time: number, index: number) {
+    const c = this.ctx;
+    const bob = Math.sin(time * 2 + index * 1.7) * 3;
+    c.save();
+    c.translate(x, y + bob);
+    const glow = c.createRadialGradient(0, 0, 3, 0, 0, 32);
+    glow.addColorStop(0, "rgba(222,255,168,.55)");
+    glow.addColorStop(1, "rgba(172,255,223,0)");
+    this.ellipse(0, 0, 32, 32, glow);
+    c.strokeStyle = "rgba(209,255,214,.72)";
+    c.lineWidth = 1.5;
+    c.beginPath();
+    c.arc(0, 0, 22, -Math.PI * 0.8, Math.PI * 0.25);
+    c.stroke();
+    c.beginPath();
+    c.arc(0, 0, 22, Math.PI * 0.45, Math.PI * 1.2);
+    c.stroke();
+    const flutter = 5 + Math.abs(Math.sin(time * 24 + index)) * 3;
+    this.ellipse(-9, -5, 8, flutter, "#d9ffef", "#67bca1", 1);
+    this.ellipse(9, -5, 8, flutter, "#d9ffef", "#67bca1", 1);
+    this.ellipse(0, 5, 7, 9, "#d9f98a", "#6c9e60", 1.5);
+    this.ellipse(0, -5, 6, 6, "#77b590", "#4d856b", 1);
+    this.ellipse(-2, -6, 1.1, 1.6, "#254b45");
+    this.ellipse(2, -6, 1.1, 1.6, "#254b45");
+    this.ellipse(-1.5, 2, 3, 4, "#f6ffbf");
+    this.line(
+      [
+        [-3, -10],
+        [-6, -15],
+      ],
+      "#4d856b",
+      1.5,
+    );
+    this.line(
+      [
+        [3, -10],
+        [6, -15],
+      ],
+      "#4d856b",
+      1.5,
+    );
+    c.restore();
+  }
+
   private feedback(game: Game) {
     game.coins.forEach((coin, i) => {
       if (coin.collected && !this.previousCoins[i])
@@ -1400,9 +2098,57 @@ export class Renderer {
       }
       this.previousDiamonds[i] = diamond.collected;
     });
+    game.fireflies.forEach((firefly, i) => {
+      if (firefly.collected && !this.previousFireflies[i]) {
+        this.burst(firefly.x, firefly.y, "#d3f99a", 16, 115);
+        this.burst(firefly.x, firefly.y, "#a3f6dc", 12, 70);
+      }
+      this.previousFireflies[i] = firefly.collected;
+    });
+    game.platforms.forEach((platform, i) => {
+      if (platform.broken && !this.previousBroken[i]) {
+        this.burst(
+          platform.x + platform.w / 2,
+          platform.y + platform.h / 2,
+          "#d9a777",
+          15,
+          135,
+        );
+        if ((platform.rewardCoins ?? 0) > 0)
+          this.burst(
+            platform.x + platform.w / 2,
+            platform.y - 5,
+            "#ffe48c",
+            9,
+            115,
+          );
+      }
+      const collapsed =
+        platform.kind === "crumble" && platform.crumbleRemaining === 0;
+      if (collapsed && !this.previousCollapsed[i])
+        this.burst(
+          platform.x + platform.w / 2,
+          platform.y + 6,
+          "#f1faff",
+          14,
+          70,
+        );
+      this.previousBroken[i] = platform.broken;
+      this.previousCollapsed[i] = collapsed;
+    });
     game.enemies.forEach((enemy, i) => {
       if (!enemy.alive && this.previousEnemies[i])
-        this.burst(enemy.x + enemy.w / 2, enemy.y + 12, "#c3a9e4", 10, 90);
+        this.burst(
+          enemy.x + enemy.w / 2,
+          enemy.y + 12,
+          enemy.kind === "hopper"
+            ? "#c1dd8b"
+            : enemy.kind === "charger"
+              ? "#f6b780"
+              : "#c3a9e4",
+          10,
+          90,
+        );
       this.previousEnemies[i] = enemy.alive;
     });
     const player = game.player;
@@ -1444,12 +2190,22 @@ export class Renderer {
         5,
         35,
       );
+    if (game.events.includes("bounce")) {
+      this.bouncePulse = 0.45;
+      this.burst(
+        player.x + player.w / 2,
+        player.y + player.h,
+        "#ffb8a4",
+        12,
+        100,
+      );
+    }
     if (game.events.includes("hurt"))
       this.burst(player.x + player.w / 2, player.y + 15, "#ff9a88", 10, 100);
-    if (game.events.includes("checkpoint"))
+    if (game.events.includes("checkpoint") && game.activeCheckpointIndex >= 0)
       this.burst(
-        game.level.checkpoint.x,
-        game.level.checkpoint.y - 60,
+        game.level.checkpoints[game.activeCheckpointIndex].x,
+        game.level.checkpoints[game.activeCheckpointIndex].y - 60,
         "#ffe49a",
         15,
         90,

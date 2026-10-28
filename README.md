@@ -2,8 +2,10 @@
 
 An original, Mario-inspired side-scrolling platformer for iPhone, iPad, and the
 browser. Guide Pip through Sunlit Meadow, Firefly Hollow, and Cloudtop Crossing:
-collect golden coins, grow with diamonds, power up with stars, squash beetles,
-activate checkpoints, and reach the sun portal. All art and sound are generated locally.
+collect golden coins, grow with diamonds, power up with stars, rescue hidden
+fireflies, and bring light back to the forest. Three extended trails include
+multiple checkpoints, optional routes, and distinct terrain. All art, music,
+and sound are generated locally.
 
 ## Play and develop
 
@@ -23,9 +25,32 @@ and use your right thumb to jump. Both touches work at the same time. A gamepad'
 left stick/D-pad and A also work; Start pauses and resumes.
 
 Movement uses quick acceleration and braking, midair steering, a small grace
-period after leaving a ledge, and buffered jumps just before landing. The
-cartoon artwork is drawn locally at the screen's pixel density, with three
-distinct palettes, animated characters, and collectible/landing effects.
+period after leaving a ledge, and buffered jumps just before landing. Controls
+can be resized, repositioned, and swapped for either hand in the game menu.
+The camera looks in the direction Pip is traveling. The cartoon artwork is
+drawn locally at the screen's pixel density, with three distinct palettes,
+animated characters, and collectible/landing effects.
+
+## Explore the longer trails
+
+- **Sunlit Meadow** introduces bouncing mushrooms and optional upper paths.
+- **Firefly Hollow** adds moving leaf platforms and climbing routes.
+- **Cloudtop Crossing** features cloud bridges that warn before crumbling and
+  return after a short delay.
+- Walking beetles, hopping grasshoppers, and charging beetles each have distinct
+  movement. Charging beetles signal before rushing. Every bug can be squashed
+  by landing on it; star power also squashes bugs on contact.
+- Big Pip can break cracked blocks from below to uncover coin rewards. Those
+  rewards cannot be collected repeatedly by losing lives.
+- Each trail contains three hidden **fireflies**, separate from power stars.
+  Fireflies are saved when rescued, including when the run ends in defeat.
+  The world map lights up as fireflies are rescued and trails are completed.
+- Multiple checkpoints keep longer journeys forgiving. Returning to an earlier
+  flag never moves the respawn point backward.
+
+Music, sound effects, and haptics have separate settings. Each world has an
+original looping score, with a musical change during star power. Music pauses
+with gameplay. Haptics use the native iOS plugin when supported.
 
 ## Lives and power-ups
 
@@ -45,7 +70,9 @@ distinct palettes, animated characters, and collectible/landing effects.
   is active, and clears star power. Diamonds return so Pip can grow again.
   Zero lives ends the run. Restarting or choosing another trail starts fresh.
 
-Best completion times, stars, and sound preference are saved on the device.
+Fireflies, completion records, best times, and settings are saved on the device.
+Records from the earlier short trails are retained separately so their times
+do not compete with the extended adventures.
 The game has no accounts, ads, analytics, remote assets, or backend requirement.
 
 ## iOS and TestFlight
@@ -69,7 +96,7 @@ TestFlight workflow steps. No Apple credentials should be committed to Git.
 ## Verification
 
 ```sh
-npm test                  # Lives, power-ups, physics, and all-star route tests
+npm test                  # Rules, terrain, enemies, saves, and playable full routes
 npm run build             # TypeScript and production build
 npm run test:browser       # Desktop + mobile Chromium smoke tests
 npm run ios:sync
@@ -91,7 +118,7 @@ be performed through Xcode Cloud and TestFlight.
 ## Structure
 
 - `src/game/engine.ts` — fixed-step simulation, collision, and game rules.
-- `src/game/levels.ts` — three authored trails.
+- `src/game/levels.ts` — three extended authored trails and their secret routes.
 - `src/game/renderer.ts` — crisp cartoon canvas, camera, and animated effects.
 - `src/main.ts` — menus, HUD, progress, and game loop.
 - `src/controls.ts` — touch capture/dragging, keyboard, and gamepad input.

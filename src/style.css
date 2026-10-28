@@ -1737,3 +1737,777 @@ dialog h2 {
     right: 0;
   }
 }
+
+/* The firefly adventure: each rescue adds light to the connected forest map. */
+.firefly-symbol .icon {
+  width: 23px;
+  height: 26px;
+  color: #8e7e24;
+  fill: #f9e994;
+  stroke-width: 1.6;
+}
+.title-footnote .icon {
+  width: 20px;
+  height: 20px;
+  color: #8c7b29;
+}
+.tab-stars .icon {
+  width: 14px;
+  height: 18px;
+  stroke-width: 1.8;
+}
+.tab-stars .earned,
+.map-fireflies .earned,
+.result-fireflies .earned {
+  color: #9b7a20;
+  filter: drop-shadow(0 0 5px #ffd75c99);
+}
+.tab-stars .earned .icon,
+.map-fireflies .earned .icon,
+.result-fireflies .earned .icon {
+  fill: #ffdf6a;
+}
+.section-status {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #2d6753;
+}
+.section-status > span {
+  display: block;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: #fffce7c9;
+  white-space: nowrap;
+}
+.result-fireflies i {
+  font-style: normal;
+}
+.result-fireflies .icon {
+  width: 34px;
+  height: 38px;
+  stroke-width: 1.5;
+}
+.result-panel .result-light {
+  margin-bottom: 14px;
+  font-size: 12px;
+}
+.result-stats {
+  gap: 24px;
+}
+#menu-dialog {
+  width: min(780px, calc(100% - 32px - var(--safe-left) - var(--safe-right)));
+}
+#forest-map {
+  --restored: 0;
+  position: relative;
+  height: 278px;
+  overflow: hidden;
+  border: 1px solid #a6c8ae;
+  border-radius: 26px;
+  background:
+    radial-gradient(ellipse at 15% 100%, #73aa8360 0 27%, transparent 28%),
+    radial-gradient(ellipse at 80% 120%, #62998f60 0 36%, transparent 37%),
+    linear-gradient(150deg, #c5dfcd, #dfecd5 48%, #c6dfdd);
+  isolation: isolate;
+}
+#forest-map::before {
+  position: absolute;
+  inset: 0;
+  content: "";
+  background: radial-gradient(
+    ellipse at 50% 40%,
+    #fff2ae,
+    #d8edaa88 60%,
+    transparent
+  );
+  opacity: var(--restored);
+  transition: opacity 0.5s;
+  pointer-events: none;
+}
+#forest-map::after {
+  content: "THE SUNSEED FOREST";
+  position: absolute;
+  bottom: 11px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: #497461;
+  pointer-events: none;
+}
+.map-trails {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.map-mobile {
+  display: none;
+}
+.map-route,
+.map-route-light {
+  fill: none;
+  stroke-linecap: round;
+}
+.map-route {
+  stroke: #769f837a;
+  stroke-width: 12px;
+}
+.map-route-light {
+  stroke: #fff3b5;
+  stroke-width: 5px;
+  stroke-dasharray: 3 12;
+  opacity: calc(0.35 + var(--restored) * 0.65);
+}
+#menu-worlds {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+#forest-map .menu-world {
+  position: absolute;
+  top: 76px;
+  left: 2%;
+  width: 30%;
+  min-height: 0;
+  border: 0;
+  padding: 0 4px 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: center;
+  background: transparent;
+  border-radius: 20px;
+}
+#forest-map .menu-world:nth-child(2) {
+  top: 24px;
+  left: 35%;
+}
+#forest-map .menu-world:nth-child(3) {
+  left: 68%;
+}
+#forest-map .menu-world:hover {
+  transform: translateY(-3px);
+}
+#forest-map .menu-world:active {
+  transform: translateY(1px);
+}
+.map-island {
+  position: relative;
+  display: block;
+  width: 112px;
+  height: 78px;
+  border: 3px solid #eff7dc;
+  border-radius: 50%;
+  box-shadow:
+    0 6px 0 #7b9d7d,
+    0 12px 20px #476d5524;
+  background: #bed4be;
+  transition: box-shadow 0.3s;
+}
+#forest-map .selected .map-island {
+  border-color: #ffdd80;
+  box-shadow:
+    0 6px 0 #b9974c,
+    0 0 0 5px #fff8c17a,
+    0 14px 20px #476d5524;
+}
+#forest-map .restored .map-island {
+  box-shadow:
+    0 6px 0 #84a35e,
+    0 0 22px 6px #fff0a180;
+}
+#forest-map .world-art {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  filter: saturate(calc(0.48 + var(--world-light) * 0.52))
+    brightness(calc(0.86 + var(--world-light) * 0.14));
+  transition: filter 0.4s;
+}
+.map-node-number {
+  position: absolute;
+  left: -5px;
+  top: -4px;
+  width: 27px;
+  height: 27px;
+  border: 2px solid #fff9d1;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #347c5b;
+  color: #fff9db;
+  font-size: 10px;
+  font-weight: 700;
+}
+#forest-map .menu-world-info {
+  align-items: center;
+  gap: 3px;
+  width: 100%;
+}
+#forest-map .menu-world-info strong {
+  font-size: 13px;
+  line-height: 1.15;
+}
+#forest-map .menu-world-info > span {
+  font-size: 9px;
+  color: #426c55;
+}
+#forest-map .world-best {
+  letter-spacing: 0;
+  font-size: 8px;
+  color: #4a6f5b;
+  font-weight: 500;
+}
+.map-fireflies {
+  display: flex;
+  gap: 3px;
+  color: #739479;
+}
+.map-fireflies .icon {
+  width: 15px;
+  height: 19px;
+  stroke-width: 1.6;
+}
+.map-decoration i {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #ffed94;
+  box-shadow: 0 0 10px 4px #fff3ab;
+  opacity: calc(var(--restored) * 0.95);
+}
+.map-decoration i:nth-child(1) {
+  left: 25%;
+  top: 14%;
+}
+.map-decoration i:nth-child(2) {
+  left: 76%;
+  top: 12%;
+}
+.map-decoration i:nth-child(3) {
+  left: 52%;
+  top: 85%;
+}
+.map-decoration i:nth-child(4) {
+  left: 8%;
+  top: 28%;
+}
+.map-decoration i:nth-child(5) {
+  left: 91%;
+  top: 81%;
+}
+.forest-progress {
+  margin-top: 16px;
+}
+.forest-progress > div:first-child {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: space-between;
+}
+#restoration-count {
+  font-size: 13px;
+}
+.forest-progress #journey-progress {
+  font-size: 11px;
+}
+.restoration-track {
+  height: 7px;
+  border-radius: 10px;
+  background: #dfe6cc;
+  overflow: hidden;
+  margin-top: 9px;
+}
+.restoration-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #80b361, #e6c84d);
+  transition: width 0.4s;
+}
+#restoration-caption {
+  font-size: 11px;
+  color: #698067;
+  margin: 9px 0 0;
+}
+.menu-settings {
+  justify-content: space-between;
+}
+.menu-settings button {
+  min-height: 44px;
+}
+
+/* An adjustable, thumb-friendly layout with a live preview. */
+:root {
+  --control-scale: 1;
+  --control-inset: 0px;
+  --control-height: 0px;
+  --dpad-width: 70px;
+  --dpad-height: 66px;
+  --jump-size: 87px;
+  --control-edge: 25px;
+  --control-bottom: 18px;
+  --control-inset-fit: clamp(
+    0px,
+    var(--control-inset),
+    calc(
+      (
+          100vw - var(--safe-left) - var(--safe-right) - var(--control-edge) *
+            2 - 166px
+        ) /
+        2
+    )
+  );
+  --control-budget: calc(
+    100vw - var(--safe-left) - var(--safe-right) - var(--control-edge) * 2 -
+      var(--control-inset-fit) * 2 - 34px
+  );
+  --dpad-button-size: max(
+    44px,
+    min(
+      calc(var(--dpad-width) * var(--control-scale)),
+      calc(44px + (var(--control-budget) - 132px) * 0.31)
+    )
+  );
+  --dpad-button-height: max(
+    44px,
+    min(
+      calc(var(--dpad-height) * var(--control-scale)),
+      var(--dpad-button-size)
+    )
+  );
+  --pad-total: calc(var(--dpad-button-size) * 2 + 18px);
+  --jump-total: max(
+    44px,
+    min(
+      calc(var(--jump-size) * var(--control-scale)),
+      calc(44px + (var(--control-budget) - 132px) * 0.38)
+    )
+  );
+}
+.movement-control,
+.jump-control {
+  bottom: calc(
+    var(--control-bottom) + var(--safe-bottom) + var(--control-height)
+  );
+}
+.movement-control {
+  left: calc(var(--control-edge) + var(--safe-left) + var(--control-inset-fit));
+  right: auto;
+}
+.jump-control {
+  right: calc(
+    var(--control-edge) + var(--safe-right) + var(--control-inset-fit)
+  );
+  left: auto;
+}
+.game-app[data-controls-swapped="true"] .movement-control {
+  left: auto;
+  right: calc(
+    var(--control-edge) + var(--safe-right) + var(--control-inset-fit)
+  );
+}
+.game-app[data-controls-swapped="true"] .jump-control {
+  right: auto;
+  left: calc(var(--control-edge) + var(--safe-left) + var(--control-inset-fit));
+}
+.touch-dpad {
+  padding: 4px;
+}
+.touch-dpad button {
+  width: var(--dpad-button-size);
+  height: var(--dpad-button-height);
+}
+.touch-jump {
+  width: var(--jump-total);
+  height: var(--jump-total);
+}
+#settings-dialog {
+  width: min(620px, calc(100% - 32px - var(--safe-left) - var(--safe-right)));
+}
+dialog .round-button {
+  min-width: 44px;
+  min-height: 44px;
+}
+.control-preview {
+  height: 142px;
+  position: relative;
+  overflow: hidden;
+  border-radius: 20px;
+  border: 1px solid #b1d4b6;
+  background: linear-gradient(#c6e9dc, #e0f1c8 77%, #69a774 78%);
+  margin: 18px 0;
+}
+.preview-label {
+  position: absolute;
+  top: 12px;
+  left: 15px;
+  letter-spacing: 1.5px;
+  font-size: 8px;
+  color: #527a62;
+  font-weight: 700;
+}
+.preview-pip {
+  position: absolute;
+  left: calc(50% - 12px);
+  bottom: 26px;
+  color: #337b50;
+}
+.preview-pip .icon {
+  width: 29px;
+  height: 34px;
+  fill: #acd477;
+}
+.preview-dpad,
+.preview-jump {
+  position: absolute;
+  bottom: calc(13px + var(--control-height) * 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #fff7dc;
+  box-shadow: 0 3px 0 #2b664d30;
+}
+.preview-dpad {
+  left: calc(15px + var(--control-inset-fit) * 0.65);
+  padding: 3px 6px;
+  gap: 10px;
+  background: #fffbdf;
+  border-radius: 15px;
+  height: calc(35px * var(--control-scale));
+  width: calc(75px * var(--control-scale));
+}
+.preview-jump {
+  right: calc(15px + var(--control-inset-fit) * 0.65);
+  border-radius: 50%;
+  width: calc(44px * var(--control-scale));
+  height: calc(44px * var(--control-scale));
+  background: #ffcf61;
+}
+.preview-controls .icon {
+  width: 18px;
+  height: 18px;
+}
+.control-preview[data-swapped="true"] .preview-dpad {
+  right: calc(15px + var(--control-inset-fit) * 0.65);
+  left: auto;
+}
+.control-preview[data-swapped="true"] .preview-jump {
+  left: calc(15px + var(--control-inset-fit) * 0.65);
+  right: auto;
+}
+.control-settings > label {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  min-height: 49px;
+  align-items: center;
+  font-size: 13px;
+}
+.control-settings output {
+  font-size: 10px;
+  color: #67816b;
+  margin-left: 5px;
+}
+select,
+input {
+  font: inherit;
+  color: inherit;
+  accent-color: #34865d;
+}
+select {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid #cedabe;
+  border-radius: 12px;
+  padding: 8px 10px;
+  background: #f4f3df;
+}
+input[type="range"] {
+  min-width: 0;
+  width: 100%;
+  height: 44px;
+}
+input:focus-visible,
+select:focus-visible {
+  outline: 3px solid #e77555;
+  outline-offset: 3px;
+}
+.switch-row {
+  display: flex !important;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 49px;
+  gap: 14px;
+  font-size: 13px;
+}
+.switch-row small {
+  display: block;
+  margin-top: 4px;
+  font-size: 10px;
+  color: #6e8267;
+}
+.switch-row input {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  width: 48px;
+  height: 44px;
+  flex: 0 0 48px;
+  margin: 0;
+  cursor: pointer;
+  background: none;
+}
+.switch-row input::before {
+  content: "";
+  position: absolute;
+  inset: 8px 0;
+  border-radius: 20px;
+  background: #ccd6bd;
+  transition: background 0.15s;
+}
+.switch-row input::after {
+  content: "";
+  position: absolute;
+  top: 11px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fffdf1;
+  box-shadow: 0 2px 4px #315f4630;
+  transition: transform 0.15s;
+}
+.switch-row input:checked::before {
+  background: #398b62;
+}
+.switch-row input:checked::after {
+  transform: translateX(20px);
+}
+.text-button {
+  background: none;
+  padding: 9px 0;
+  min-height: 44px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #417c58;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.audio-settings {
+  border-top: 1px solid #dbe2cb;
+  margin: 10px 0 18px;
+  padding-top: 10px;
+}
+#settings-done {
+  min-height: 44px;
+  font-size: 14px;
+  padding: 12px 22px;
+}
+#game-toast[data-event="firefly"] {
+  color: #6b661d;
+  background: #fff7bd;
+  border-color: #dfd793;
+}
+@media (max-height: 600px) and (min-aspect-ratio: 1/1) {
+  :root {
+    --dpad-width: 64px;
+    --dpad-height: 58px;
+    --jump-size: 74px;
+    --control-edge: 22px;
+    --control-bottom: 4px;
+  }
+  .title-footnote .icon {
+    width: 15px;
+    height: 15px;
+  }
+  .tab-stars .icon {
+    width: 10px;
+    height: 14px;
+  }
+  .section-status {
+    font-size: 8px;
+    top: calc(100% + 6px);
+  }
+  .section-status > span {
+    padding: 3px 6px;
+  }
+  .firefly-symbol .icon {
+    width: 18px;
+    height: 21px;
+  }
+  .result-fireflies .icon {
+    width: 25px;
+    height: 28px;
+  }
+  #forest-map {
+    height: 244px;
+  }
+  #forest-map .menu-world {
+    top: 66px;
+  }
+  #forest-map .menu-world:nth-child(2) {
+    top: 17px;
+  }
+  .control-preview {
+    height: 115px;
+  }
+  .checkpoint-toast {
+    --left-reserve: calc(
+      var(--control-edge) + var(--control-inset-fit) + var(--pad-total) + 12px
+    );
+    --right-reserve: calc(
+      var(--control-edge) + var(--control-inset-fit) + var(--jump-total) + 12px
+    );
+    left: calc(var(--safe-left) + var(--left-reserve));
+    right: calc(var(--safe-right) + var(--right-reserve));
+    max-width: max(
+      90px,
+      calc(
+        100vw - var(--safe-left) - var(--safe-right) - var(--left-reserve) -
+          var(--right-reserve)
+      )
+    );
+  }
+  .game-app[data-controls-swapped="true"] .checkpoint-toast {
+    --left-reserve: calc(
+      var(--control-edge) + var(--control-inset-fit) + var(--jump-total) + 12px
+    );
+    --right-reserve: calc(
+      var(--control-edge) + var(--control-inset-fit) + var(--pad-total) + 12px
+    );
+  }
+}
+@media (max-height: 350px) and (min-aspect-ratio: 1/1) {
+  :root {
+    --dpad-width: 57px;
+    --dpad-height: 44px;
+    --jump-size: 60px;
+    --control-bottom: 3px;
+  }
+  .section-status {
+    top: calc(100% + 4px);
+    font-size: 7px;
+  }
+  .result-panel .result-light {
+    display: none;
+  }
+}
+@media (max-aspect-ratio: 1/1) {
+  :root {
+    --dpad-width: 66px;
+    --dpad-height: 66px;
+    --jump-size: 86px;
+    --control-edge: 20px;
+    --control-bottom: 52px;
+  }
+  .section-status {
+    width: calc(100% - 102px);
+    top: calc(100% + 12px);
+    flex-direction: column;
+    gap: 3px;
+    align-items: flex-start;
+  }
+  .section-status > span {
+    font-size: 8px;
+    padding: 2px 5px;
+  }
+  .tab-stars .icon {
+    width: 13px;
+    height: 18px;
+  }
+  .menu-settings {
+    gap: 12px;
+  }
+}
+@media (max-aspect-ratio: 1/1) and (max-height: 720px) {
+  :root {
+    --control-bottom: 30px;
+  }
+}
+@media (max-width: 500px) {
+  #forest-map {
+    height: 480px;
+  }
+  .map-desktop {
+    display: none;
+  }
+  .map-mobile {
+    display: block;
+  }
+  #forest-map .menu-world {
+    top: 20px;
+    left: 2%;
+    width: 60%;
+  }
+  #forest-map .menu-world:nth-child(2) {
+    top: 172px;
+    left: 38%;
+  }
+  #forest-map .menu-world:nth-child(3) {
+    top: 324px;
+    left: 2%;
+  }
+  #forest-map .menu-world-info strong {
+    font-size: 12px;
+  }
+  #forest-map .menu-world-info > span {
+    font-size: 9px;
+  }
+  #forest-map::after {
+    font-size: 7px;
+    bottom: 7px;
+  }
+  .map-island {
+    width: 102px;
+    height: 70px;
+  }
+  .forest-progress > div:first-child {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .forest-progress #journey-progress {
+    margin-left: 0;
+  }
+  .control-settings > label {
+    gap: 10px;
+    font-size: 12px;
+  }
+}
+
+/* When customized controls leave little center space, move feedback above them. */
+.game-app[data-toast-position="above"] .checkpoint-toast {
+  left: calc(16px + var(--safe-left));
+  right: calc(16px + var(--safe-right));
+  bottom: calc(
+    var(--control-bottom) + var(--safe-bottom) + var(--control-height) +
+      max(calc(var(--dpad-button-height) + 12px), var(--jump-total)) + 18px
+  );
+  width: max-content;
+  max-width: min(
+    340px,
+    calc(100vw - 32px - var(--safe-left) - var(--safe-right))
+  );
+  transform: none;
+  margin-inline: auto;
+}
+.movement-control {
+  width: var(--pad-total);
+}
+.jump-control {
+  width: var(--jump-total);
+}
+.control-caption {
+  white-space: nowrap;
+}
