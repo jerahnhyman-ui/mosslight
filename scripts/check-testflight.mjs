@@ -12,6 +12,7 @@ function check(label, condition) {
 const required = [
   "package-lock.json",
   "ios/App/App.xcodeproj/project.pbxproj",
+  "ios/App/App.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved",
   "ios/App/App.xcodeproj/xcshareddata/xcschemes/App.xcscheme",
   "ios/App/App/Info.plist",
   "ios/App/App/PrivacyInfo.xcprivacy",
@@ -31,6 +32,35 @@ const scheme = read(
   "ios/App/App.xcodeproj/xcshareddata/xcschemes/App.xcscheme",
 );
 const icon = readFileSync(resolve(root, required.at(-1)));
+const resolved = JSON.parse(
+  read(
+    "ios/App/App.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved",
+  ),
+);
+const capacitorPins = (resolved.pins ?? []).filter(
+  (pin) => pin.identity === "capacitor-swift-pm",
+);
+const capacitorPin = capacitorPins[0];
+const capacitorVersion = JSON.parse(read("package-lock.json")).packages[
+  "node_modules/@capacitor/ios"
+].version;
+const swiftPackage = read("ios/App/CapApp-SPM/Package.swift");
+check(
+  "Xcode Cloud has a locked Capacitor Swift package revision",
+  [2, 3].includes(resolved.version) &&
+    capacitorPins.length === 1 &&
+    capacitorPin.kind === "remoteSourceControl" &&
+    capacitorPin.location ===
+      "https://github.com/ionic-team/capacitor-swift-pm.git" &&
+    /^[0-9a-f]{40}$/.test(capacitorPin.state?.revision ?? ""),
+);
+check(
+  "Swift package lock matches the npm and generated Capacitor versions",
+  capacitorPin?.state?.version === capacitorVersion &&
+    swiftPackage.includes(
+      `.package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", exact: "${capacitorVersion}")`,
+    ),
+);
 check("Web assets are bundled; no development server URL", !config.server?.url);
 check(
   "Bundle ID matches both native configurations",

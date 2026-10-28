@@ -34,8 +34,8 @@ npm run ios:check
 npm run ios:open
 ```
 
-**Xcode Cloud preparation is complete in the repository; account activation and
-an actual TestFlight upload are still pending.** See [the setup guide](docs/TESTFLIGHT.md)
+**Mosslight is connected to Xcode Cloud; a successful signed archive and
+TestFlight upload still need verification.** See [the setup guide](docs/TESTFLIGHT.md)
 for the Apple team, bundle identifier, repository authorization, and Archive →
 TestFlight workflow steps. No Apple credentials should be committed to Git.
 
