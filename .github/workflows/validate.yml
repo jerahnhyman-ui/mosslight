@@ -1,0 +1,25 @@
+name: Validate game
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  game:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm test
+      - run: npm run build
+      - run: npx --no-install cap sync ios
+      - run: node scripts/check-testflight.mjs
+# Archives, managed signing, and TestFlight distribution use Xcode Cloud.
