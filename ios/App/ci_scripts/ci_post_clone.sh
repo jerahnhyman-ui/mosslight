@@ -22,6 +22,7 @@ npm ci --no-audit --no-fund
 npm test
 npm run build
 npx --no-install cap sync ios
+npm run ios:check
 
 test -s ios/App/App/public/index.html
 echo "Web assets and the generated Capacitor Swift package are ready for Xcode."

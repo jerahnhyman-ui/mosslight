@@ -6,11 +6,10 @@ Xcode Cloud build hooks. The game is bundled inside the app and works offline. T
 GitHub Actions checks the JavaScript build; Xcode Cloud handles Apple archives,
 managed signing, and TestFlight distribution.
 
-**Activation status:** repository setup is prepared. An Xcode Cloud workflow has
-not been activated, an Apple archive has not been built, and no build has been
-uploaded to TestFlight. The current Linux workspace has neither Xcode nor an
-authenticated Apple Developer connection. Account setup below must be completed
-by an authorized Apple team member.
+Mosslight is connected to Xcode Cloud with automatic signing configured in the
+project. A successful signed archive and TestFlight upload still require
+verification in App Store Connect. The account setup below also applies when
+connecting a new Apple team or repository.
 
 ## 1. Register the app and connect the repository
 
@@ -62,10 +61,27 @@ Xcode/App Store Connect. Do not paste Apple credentials into chat or source file
 Xcode Cloud discovers `ios/App/ci_scripts/ci_post_clone.sh` beside the Xcode
 project. It selects Node 22, installs from `package-lock.json`, runs the game
 tests, builds the web bundle, and syncs the Capacitor Swift package. The
+repository preflight then verifies the generated assets and dependency lock. The
 `ci_pre_xcodebuild.sh` hook fails early if those assets or the package are absent.
 Keep these hooks executable in Git. CocoaPods is not required: this project uses
 Swift Package Manager. The generated `CapApp-SPM` package pins the remote
 `capacitor-swift-pm` dependency to the Capacitor version in the npm lockfile.
+
+Xcode Cloud disables automatic dependency resolution. Commit the matching Swift
+dependency lockfile at
+`ios/App/App.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved`.
+It locks the Capacitor release to its Git revision; `Package.swift` alone is not
+enough. After updating Capacitor, run `npm run ios:sync`, then on a Mac resolve
+the updated dependencies and commit both lockfiles and the generated manifest:
+
+```sh
+xcodebuild -resolvePackageDependencies -project ios/App/App.xcodeproj -scheme App
+npm run ios:check
+```
+
+Keep `package-lock.json`, `CapApp-SPM/Package.swift`, and `Package.resolved` in
+sync. The repository preflight rejects a missing Swift lockfile or a Capacitor
+version mismatch before the Xcode Cloud archive starts.
 
 ## 3. Run the first build
 
@@ -100,6 +116,10 @@ TestFlight upload. Native compilation and device testing require Xcode/macOS.
 
 ## Common build failures
 
+- **A resolved file is required when automatic dependency resolution is disabled:**
+  commit the workspace's `Package.resolved` at the path above. If Capacitor was
+  updated, resolve packages on a Mac and commit the refreshed lockfile before
+  retrying. Do not disable Xcode Cloud's dependency locking.
 - **Generated Capacitor Swift package missing:** check the `npm ci` and `cap sync ios`
   output in the post-clone log. Do not resolve packages before that hook finishes.
 - **No signing team / App ID unavailable:** select the correct team and an App ID
