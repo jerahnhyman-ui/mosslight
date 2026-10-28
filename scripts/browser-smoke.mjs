@@ -40,6 +40,30 @@ async function checkLayout(page, label) {
         backingWidth: canvas.width,
         backingHeight: canvas.height,
       },
+      hud: [".coin-meter", ".stars-pill", ".power-state", ".vitals"]
+        .map((selector) => {
+          const rect = document.querySelector(selector).getBoundingClientRect();
+          return {
+            selector,
+            x: rect.x,
+            y: rect.y,
+            width: rect.width,
+            height: rect.height,
+          };
+        })
+        .filter((rect) => rect.width > 0 && rect.height > 0),
+      touchOverlays: ["#game-toast", ".touch-dpad", ".touch-jump"]
+        .map((selector) => {
+          const rect = document.querySelector(selector).getBoundingClientRect();
+          return {
+            selector,
+            x: rect.x,
+            y: rect.y,
+            width: rect.width,
+            height: rect.height,
+          };
+        })
+        .filter((rect) => rect.width > 0 && rect.height > 0),
     };
   });
   expect(
@@ -74,6 +98,46 @@ async function checkLayout(page, label) {
     dimensions.canvas.backingWidth,
     `${label}: sharp canvas backing`,
   ).toBeGreaterThanOrEqual(Math.floor(dimensions.canvas.width));
+  for (const [index, box] of dimensions.hud.entries()) {
+    expect(box.x, `${label}: ${box.selector} left edge`).toBeGreaterThanOrEqual(
+      -1,
+    );
+    expect(
+      box.x + box.width,
+      `${label}: ${box.selector} right edge`,
+    ).toBeLessThanOrEqual(dimensions.viewport.width + 1);
+    for (const other of dimensions.hud.slice(index + 1)) {
+      const horizontalOverlap =
+        Math.min(box.x + box.width, other.x + other.width) -
+        Math.max(box.x, other.x);
+      const verticalOverlap =
+        Math.min(box.y + box.height, other.y + other.height) -
+        Math.max(box.y, other.y);
+      expect(
+        horizontalOverlap > 1 && verticalOverlap > 1,
+        `${label}: ${box.selector} overlaps ${other.selector}`,
+      ).toBe(false);
+    }
+  }
+  const toast = dimensions.touchOverlays.find(
+    (box) => box.selector === "#game-toast",
+  );
+  if (toast) {
+    for (const control of dimensions.touchOverlays.filter(
+      (box) => box !== toast,
+    )) {
+      const horizontalOverlap =
+        Math.min(toast.x + toast.width, control.x + control.width) -
+        Math.max(toast.x, control.x);
+      const verticalOverlap =
+        Math.min(toast.y + toast.height, control.y + control.height) -
+        Math.max(toast.y, control.y);
+      expect(
+        horizontalOverlap > 1 && verticalOverlap > 1,
+        `${label}: toast overlaps ${control.selector}`,
+      ).toBe(false);
+    }
+  }
 }
 async function controlCenter(page, name, id) {
   const box = await page.locator(`[data-control="${name}"]`).boundingBox();
@@ -124,6 +188,104 @@ async function neutralControls(page) {
       /pressed/,
     );
   }
+}
+async function advanceUntil(
+  page,
+  condition,
+  description,
+  maxMilliseconds = 6000,
+) {
+  for (let elapsed = 0; elapsed < maxMilliseconds; elapsed += 64) {
+    if (await condition()) return;
+    await page.clock.runFor(64);
+  }
+  throw new Error(`Timed out waiting for ${description}`);
+}
+async function walkToMeadowX(page, targetX) {
+  // Read the visible trail-progress indicator, rather than exposing game state.
+  for (let frame = 0; frame < 200; frame++) {
+    const x = (await trailProgress(page)) * 3290;
+    if (Math.abs(targetX - x) < 9) {
+      await page.keyboard.up("ArrowLeft");
+      await page.keyboard.up("ArrowRight");
+      await page.clock.runFor(120);
+      return;
+    }
+    const direction = targetX > x ? "ArrowRight" : "ArrowLeft";
+    await page.keyboard.up(
+      direction === "ArrowRight" ? "ArrowLeft" : "ArrowRight",
+    );
+    await page.keyboard.down(direction);
+    await page.clock.runFor(32);
+  }
+  throw new Error(
+    `Could not reach meadow x=${targetX} using keyboard controls`,
+  );
+}
+async function jumpToMeadowX(page, targetX) {
+  await page.keyboard.down("Space");
+  await walkToMeadowX(page, targetX);
+  await page.clock.runFor(450);
+  await page.keyboard.up("Space");
+  await page.clock.runFor(64);
+}
+async function checkStarPickupVisibility(page, label) {
+  const overlaps = await page.evaluate(() => {
+    const canvas = document.querySelector("#game").getBoundingClientRect();
+    const toast = document.querySelector("#game-toast").getBoundingClientRect();
+    // This real-keyboard route stops on the first upper ledge, feet at y=265.
+    // The settled follow camera places Pip around x=356. Reserve an expanded
+    // area for the full big sprite and its star aura, not just the hitbox.
+    const hero = {
+      left: canvas.left + (310 / 960) * canvas.width,
+      right: canvas.left + (400 / 960) * canvas.width,
+      top: canvas.top + (175 / 540) * canvas.height,
+      bottom: canvas.top + (280 / 540) * canvas.height,
+    };
+    return (
+      toast.left < hero.right &&
+      toast.right > hero.left &&
+      toast.top < hero.bottom &&
+      toast.bottom > hero.top
+    );
+  });
+  expect(
+    overlaps,
+    `${label}: star-power toast must not obscure Pip on the upper ledge`,
+  ).toBe(false);
+}
+async function rulesPage(browser, audioNotes) {
+  const page = await browser.newPage({
+    viewport: { width: 844, height: 390 },
+    isMobile: true,
+    hasTouch: true,
+    deviceScaleFactor: 2,
+  });
+  captureErrors(page);
+  await page.exposeBinding("recordAudioNote", (_, value) =>
+    audioNotes.push(value),
+  );
+  await page.addInitScript(() => {
+    const original = AudioContext.prototype.createOscillator;
+    AudioContext.prototype.createOscillator = function (...args) {
+      const oscillator = original.apply(this, args);
+      const setFrequency = oscillator.frequency.setValueAtTime.bind(
+        oscillator.frequency,
+      );
+      oscillator.frequency.setValueAtTime = (frequency, at) => {
+        void window.recordAudioNote(frequency);
+        return setFrequency(frequency, at);
+      };
+      return oscillator;
+    };
+  });
+  const startTime = new Date("2026-01-01T00:00:00Z");
+  await page.clock.install({ time: startTime });
+  await page.clock.pauseAt(new Date(startTime.getTime() + 1000));
+  await page.goto(baseURL);
+  await page.locator("#start-button").click();
+  await page.clock.runFor(64);
+  return page;
 }
 try {
   for (let attempt = 0; ; attempt++) {
@@ -201,9 +363,9 @@ try {
   await desktop
     .getByRole("button", { name: "Restart trail", exact: true })
     .click();
-  await expect(desktop.locator("#health")).toHaveAttribute(
+  await expect(desktop.locator("#lives")).toHaveAttribute(
     "aria-label",
-    "3 hearts remaining",
+    "3 lives remaining",
   );
   await expect(desktop.locator("#coin-count")).toHaveText("00");
   await screenshot(desktop, "dusk-gameplay");
@@ -242,6 +404,180 @@ try {
   await lowFPS.close();
   console.log(
     "PASS low frame rate: game clock keeps pace at approximately 15fps",
+  );
+
+  const audioNotes = [];
+  const rules = await rulesPage(browser, audioNotes);
+  await expect(rules.locator("#player-form")).toHaveText("Small");
+  await expect(rules.locator("#lives")).toHaveAttribute(
+    "aria-label",
+    "3 lives remaining",
+  );
+  await expect(rules.locator("#coin-count")).toHaveText("00");
+  await expect(rules.locator("#coin-total")).toHaveText("/ 50");
+  await expect(rules.locator("#star-power")).toBeHidden();
+  await rules.screenshot({
+    path: "artifacts/rules-small-phone.png",
+    fullPage: true,
+  });
+  await walkToMeadowX(rules, 225);
+  await expect(rules.locator("#player-form")).toHaveText("Big");
+  await expect(rules.locator(".power-state")).toHaveAttribute(
+    "data-form",
+    "big",
+  );
+  await expect(rules.locator("#game-toast")).toHaveAttribute(
+    "data-event",
+    "grow",
+  );
+  await expect(rules.locator("#coin-count")).not.toHaveText("00");
+  await checkLayout(rules, "phone big Pip HUD");
+  await rules.screenshot({
+    path: "artifacts/rules-diamond-growth.png",
+    fullPage: true,
+  });
+  const growthNotes = [...audioNotes];
+  expect(
+    growthNotes,
+    "collecting a diamond schedules its growth sound",
+  ).toContain(550);
+  const notesBeforeHit = audioNotes.length;
+  await rules.keyboard.down("ArrowRight");
+  await advanceUntil(
+    rules,
+    async () => (await rules.locator("#player-form").textContent()) === "Small",
+    "enemy contact shrinking big Pip",
+  );
+  await rules.keyboard.up("ArrowRight");
+  await expect(rules.locator("#lives")).toHaveAttribute(
+    "aria-label",
+    "3 lives remaining",
+  );
+  expect(
+    audioNotes.slice(notesBeforeHit),
+    "enemy contact schedules the shrink sound",
+  ).toContain(220);
+  await expect(rules.locator("#game-toast")).toHaveAttribute(
+    "data-event",
+    "shrink",
+  );
+  await checkLayout(rules, "phone shrink feedback");
+  await rules.screenshot({
+    path: "artifacts/rules-enemy-shrink.png",
+    fullPage: true,
+  });
+  // Remain on solid ground while the patrolling bug comes back after hit immunity.
+  await advanceUntil(
+    rules,
+    async () =>
+      (await rules.locator("#lives").getAttribute("aria-label")) ===
+      "2 lives remaining",
+    "a subsequent small-form enemy hit losing a life",
+    10000,
+  );
+  await expect(rules.locator("#player-form")).toHaveText("Small");
+  expect(
+    await trailProgress(rules),
+    "losing a life respawns Pip near the start",
+  ).toBeLessThan(0.05);
+  await walkToMeadowX(rules, 225);
+  await expect(rules.locator("#player-form")).toHaveText("Big");
+  // The diamond must respawn too, so a lost life never leaves growth unavailable.
+  await expect(rules.locator("#lives")).toHaveAttribute(
+    "aria-label",
+    "2 lives remaining",
+  );
+  let furthestX = 0;
+  await rules.keyboard.down("ArrowRight");
+  await advanceUntil(
+    rules,
+    async () => {
+      furthestX = Math.max(furthestX, (await trailProgress(rules)) * 3290);
+      return (
+        (await rules.locator("#lives").getAttribute("aria-label")) ===
+        "1 lives remaining"
+      );
+    },
+    "walking off the first pit losing a life",
+  );
+  await rules.keyboard.up("ArrowRight");
+  expect(
+    furthestX,
+    "Pip actually crossed the first pit edge before life loss",
+  ).toBeGreaterThan(810);
+  await expect(rules.locator("#player-form")).toHaveText("Small");
+  expect(await trailProgress(rules)).toBeLessThan(0.05);
+  await rules.close();
+
+  const stars = await rulesPage(browser, audioNotes);
+  await walkToMeadowX(stars, 230);
+  await jumpToMeadowX(stars, 386);
+  await walkToMeadowX(stars, 445);
+  const notesBeforeStar = audioNotes.length;
+  await jumpToMeadowX(stars, 616);
+  await expect(stars.locator("#star-count")).toHaveText("1");
+  await expect(stars.locator(".power-state")).toHaveAttribute(
+    "data-powered",
+    "true",
+  );
+  await expect(stars.locator("#star-power")).toBeVisible();
+  await expect(stars.locator("#game-toast")).toHaveAttribute(
+    "data-event",
+    "star",
+  );
+  await checkLayout(stars, "phone star power HUD");
+  await checkStarPickupVisibility(stars, "phone");
+  expect(
+    audioNotes.slice(notesBeforeStar),
+    "collecting a star schedules its power sound",
+  ).toContain(990);
+  await stars.screenshot({
+    path: "artifacts/rules-star-power.png",
+    fullPage: true,
+  });
+  await stars.setViewportSize({ width: 568, height: 320 });
+  await stars.evaluate(() => {
+    const style = document.documentElement.style;
+    style.setProperty("--safe-left", "44px");
+    style.setProperty("--safe-right", "44px");
+    style.setProperty("--safe-bottom", "21px");
+  });
+  await stars.clock.runFor(64);
+  await checkLayout(
+    stars,
+    "small phone star power with notch and home indicator",
+  );
+  await checkStarPickupVisibility(stars, "small phone with safe areas");
+  await stars.screenshot({
+    path: "artifacts/rules-star-power-small-safe-area.png",
+    fullPage: true,
+  });
+  await stars.getByRole("button", { name: "Pause game", exact: true }).click();
+  const pausedPower = await stars
+    .locator("#star-power")
+    .getAttribute("data-seconds");
+  await stars.clock.runFor(2500);
+  await expect(stars.locator("#star-power")).toHaveAttribute(
+    "data-seconds",
+    pausedPower,
+  );
+  await stars
+    .getByRole("button", { name: "Keep exploring", exact: true })
+    .click();
+  await stars.clock.runFor(11000);
+  await expect(stars.locator("#star-power")).toBeHidden();
+  await expect(stars.locator(".power-state")).toHaveAttribute(
+    "data-powered",
+    "false",
+  );
+  await expect(stars.locator("#player-form")).toHaveText("Big");
+  await expect(stars.locator("#lives")).toHaveAttribute(
+    "aria-label",
+    "3 lives remaining",
+  );
+  await stars.close();
+  console.log(
+    "PASS rules: diamond growth, enemy shrink, small-form life loss, diamond respawn, pit life loss, star countdown/pause/expiry, WebAudio effects",
   );
 
   const mobile = await browser.newPage({

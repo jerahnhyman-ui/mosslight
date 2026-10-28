@@ -3,7 +3,12 @@ import "@fontsource/dm-sans/500.css";
 import "@fontsource/dm-sans/600.css";
 import "@fontsource/dm-sans/700.css";
 import "./style.css";
-import { Game } from "./game/engine";
+import {
+  Game,
+  COINS_PER_LIFE,
+  MAX_LIVES,
+  STAR_POWER_DURATION,
+} from "./game/engine";
 import { levels } from "./game/levels";
 import { Renderer } from "./game/renderer";
 import { Controls } from "./controls";
@@ -25,8 +30,8 @@ const paths = {
   muted: '<path d="m11 5-6 4H2v6h3l6 4ZM16 9l6 6m0-6-6 6"/>',
   help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 8.5a2.5 2.5 0 0 1 5 0c0 2-2.5 2-2.5 4M12 16h.01"/>',
   flag: '<path d="M5 21V3m0 1c5-3 9 3 14 0v10c-5 3-9-3-14 0"/>',
-  heart:
-    '<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/>',
+  pip: '<path d="M12 7V4m0 1C7 5 7 1 7 1s5-1 5 4Zm1 0c0-4 5-4 5-4s0 4-5 4Z"/><rect x="4" y="7" width="16" height="15" rx="7"/><path d="M9 13v2m6-2v2m-5 3q2 2 4 0"/>',
+  diamond: '<path d="m5 4-4 6 11 12 11-12-4-6ZM1 10h22M5 4l7 18 7-18M5 4h14"/>',
 };
 const icon = (name: keyof typeof paths) =>
   `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name]}</svg>`;
@@ -51,8 +56,9 @@ $("#app").innerHTML = `
     <div class="toolbar-actions"><button class="round-button sound-button" aria-label="Mute sound" title="Sound"></button><button class="round-button help-button" aria-label="How to play" title="How to play">${icon("help")}</button><button class="round-button" id="pause-button" aria-label="Pause game" title="Pause (P)">${icon("pause")}</button><button class="round-button" id="menu-button" aria-label="Game menu" title="Worlds and settings">${icon("menu")}</button></div>
   </header>
   <div class="hud" hidden>
-    <div class="collectibles"><span class="hud-pill"><span class="seed-symbol" aria-hidden="true"></span><b id="coin-count">00</b><span id="coin-total"></span></span><span class="hud-pill stars-pill"><span class="star-symbol" aria-hidden="true">★</span><b id="star-count">0</b><span>/ 3</span></span></div>
-    <div class="vitals"><span id="health" aria-label="3 hearts remaining"></span><span id="timer">00:00</span></div>
+    <div class="collectibles"><span class="hud-pill coin-meter" title="50 coins = an extra life, up to 3"><span class="seed-symbol" aria-hidden="true"></span><b id="coin-count">00</b><span id="coin-total">/ 50</span></span><span class="hud-pill stars-pill" title="Stars give 10 seconds of star power"><span class="star-symbol" aria-hidden="true">★</span><b id="star-count">0</b><span>/ 3</span></span></div>
+    <div class="power-state hud-pill" data-form="small" data-powered="false"><span id="player-form">Small</span><b id="star-power" hidden></b></div>
+    <div class="vitals"><span id="lives" aria-label="3 lives remaining">${icon("pip")}<span>× <b id="life-count">3</b></span><small>LIVES</small></span><span id="timer">00:00</span></div>
     <div class="trail-track" aria-label="Trail progress"><span></span></div>
   </div>
   <div id="overlay" class="game-overlay"></div>
@@ -61,12 +67,12 @@ $("#app").innerHTML = `
     <div class="movement-control"><div class="touch-dpad" data-direction="0"><button data-control="left" data-direction="-1" aria-label="Move left" aria-pressed="false">${icon("left")}</button><span class="dpad-divider"></span><button data-control="right" data-direction="1" aria-label="Move right" aria-pressed="false">${icon("right")}</button></div><span class="control-caption">SLIDE TO MOVE</span></div>
     <div class="jump-control"><button class="touch-jump" data-control="jump" aria-label="Jump" aria-pressed="false">${icon("jump")}<span>JUMP</span></button><span class="control-caption">HOLD TO GO HIGHER</span></div>
   </div>
-  <div class="checkpoint-toast" role="status" hidden>${icon("flag")} Checkpoint reached!</div>
+  <div class="checkpoint-toast" id="game-toast" role="status" hidden></div>
   <p class="rotate-tip">↻ Turn sideways for a bigger adventure</p>
   <div class="keyboard-hint"><span><kbd>←</kbd><kbd>→</kbd> move</span><span><kbd>SPACE</kbd> jump</span><span><kbd>P</kbd> pause</span></div>
 </main>
 <dialog id="menu-dialog" aria-labelledby="menu-title"><button class="round-button menu-close" aria-label="Close game menu">${icon("close")}</button><p class="eyebrow">THE SUNSEED TRAILS</p><h2 id="menu-title">Choose your adventure.</h2><p class="dialog-description">Three little worlds. A whole lot to discover.</p><div id="menu-worlds"></div><div class="menu-settings"><button class="menu-sound"></button><button class="menu-help">${icon("help")} Controls</button><span id="journey-progress"></span></div></dialog>
-<dialog id="help-dialog" aria-labelledby="help-title"><button class="round-button dialog-close" aria-label="Close instructions">${icon("close")}</button><p class="eyebrow">MEET YOUR MOVES</p><h2 id="help-title">Little hero. Big leaps.</h2><div class="guide-grid"><div><span class="guide-symbol">↔</span><h3>Move your way</h3><p>Slide your left thumb across the arrows to steer. On a keyboard, use <kbd>←</kbd> <kbd>→</kbd> or <kbd>A</kbd> <kbd>D</kbd>.</p></div><div><span class="guide-symbol coral">↑</span><h3>Make the jump</h3><p>Tap for a short hop. Hold for a higher leap. Use your right thumb, <kbd>Space</kbd>, or the A button on a gamepad.</p></div><div><span class="guide-symbol gold">★</span><h3>Find the light</h3><p>Gather sunseeds, find all three stars, and reach the glowing portal. Bounce on beetles from above.</p></div><div><span class="guide-symbol">⚑</span><h3>Keep exploring</h3><p>Flags save your place during a run. You have three hearts. Pause whenever you need a break.</p></div></div><button class="primary-button close-guide">Got it ${icon("arrow")}</button></dialog>
+<dialog id="help-dialog" aria-labelledby="help-title"><button class="round-button dialog-close" aria-label="Close instructions">${icon("close")}</button><p class="eyebrow">MEET YOUR MOVES</p><h2 id="help-title">Little hero. Big leaps.</h2><div class="guide-grid"><div><span class="guide-symbol">↔</span><h3>Move & jump</h3><p>Slide your left thumb to steer. Tap jump for a short hop; hold for a higher leap. Keyboard: arrows or A/D, and Space. Gamepad: stick and A.</p></div><div><span class="guide-symbol diamond-guide">${icon("diamond")}</span><h3>Diamonds make you big</h3><p>Start small. Collect a diamond to grow. A bug hit shrinks big Pip; a hit while small costs a life. Jump on bugs to squash them.</p></div><div><span class="guide-symbol gold">★</span><h3>Star power</h3><p>A star gives ${STAR_POWER_DURATION} seconds of protection from bugs. Touch bugs to squash them while powered. Falling in a gap still costs a life.</p></div><div><span class="guide-symbol coral">${icon("pip")}</span><h3>Make every life count</h3><p>Start each trail with ${MAX_LIVES} lives. Every ${COINS_PER_LIFE} coins earns one life, up to ${MAX_LIVES}. Lost a life? Return small to your checkpoint. Zero lives ends the run.</p></div></div><button class="primary-button close-guide">Got it ${icon("arrow")}</button></dialog>
 `;
 const app = $(".game-app");
 const canvas = $<HTMLCanvasElement>("#game");
@@ -226,7 +232,7 @@ function updateUI() {
     });
     bindPanel();
   } else {
-    overlay.innerHTML = `<div class="result-panel"><span class="panel-badge">${icon("leaf")}</span><p class="eyebrow">ONE MORE ADVENTURE?</p><h2>You’ve got this, Pip.</h2><p>A fresh start is just a leap away.</p><button class="primary-button" id="retry-button">Try again ${icon("arrow")}</button><div class="panel-links"><button id="home-button">Choose a world</button></div></div>`;
+    overlay.innerHTML = `<div class="result-panel"><span class="panel-badge">${icon("pip")}</span><p class="eyebrow">OUT OF LIVES</p><h2>You’ve got this, Pip.</h2><p>Try again with ${MAX_LIVES} lives and a fresh trail.</p><button class="primary-button" id="retry-button">Try again ${icon("arrow")}</button><div class="panel-links"><button id="home-button">Choose a world</button></div></div>`;
     $("#retry-button").addEventListener("click", start);
     $("#home-button").addEventListener("click", showMenu);
   }
@@ -297,21 +303,43 @@ const setText = (selector: string, value: string) => {
   const el = $(selector);
   if (el.textContent !== value) el.textContent = value;
 };
-let lastHealth = -1;
+let lastLives = -1;
+let lastCoinProgress = -1;
+let lastPowerSeconds = -1;
 function updateHUD() {
-  setText("#coin-count", String(game.collectedCoins).padStart(2, "0"));
-  setText("#coin-total", `/ ${game.coins.length}`);
+  setText("#coin-count", String(game.coinsTowardLife).padStart(2, "0"));
+  setText("#coin-total", `/ ${COINS_PER_LIFE}`);
+  if (lastCoinProgress !== game.coinsTowardLife) {
+    lastCoinProgress = game.coinsTowardLife;
+    $(".coin-meter").setAttribute(
+      "aria-label",
+      `${game.coinsTowardLife} of ${COINS_PER_LIFE} coins toward an extra life`,
+    );
+  }
   setText("#star-count", String(game.collectedStars));
   setText("#timer", formatTime(game.elapsed));
-  if (lastHealth !== game.health) {
-    lastHealth = game.health;
-    $("#health").innerHTML = [0, 1, 2]
-      .map(
-        (i) =>
-          `<span class="${i < game.health ? "" : "empty-heart"}">${icon("heart")}</span>`,
-      )
-      .join("");
-    $("#health").setAttribute("aria-label", `${game.health} hearts remaining`);
+  setText("#player-form", game.player.form === "big" ? "Big" : "Small");
+  $(".power-state").dataset.form = game.player.form;
+  const powerSeconds = Math.ceil(game.starPowerRemaining);
+  if (lastPowerSeconds !== powerSeconds) {
+    lastPowerSeconds = powerSeconds;
+    const power = $("#star-power");
+    power.hidden = powerSeconds === 0;
+    power.dataset.seconds = String(powerSeconds);
+    power.textContent = `★ ${powerSeconds}s`;
+    power.setAttribute(
+      "aria-label",
+      `Star power: ${powerSeconds} seconds remaining`,
+    );
+    $(".power-state").dataset.powered = String(powerSeconds > 0);
+    $(".power-state").dataset.expiring = String(
+      powerSeconds > 0 && powerSeconds <= 3,
+    );
+  }
+  if (lastLives !== game.lives) {
+    lastLives = game.lives;
+    setText("#life-count", String(game.lives));
+    $("#lives").setAttribute("aria-label", `${game.lives} lives remaining`);
   }
   $(".trail-track span").style.transform =
     `scaleX(${Math.max(0, Math.min(1, game.player.x / game.level.goal.x))})`;
@@ -330,7 +358,28 @@ function frame(now: number) {
     game.update(delta, input);
     for (const event of game.events) {
       audio.play(event);
-      if (event === "checkpoint") toastUntil = now + 2300;
+      if (event === "life-lost") controls.reset();
+    }
+    // Important events win over a collectible picked up in the same frame.
+    const messages: [string, string, keyof typeof paths][] = [
+      [
+        "life-lost",
+        `Life lost · ${game.lives} ${game.lives === 1 ? "life" : "lives"} left`,
+        "pip",
+      ],
+      ["shrink", "Back to small · find a diamond!", "diamond"],
+      ["extra-life", "+1 life!", "pip"],
+      ["grow", "Big Pip! One hit protected", "diamond"],
+      ["star", `Star power! ${STAR_POWER_DURATION} seconds`, "leaf"],
+      ["checkpoint", "Checkpoint reached!", "flag"],
+      ["star-end", "Star power ended", "leaf"],
+    ];
+    const message = messages.find(([event]) => game.events.includes(event));
+    if (message) {
+      $("#game-toast").innerHTML =
+        `${icon(message[2])}<span>${message[1]}</span>`;
+      $("#game-toast").dataset.event = message[0];
+      toastUntil = now + 2300;
     }
     updateHUD();
     if (game.state !== "playing") finish();

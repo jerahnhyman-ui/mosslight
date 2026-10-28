@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { Game, type GameInput } from "./engine";
+import {
+  Game,
+  COINS_PER_LIFE,
+  MAX_LIVES,
+  STAR_POWER_DURATION,
+  type GameInput,
+} from "./engine";
 import { levels } from "./levels";
 
 const idle: GameInput = {
@@ -11,6 +17,44 @@ const idle: GameInput = {
 function advance(game: Game, seconds: number, input: GameInput = idle) {
   for (let i = 0; i < Math.round(seconds * 120); i++)
     game.update(1 / 120, input);
+}
+
+function collectDiamond(game: Game, index = 0) {
+  const diamond = game.diamonds[index]!;
+  game.player.x = diamond.x - game.player.w / 2;
+  game.player.y = 430 - game.player.h;
+  game.player.vx = game.player.vy = 0;
+  game.update(1 / 120, idle);
+}
+
+function collectStar(game: Game, index = 0) {
+  const star = game.stars[index]!;
+  game.player.x = star.x - game.player.w / 2;
+  game.player.y = star.y - game.player.h / 2;
+  game.player.vx = game.player.vy = 0;
+  game.update(1 / 120, idle);
+}
+
+function touchEnemy(game: Game, index = 0, dt = 1 / 120) {
+  const enemy = game.enemies[index]!;
+  game.player.x = enemy.x;
+  game.player.y = enemy.y + enemy.h - game.player.h;
+  game.player.vx = game.player.vy = 0;
+  game.update(dt, idle);
+}
+
+// Coin clusters isolate threshold behavior from route hazards while exercising
+// the same collision/collection path used by ordinary level coins.
+function collectCoins(game: Game, count: number) {
+  game.player.x = 95;
+  game.player.y = 430 - game.player.h;
+  game.player.vx = game.player.vy = 0;
+  game.coins = Array.from({ length: count }, () => ({
+    x: 109,
+    y: 400,
+    collected: false,
+  }));
+  game.update(1 / 120, idle);
 }
 
 // These integration routes send the same four controls as the UI. In particular,
@@ -152,7 +196,7 @@ describe("Mosslight simulation", () => {
       }
       expect(game.state).toBe("won");
       expect(game.collectedStars).toBe(3);
-      expect(game.health).toBeGreaterThan(0);
+      expect(game.lives).toBeGreaterThan(0);
       expect(game.deaths).toBe(0);
       expect(game.checkpointActive).toBe(true);
     },
@@ -319,16 +363,16 @@ describe("Mosslight simulation", () => {
     game.update(1 / 60, { ...idle, jump: true });
     expect(enemy.alive).toBe(false);
     expect(game.player.vy).toBeLessThan(0);
-    expect(game.health).toBe(3);
+    expect(game.lives).toBe(3);
     const next = game.enemies[1]!;
     game.player.x = next.x;
     game.player.y = next.y;
     game.player.vy = 0;
     game.update(1 / 60, idle);
-    expect(game.health).toBe(2);
+    expect(game.lives).toBe(2);
     expect(game.player.invulnerable).toBeGreaterThan(1);
     game.update(1 / 60, idle);
-    expect(game.health).toBe(2);
+    expect(game.lives).toBe(2);
   });
 
   it("keeps an automatic beetle bounce useful without holding jump", () => {
@@ -355,9 +399,12 @@ describe("Mosslight simulation", () => {
   it("does not reuse grounded jump permission during damage knockback", () => {
     const game = new Game();
     advance(game, 0.1);
+    game.player.x = game.diamonds[0]!.x - game.player.w / 2;
+    game.update(1 / 120, idle);
+    expect(game.player.form).toBe("big");
     game.player.x = game.enemies[0]!.x;
     game.update(1 / 120, idle);
-    expect(game.events).toContain("hurt");
+    expect(game.events).toContain("shrink");
     expect(game.player.grounded).toBe(false);
     game.update(1 / 120, { ...idle, jump: true, jumpPressed: true });
     expect(game.events).not.toContain("jump");
@@ -365,7 +412,7 @@ describe("Mosslight simulation", () => {
     expect(game.player.vy).toBeGreaterThan(-350);
   });
 
-  it("respawns at an activated checkpoint, keeps collectibles, and ends at zero hearts", () => {
+  it("respawns at an activated checkpoint, keeps collectibles, and ends at zero lives", () => {
     const game = new Game();
     game.player.x = game.level.checkpoint.x;
     game.update(1 / 60, idle);
@@ -373,7 +420,7 @@ describe("Mosslight simulation", () => {
     game.collectedCoins = 4;
     game.player.y = 700;
     game.update(1 / 60, idle);
-    expect(game.health).toBe(2);
+    expect(game.lives).toBe(2);
     expect(game.deaths).toBe(1);
     expect(game.player.x).toBe(game.level.checkpoint.x);
     expect(game.collectedCoins).toBe(4);
@@ -382,10 +429,10 @@ describe("Mosslight simulation", () => {
       game.update(1 / 60, idle);
     }
     expect(game.state).toBe("lost");
-    expect(game.health).toBe(0);
+    expect(game.lives).toBe(0);
     game.restart();
     expect(game.state).toBe("playing");
-    expect(game.health).toBe(3);
+    expect(game.lives).toBe(3);
     expect(game.checkpointActive).toBe(false);
     expect(game.collectedCoins).toBe(0);
   });
@@ -400,6 +447,352 @@ describe("Mosslight simulation", () => {
     advance(game, 2, { ...idle, right: true });
     expect(game.elapsed).toBe(elapsed);
   });
+
+  it("grows from a diamond with a larger collision body and fixed feet/center", () => {
+    const game = new Game();
+    const diamond = game.diamonds[0]!;
+    expect(game.player.form).toBe("small");
+    expect([game.player.w, game.player.h]).toEqual([28, 38]);
+    collectDiamond(game);
+    expect(game.player.form).toBe("big");
+    expect([game.player.w, game.player.h]).toEqual([40, 56]);
+    expect(game.player.x + game.player.w / 2).toBe(diamond.x);
+    expect(game.player.y + game.player.h).toBe(430);
+    expect(diamond.collected).toBe(true);
+    expect(game.events).toContain("grow");
+    advance(game, 0.1);
+    expect(game.events).not.toContain("grow");
+  });
+
+  it("leaves a diamond available while big", () => {
+    const game = new Game();
+    collectDiamond(game);
+    collectDiamond(game, 1);
+    expect(game.player.form).toBe("big");
+    expect(game.diamonds[1]!.collected).toBe(false);
+    expect(game.events).not.toContain("grow");
+  });
+
+  it("defers growth beside a solid wall, then grows when there is room", () => {
+    const game = new Game();
+    // The small body fits in the gap beside the ground that starts at x=930.
+    // A centered 40px body would extend into that solid ground wall.
+    game.player.x = 898;
+    game.player.y = 442;
+    game.diamonds = [{ x: 912, y: 461, collected: false }];
+    game.update(1 / 120, idle);
+    expect(game.player.form).toBe("small");
+    expect(game.diamonds[0]!.collected).toBe(false);
+    game.player.x -= 12;
+    game.update(1 / 120, idle);
+    expect(game.player.form).toBe("big");
+    expect(game.player.x + game.player.w).toBeLessThanOrEqual(930);
+    expect(game.diamonds[0]!.collected).toBe(true);
+  });
+
+  it("defers growth at the world edge without consuming the diamond", () => {
+    const game = new Game();
+    game.player.x = 0;
+    game.diamonds = [{ x: 14, y: 400, collected: false }];
+    game.update(1 / 120, idle);
+    expect(game.player.form).toBe("small");
+    expect(game.diamonds[0]!.collected).toBe(false);
+    game.player.x = 7;
+    game.update(1 / 120, idle);
+    expect(game.player.form).toBe("big");
+    expect(game.player.x).toBeGreaterThanOrEqual(0);
+  });
+
+  it("defers growth under a solid ceiling but allows one-way ledges", () => {
+    const original = levels[0]!;
+    // A separate level fixture keeps the real level data untouched.
+    levels.push({
+      ...original,
+      platforms: [
+        ...original.platforms,
+        { x: 140, y: 365, w: 60, h: 20, kind: "brick" },
+      ],
+    });
+    const game = new Game(levels.length - 1);
+    levels.pop();
+    collectDiamond(game);
+    expect(game.player.form).toBe("small");
+    expect(game.diamonds[0]!.collected).toBe(false);
+    game.level.platforms.at(-1)!.kind = "platform";
+    game.update(1 / 120, idle);
+    expect(game.player.form).toBe("big");
+    expect(game.player.y + game.player.h).toBe(430);
+  });
+
+  it("shrinks on a big side hit and protects against consecutive contacts", () => {
+    const game = new Game();
+    collectDiamond(game);
+    const enemy = game.enemies[0]!;
+    game.enemies.push({ ...enemy });
+    touchEnemy(game, 0, 0.1);
+    expect(game.lives).toBe(MAX_LIVES);
+    expect(game.deaths).toBe(0);
+    expect(game.player.form).toBe("small");
+    expect([game.player.w, game.player.h]).toEqual([28, 38]);
+    expect(game.player.invulnerable).toBeGreaterThan(1.3);
+    expect(game.events.filter((event) => event === "shrink")).toHaveLength(1);
+    expect(game.events).not.toContain("life-lost");
+    touchEnemy(game);
+    expect(game.lives).toBe(MAX_LIVES);
+    expect(enemy.alive).toBe(true);
+    game.player.x = 95;
+    game.player.y = 392;
+    advance(game, 1.6);
+    touchEnemy(game);
+    expect(game.lives).toBe(2);
+    expect(game.deaths).toBe(1);
+  });
+
+  it("respawns on a small side hit without applying stale movement or hits", () => {
+    const game = new Game();
+    const oldPlayer = game.player;
+    game.enemies.push({ ...game.enemies[0]! });
+    touchEnemy(game, 0, 0.1);
+    expect(game.player).not.toBe(oldPlayer);
+    expect(game.lives).toBe(2);
+    expect(game.deaths).toBe(1);
+    expect(game.player.form).toBe("small");
+    expect(game.player.x).toBe(game.level.spawn.x);
+    expect(game.player.y).toBe(game.level.spawn.y);
+    expect(game.player.vx).toBe(0);
+    expect(game.player.vy).toBe(0);
+    expect(game.player.invulnerable).toBe(1.5);
+    expect(game.events.filter((event) => event === "life-lost")).toHaveLength(
+      1,
+    );
+    expect(game.events).not.toContain("lose");
+  });
+
+  it.each(["small", "big", "star", "grace"] as const)(
+    "loses exactly one life to a gap with %s protection and resets powerups",
+    (protection) => {
+      const game = new Game();
+      if (protection === "big" || protection === "star") collectDiamond(game);
+      if (protection === "star") collectStar(game);
+      if (protection === "grace") game.player.invulnerable = 1.5;
+      game.player.y = 700;
+      game.update(0.1, { ...idle, right: true, jump: true, jumpPressed: true });
+      expect(game.lives).toBe(2);
+      expect(game.deaths).toBe(1);
+      expect(game.player.form).toBe("small");
+      expect(game.starPowerRemaining).toBe(0);
+      expect(game.player.invulnerable).toBe(1.5);
+      expect(game.player.x).toBe(game.level.spawn.x);
+      expect(game.events.filter((event) => event === "life-lost")).toHaveLength(
+        1,
+      );
+      expect(game.diamonds.every((diamond) => !diamond.collected)).toBe(true);
+    },
+  );
+
+  it("restores diamonds after death but preserves consumed coins and stars", () => {
+    const game = new Game();
+    collectCoins(game, 7);
+    collectDiamond(game);
+    collectStar(game);
+    const usedCoins = game.coins.filter((coin) => coin.collected).length;
+    const usedStars = game.stars.filter((star) => star.collected).length;
+    game.player.y = 700;
+    game.update(1 / 120, idle);
+    expect(game.collectedCoins).toBe(7);
+    expect(game.coinsTowardLife).toBe(7);
+    expect(game.collectedStars).toBe(1);
+    expect(game.coins.filter((coin) => coin.collected)).toHaveLength(usedCoins);
+    expect(game.stars.filter((star) => star.collected)).toHaveLength(usedStars);
+    expect(game.diamonds[0]!.collected).toBe(false);
+    collectDiamond(game);
+    expect(game.player.form).toBe("big");
+    expect(game.events).toContain("grow");
+  });
+
+  it("awards a life exactly at 50 coins and retains the total count", () => {
+    const game = new Game();
+    game.player.y = 700;
+    game.update(1 / 120, idle);
+    collectCoins(game, COINS_PER_LIFE - 1);
+    expect(game.lives).toBe(2);
+    expect(game.coinsTowardLife).toBe(49);
+    expect(game.events).not.toContain("extra-life");
+    collectCoins(game, 1);
+    expect(game.lives).toBe(MAX_LIVES);
+    expect(game.coinsTowardLife).toBe(0);
+    expect(game.collectedCoins).toBe(COINS_PER_LIFE);
+    expect(game.events.filter((event) => event === "extra-life")).toHaveLength(
+      1,
+    );
+    advance(game, 0.1);
+    expect(game.collectedCoins).toBe(COINS_PER_LIFE);
+    expect(game.events).not.toContain("extra-life");
+  });
+
+  it("spends coin thresholds at the life cap instead of banking lives", () => {
+    const game = new Game();
+    collectCoins(game, COINS_PER_LIFE * 2 + 3);
+    expect(game.lives).toBe(MAX_LIVES);
+    expect(game.coinsTowardLife).toBe(3);
+    expect(game.collectedCoins).toBe(103);
+    expect(game.events).not.toContain("extra-life");
+    game.player.y = 700;
+    game.update(1 / 120, idle);
+    collectCoins(game, 46);
+    expect(game.lives).toBe(2);
+    expect(game.coinsTowardLife).toBe(49);
+    collectCoins(game, 1);
+    expect(game.lives).toBe(MAX_LIVES);
+    expect(game.coinsTowardLife).toBe(0);
+    expect(game.collectedCoins).toBe(150);
+  });
+
+  it("grants star power immediately, refreshes it, and expires once", () => {
+    const game = new Game();
+    collectStar(game);
+    expect(game.starPowerRemaining).toBe(STAR_POWER_DURATION);
+    game.player.x = 95;
+    game.player.y = 392;
+    advance(game, 4);
+    expect(game.starPowerRemaining).toBeCloseTo(6, 8);
+    collectStar(game, 1);
+    expect(game.starPowerRemaining).toBe(STAR_POWER_DURATION);
+    expect(game.collectedStars).toBe(2);
+    game.player.x = 95;
+    game.player.y = 392;
+    let expirations = 0;
+    for (let i = 0; i < (STAR_POWER_DURATION + 1) * 120; i++) {
+      game.update(1 / 120, idle);
+      if (game.events.includes("star-end")) expirations++;
+    }
+    expect(game.starPowerRemaining).toBe(0);
+    expect(expirations).toBe(1);
+    touchEnemy(game);
+    expect(game.lives).toBe(2);
+  });
+
+  it("uses a same-tick star pickup to squash a touching enemy safely", () => {
+    const game = new Game();
+    const enemy = game.enemies[0]!;
+    game.stars = [{ x: enemy.x + 14, y: 410, collected: false }];
+    touchEnemy(game);
+    expect(game.lives).toBe(MAX_LIVES);
+    expect(game.deaths).toBe(0);
+    expect(game.starPowerRemaining).toBe(STAR_POWER_DURATION);
+    expect(enemy.alive).toBe(false);
+    expect(enemy.squashed).toBeGreaterThan(0);
+    expect(game.events).toContain("star");
+    expect(game.events).toContain("stomp");
+    expect(game.events).not.toContain("life-lost");
+  });
+
+  it("uses a same-tick diamond pickup to absorb a touching enemy's hit", () => {
+    const game = new Game();
+    game.diamonds = [{ x: game.enemies[0]!.x + 14, y: 400, collected: false }];
+    touchEnemy(game);
+    expect(game.events).toContain("grow");
+    expect(game.events).toContain("shrink");
+    expect(game.events).not.toContain("life-lost");
+    expect(game.player.form).toBe("small");
+    expect(game.lives).toBe(MAX_LIVES);
+    expect(game.diamonds[0]!.collected).toBe(true);
+  });
+
+  it("keeps a checkpoint reached on the same tick as a fatal enemy hit", () => {
+    const game = new Game();
+    const x = game.level.checkpoint.x;
+    game.enemies = [{ ...game.enemies[0]!, x, minX: x, maxX: x, vx: 0 }];
+    touchEnemy(game);
+    expect(game.events).toContain("checkpoint");
+    expect(game.events).toContain("life-lost");
+    expect(game.checkpointActive).toBe(true);
+    expect(game.player.x).toBe(x);
+    expect(game.lives).toBe(2);
+  });
+
+  it("squashes every contacted enemy while powered without shrinking", () => {
+    const game = new Game();
+    collectDiamond(game);
+    collectStar(game);
+    game.enemies.push({ ...game.enemies[0]! });
+    touchEnemy(game);
+    expect(game.player.form).toBe("big");
+    expect(game.lives).toBe(MAX_LIVES);
+    expect(game.enemies[0]!.alive).toBe(false);
+    expect(game.enemies.at(-1)!.alive).toBe(false);
+    expect(game.events.filter((event) => event === "stomp")).toHaveLength(2);
+  });
+
+  it("removes a stomped enemy from collisions while its squash animation fades", () => {
+    const game = new Game();
+    const enemy = game.enemies[0]!;
+    game.player.x = enemy.x;
+    game.player.y = enemy.y - game.player.h - 1;
+    game.player.vy = 200;
+    game.update(1 / 120, idle);
+    expect(enemy.alive).toBe(false);
+    expect(enemy.squashed).toBeGreaterThan(0.3);
+    expect(game.player.vy).toBeLessThan(0);
+    touchEnemy(game);
+    expect(game.lives).toBe(MAX_LIVES);
+    expect(game.events).not.toContain("stomp");
+    advance(game, 0.5);
+    expect(enemy.squashed).toBe(0);
+    expect(enemy.alive).toBe(false);
+  });
+
+  it("ends on the last life and resets all run state when restarted", () => {
+    const game = new Game();
+    collectCoins(game, 12);
+    for (let i = 0; i < MAX_LIVES; i++) {
+      game.player.y = 700;
+      game.update(0.1, idle);
+    }
+    expect(game.lives).toBe(0);
+    expect(game.deaths).toBe(MAX_LIVES);
+    expect(game.state).toBe("lost");
+    expect(game.events).toEqual(["life-lost", "lose"]);
+    advance(game, 1);
+    expect(game.deaths).toBe(MAX_LIVES);
+    game.restart();
+    expect(game.lives).toBe(MAX_LIVES);
+    expect(game.deaths).toBe(0);
+    expect(game.collectedCoins).toBe(0);
+    expect(game.coinsTowardLife).toBe(0);
+    expect(game.collectedStars).toBe(0);
+    expect(game.starPowerRemaining).toBe(0);
+    expect(game.player.form).toBe("small");
+    expect(
+      game.enemies.every((enemy) => enemy.alive && enemy.squashed === 0),
+    ).toBe(true);
+    expect(game.diamonds.every((diamond) => !diamond.collected)).toBe(true);
+  });
+
+  it.each(levels)(
+    "$name has reachable growth before enemies and after respawn",
+    (level) => {
+      const game = new Game(level.id - 1);
+      advance(game, 0.1);
+      walkTo(game, level.diamonds[0]!.x, 430);
+      expect(game.player.form).toBe("big");
+      expect(game.deaths).toBe(0);
+      expect(level.diamonds[0]!.x).toBeLessThan(level.enemies[0]!.minX);
+      game.player.x = level.checkpoint.x;
+      game.player.y = 430 - game.player.h;
+      game.player.vx = game.player.vy = 0;
+      game.update(1 / 120, idle);
+      expect(game.checkpointActive).toBe(true);
+      game.player.y = 700;
+      game.update(1 / 120, idle);
+      expect(game.player.form).toBe("small");
+      expect(game.player.x).toBe(level.checkpoint.x);
+      walkTo(game, level.diamonds[1]!.x, 430);
+      expect(game.player.form).toBe("big");
+      expect(game.lives).toBe(2);
+      expect(game.diamonds[1]!.collected).toBe(true);
+    },
+  );
 
   it("produces the same result at 30 Hz and 120 Hz", () => {
     const a = new Game();
