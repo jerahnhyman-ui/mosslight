@@ -15,6 +15,7 @@ export interface Level {
   platforms: (Rect & { kind: "ground" | "platform" | "brick" })[];
   coins: { x: number; y: number }[];
   stars: { x: number; y: number }[];
+  diamonds: { x: number; y: number }[];
   enemies: { x: number; y: number; minX: number; maxX: number }[];
   checkpoint: { x: number; y: number };
   goal: { x: number; y: number };
@@ -88,6 +89,10 @@ export const levels: Level[] = [
       { x: 1445, y: 220 },
       { x: 2215, y: 220 },
     ],
+    diamonds: [
+      { x: 170, y: 400 },
+      { x: 1860, y: 400 },
+    ],
     enemies: [
       bug(610, 520, 735),
       bug(1200, 1040, 1390),
@@ -142,6 +147,10 @@ export const levels: Level[] = [
       { x: 1160, y: 210 },
       { x: 1905, y: 215 },
       { x: 2700, y: 210 },
+    ],
+    diamonds: [
+      { x: 170, y: 400 },
+      { x: 1620, y: 400 },
     ],
     enemies: [
       bug(430, 370, 550),
@@ -200,6 +209,10 @@ export const levels: Level[] = [
       { x: 1110, y: 205 },
       { x: 2580, y: 210 },
       { x: 3310, y: 210 },
+    ],
+    diamonds: [
+      { x: 170, y: 400 },
+      { x: 2290, y: 400 },
     ],
     enemies: [
       bug(420, 365, 500),

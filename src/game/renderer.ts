@@ -1,4 +1,8 @@
-import type { Game } from "./engine";
+import {
+  ENEMY_SQUASH_DURATION,
+  STAR_POWER_DURATION,
+  type Game,
+} from "./engine";
 import type { Rect } from "./levels";
 
 type Theme = "meadow" | "dusk" | "alpine";
@@ -100,7 +104,12 @@ export class Renderer {
   private previousGrounded = false;
   private previousCoins: boolean[] = [];
   private previousStars: boolean[] = [];
+  private previousDiamonds: boolean[] = [];
   private previousEnemies: boolean[] = [];
+  private previousForm: "small" | "big" = "small";
+  private previousDeaths = 0;
+  private formChange = 0;
+  private growing = false;
   private particles: Particle[] = [];
   private landing = 0;
   private needsResize = true;
@@ -158,16 +167,28 @@ export class Renderer {
     const p = palettes[game.level.theme];
     const dt = Math.max(0, Math.min(time - this.previousTime, 0.05));
     this.previousTime = time;
-    const newGame = this.previousGame !== game;
+    const newGame =
+      this.previousGame !== game || game.elapsed < this.previousElapsed;
+    const respawned = !newGame && game.deaths !== this.previousDeaths;
     if (newGame) {
       this.previousGame = game;
       this.previousElapsed = -1;
       this.previousGrounded = false;
       this.previousCoins = game.coins.map((coin) => coin.collected);
       this.previousStars = game.stars.map((star) => star.collected);
+      this.previousDiamonds = game.diamonds.map((diamond) => diamond.collected);
       this.previousEnemies = game.enemies.map((enemy) => enemy.alive);
+      this.previousForm = game.player.form;
+      this.previousDeaths = game.deaths;
       this.particles = [];
       this.landing = 0;
+      this.formChange = 0;
+    } else if (respawned) {
+      this.particles = [];
+      this.landing = 0;
+      this.formChange = 0;
+      this.previousForm = game.player.form;
+      this.previousGrounded = false;
     }
     const target = titleMode
       ? 0
@@ -175,7 +196,12 @@ export class Renderer {
           0,
           Math.min(game.level.width - WIDTH, game.player.x - WIDTH * 0.35),
         );
-    if (newGame || titleMode || Math.abs(target - this.cameraX) > 760)
+    if (
+      newGame ||
+      respawned ||
+      titleMode ||
+      Math.abs(target - this.cameraX) > 760
+    )
       this.cameraX = target;
     else this.cameraX += (target - this.cameraX) * (1 - Math.exp(-9 * dt));
     const camera = this.cameraX;
@@ -185,8 +211,10 @@ export class Renderer {
     );
     const titleX = Math.max(730, (titleFloor?.x ?? 0) + 50);
     this.landing = Math.max(0, this.landing - dt);
+    this.formChange = Math.max(0, this.formChange - dt);
     if (!titleMode && game.elapsed !== this.previousElapsed)
       this.feedback(game);
+    this.previousDeaths = game.deaths;
     this.previousElapsed = game.elapsed;
     this.background(p, game.level.theme, time, camera);
     c.save();
@@ -231,22 +259,40 @@ export class Renderer {
         if (!star.collected && this.visible(star.x, 30))
           this.star(star.x, star.y, time, i);
       });
+      game.diamonds.forEach((diamond, i) => {
+        if (!diamond.collected && this.visible(diamond.x, 30))
+          this.diamond(diamond.x, diamond.y, time, i);
+      });
       for (const enemy of game.enemies) {
-        if (enemy.alive && this.visible(enemy.x, 40)) this.beetle(enemy, time);
+        if ((enemy.alive || enemy.squashed > 0) && this.visible(enemy.x, 40))
+          this.beetle(enemy, time, enemy.alive ? 0 : enemy.squashed);
       }
       const player = game.player;
-      if (player.invulnerable <= 0 || Math.floor(time * 16) % 3 !== 0) {
-        this.hero(
-          player.x + player.w / 2,
-          player.y + player.h,
-          player.vx,
-          player.vy,
-          player.facing,
-          player.grounded,
-          time,
-          this.landing,
-        );
-      }
+      const center = player.x + player.w / 2;
+      const feet = player.y + player.h;
+      const size = player.h / 38;
+      if (game.starPowerRemaining > 0)
+        this.starAura(center, feet, size, game.starPowerRemaining, time, false);
+      if (this.formChange > 0)
+        this.transformation(center, feet, size, this.growing, this.formChange);
+      c.save();
+      // Damage grace is visually distinct from star power and never hides Pip.
+      if (player.invulnerable > 0 && game.starPowerRemaining <= 0)
+        c.globalAlpha = 0.55 + (Math.sin(time * 9) + 1) * 0.18;
+      this.hero(
+        center,
+        feet,
+        player.vx,
+        player.vy,
+        player.facing,
+        player.grounded,
+        time,
+        this.landing,
+        size,
+      );
+      c.restore();
+      if (game.starPowerRemaining > 0)
+        this.starAura(center, feet, size, game.starPowerRemaining, time, true);
     } else {
       this.hero(titleX, 431, 0, 0, 1, true, time, 0, 2.9);
       this.firefly(
@@ -291,7 +337,7 @@ export class Renderer {
     y: number,
     rx: number,
     ry: number,
-    color: string,
+    color: string | CanvasGradient,
     outline?: string,
     lineWidth = 2,
   ) {
@@ -814,12 +860,257 @@ export class Renderer {
     }
   }
 
-  private beetle(enemy: Rect & { vx: number }, time: number) {
+  private diamond(x: number, y: number, time: number, index: number) {
+    const c = this.ctx;
+    c.save();
+    c.translate(x, y + Math.sin(time * 2.1 + index) * 3);
+    this.ellipse(0, 1, 23, 24, "rgba(132,248,255,.16)");
+    this.ellipse(0, 1, 18, 19, "rgba(226,255,253,.22)");
+    const facet = (points: number[][], color: string) => {
+      c.beginPath();
+      c.moveTo(points[0][0], points[0][1]);
+      for (const point of points.slice(1)) c.lineTo(point[0], point[1]);
+      c.closePath();
+      c.fillStyle = color;
+      c.fill();
+    };
+    facet(
+      [
+        [-10, -11],
+        [10, -11],
+        [16, -3],
+        [0, 17],
+        [-16, -3],
+      ],
+      "#1d9fbf",
+    );
+    facet(
+      [
+        [-10, -11],
+        [0, -11],
+        [-6, -3],
+        [-16, -3],
+      ],
+      "#b2fbff",
+    );
+    facet(
+      [
+        [0, -11],
+        [10, -11],
+        [16, -3],
+        [6, -3],
+      ],
+      "#65e5f3",
+    );
+    facet(
+      [
+        [0, -11],
+        [6, -3],
+        [-6, -3],
+      ],
+      "#e5ffff",
+    );
+    facet(
+      [
+        [-16, -3],
+        [-6, -3],
+        [0, 17],
+      ],
+      "#18b7db",
+    );
+    facet(
+      [
+        [-6, -3],
+        [6, -3],
+        [0, 17],
+      ],
+      "#7af3fa",
+    );
+    facet(
+      [
+        [6, -3],
+        [16, -3],
+        [0, 17],
+      ],
+      "#29d0e6",
+    );
+    this.line(
+      [
+        [-10, -11],
+        [10, -11],
+        [16, -3],
+        [0, 17],
+        [-16, -3],
+        [-10, -11],
+      ],
+      "#168baf",
+      1.4,
+    );
+    this.line(
+      [
+        [-14, -3],
+        [14, -3],
+      ],
+      "rgba(239,255,255,.75)",
+      1.2,
+    );
+    this.line(
+      [
+        [-9, -8],
+        [-12, -4],
+      ],
+      "#ffffff",
+      2,
+    );
+    // A quiet glint keeps the facets legible without flashing the whole pickup.
+    const glint = 0.5 + (Math.sin(time * 2.2 + index) + 1) * 0.25;
+    c.globalAlpha = glint;
+    this.line(
+      [
+        [17, -17],
+        [17, -9],
+      ],
+      "#f5ffff",
+      1.7,
+    );
+    this.line(
+      [
+        [13, -13],
+        [21, -13],
+      ],
+      "#f5ffff",
+      1.7,
+    );
+    c.restore();
+  }
+
+  private starAura(
+    x: number,
+    feet: number,
+    size: number,
+    remaining: number,
+    time: number,
+    foreground: boolean,
+  ) {
+    const c = this.ctx;
+    const urgent = remaining < 3;
+    const centerY = feet - 29 * size;
+    const fade = Math.min(1, remaining / 0.65);
+    c.save();
+    c.globalAlpha = fade;
+    if (!foreground) {
+      const radius = (44 + Math.sin(time * 3) * 1.5) * size;
+      const glow = c.createRadialGradient(
+        x,
+        centerY,
+        7 * size,
+        x,
+        centerY,
+        radius,
+      );
+      glow.addColorStop(0, "rgba(255,250,158,.35)");
+      glow.addColorStop(
+        0.65,
+        urgent ? "rgba(255,178,94,.28)" : "rgba(255,223,106,.25)",
+      );
+      glow.addColorStop(1, "rgba(255,242,155,0)");
+      this.ellipse(x, centerY, radius, radius, glow);
+      c.lineWidth = 1.8;
+      c.strokeStyle = "rgba(255,255,226,.28)";
+      c.beginPath();
+      c.ellipse(x, centerY, 31 * size, 40 * size, 0, 0, Math.PI * 2);
+      c.stroke();
+      // The continuous draining halo communicates expiry without a strobe.
+      c.strokeStyle = urgent ? "#ffb165" : "#fff4a5";
+      c.lineWidth = urgent ? 2.5 : 2;
+      c.lineCap = "round";
+      c.beginPath();
+      c.ellipse(
+        x,
+        centerY,
+        31 * size,
+        40 * size,
+        0,
+        -Math.PI / 2,
+        -Math.PI / 2 +
+          Math.PI * 2 * Math.min(1, remaining / STAR_POWER_DURATION),
+      );
+      c.stroke();
+    }
+    const colors = urgent
+      ? ["#ffd580", "#ffb16d", "#fff2bd"]
+      : ["#fff19b", "#a4f5eb", "#e9b4f4"];
+    for (let i = 0; i < 3; i++) {
+      const angle = time * 2.2 + (i / 3) * Math.PI * 2;
+      const depth = Math.sin(angle);
+      if (depth >= 0 !== foreground) continue;
+      const sx = x + Math.cos(angle) * 31 * size;
+      const sy = centerY + depth * 24 * size;
+      this.starPath(sx, sy, (4.5 + (depth + 1) * 0.7) * Math.sqrt(size));
+      c.fillStyle = colors[i];
+      c.fill();
+      c.lineWidth = 1;
+      c.strokeStyle = "#fffbee";
+      c.stroke();
+      this.ellipse(
+        sx - 5 * Math.cos(angle),
+        sy - 4 * Math.sin(angle),
+        1.4,
+        1.4,
+        "#fff9d8",
+      );
+    }
+    c.restore();
+  }
+
+  private transformation(
+    x: number,
+    feet: number,
+    size: number,
+    growing: boolean,
+    remaining: number,
+  ) {
+    const c = this.ctx;
+    const progress = 1 - remaining / 0.55;
+    c.save();
+    c.globalAlpha = (1 - progress) * 0.75;
+    c.strokeStyle = growing ? "#b8fbff" : "#ffbea2";
+    c.lineWidth = 3 * (1 - progress) + 1;
+    c.beginPath();
+    c.ellipse(
+      x,
+      feet - 24 * size,
+      (20 + progress * 24) * size,
+      (28 + progress * 9) * size,
+      0,
+      0,
+      Math.PI * 2,
+    );
+    c.stroke();
+    for (let i = 0; i < 5; i++) {
+      const angle = (i / 5) * Math.PI * 2 - Math.PI / 2;
+      const radius = (25 + progress * 22) * size;
+      this.starPath(
+        x + Math.cos(angle) * radius,
+        feet - 25 * size + Math.sin(angle) * radius,
+        (3 + (1 - progress) * 2) * Math.sqrt(size),
+      );
+      c.fillStyle = growing ? "#caffff" : "#ffd7b5";
+      c.fill();
+    }
+    c.restore();
+  }
+
+  private beetle(enemy: Rect & { vx: number }, time: number, squashed = 0) {
     const c = this.ctx;
     c.save();
     c.translate(enemy.x + enemy.w / 2, enemy.y + enemy.h);
     c.scale(enemy.vx < 0 ? -1 : 1, 1);
-    const stride = Math.sin(time * 15 + enemy.x * 0.05) * 2;
+    if (squashed > 0) {
+      c.globalAlpha = Math.min(1, squashed / (ENEMY_SQUASH_DURATION * 0.5));
+      c.scale(1.24, 0.26);
+    }
+    const stride = squashed > 0 ? 0 : Math.sin(time * 15 + enemy.x * 0.05) * 2;
     this.ellipse(0, -1, 18, 3, "rgba(36,65,53,.17)");
     for (let i = 0; i < 3; i++) {
       const x = -11 + i * 9;
@@ -1102,12 +1393,39 @@ export class Renderer {
         this.burst(star.x, star.y, "#ffe89a", 18, 120);
       this.previousStars[i] = star.collected;
     });
+    game.diamonds.forEach((diamond, i) => {
+      if (diamond.collected && !this.previousDiamonds[i]) {
+        this.burst(diamond.x, diamond.y, "#67e8f2", 12, 105);
+        this.burst(diamond.x, diamond.y, "#e1ffff", 7, 65);
+      }
+      this.previousDiamonds[i] = diamond.collected;
+    });
     game.enemies.forEach((enemy, i) => {
       if (!enemy.alive && this.previousEnemies[i])
         this.burst(enemy.x + enemy.w / 2, enemy.y + 12, "#c3a9e4", 10, 90);
       this.previousEnemies[i] = enemy.alive;
     });
     const player = game.player;
+    if (player.form !== this.previousForm) {
+      this.formChange = 0.55;
+      this.growing = player.form === "big";
+      this.burst(
+        player.x + player.w / 2,
+        player.y + player.h / 2,
+        this.growing ? "#a6f7fb" : "#ffb29a",
+        18,
+        110,
+      );
+      this.previousForm = player.form;
+    }
+    if (game.deaths !== this.previousDeaths && game.state === "playing")
+      this.burst(
+        player.x + player.w / 2,
+        player.y + player.h / 2,
+        "#e3f8d2",
+        12,
+        70,
+      );
     if (player.grounded && !this.previousGrounded) {
       this.landing = 0.14;
       this.burst(

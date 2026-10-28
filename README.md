@@ -2,8 +2,8 @@
 
 An original, Mario-inspired side-scrolling platformer for iPhone, iPad, and the
 browser. Guide Pip through Sunlit Meadow, Firefly Hollow, and Cloudtop Crossing:
-collect sunseeds, find three hidden stars per world, bounce on beetles, activate
-checkpoints, and reach the sun portal. All art and sound are generated locally.
+collect golden coins, grow with diamonds, power up with stars, squash beetles,
+activate checkpoints, and reach the sun portal. All art and sound are generated locally.
 
 ## Play and develop
 
@@ -26,6 +26,24 @@ Movement uses quick acceleration and braking, midair steering, a small grace
 period after leaving a ledge, and buffered jumps just before landing. The
 cartoon artwork is drawn locally at the screen's pixel density, with three
 distinct palettes, animated characters, and collectible/landing effects.
+
+## Lives and power-ups
+
+- Start each trail small with **3 lives**. Falling into a gap always costs one
+  life, including while big or using star power.
+- **Diamonds make Pip big.** A bug hit then shrinks Pip without taking a life.
+  A hit while small costs a life. A brief grace period after shrinking or
+  respawning prevents one collision from counting as several hits.
+- **Every 50 coins earns one life, up to 3.** The counter rolls over at 50 even
+  when lives are full. Coins stay collected after a death, so the same coins
+  cannot be collected repeatedly for extra lives.
+- **Land on a bug to squash it** and bounce upward. Squashed bugs no longer hurt.
+- **Stars give 10 seconds of star power:** bugs cannot hurt Pip and touching them
+  squashes them. Another star refreshes the timer. Pausing freezes the timer;
+  falling still costs a life.
+- Losing a life returns small Pip to the checkpoint, or the start if no checkpoint
+  is active, and clears star power. Diamonds return so Pip can grow again.
+  Zero lives ends the run. Restarting or choosing another trail starts fresh.
 
 Best completion times, stars, and sound preference are saved on the device.
 The game has no accounts, ads, analytics, remote assets, or backend requirement.
@@ -51,7 +69,7 @@ TestFlight workflow steps. No Apple credentials should be committed to Git.
 ## Verification
 
 ```sh
-npm test                  # Physics, damage, checkpoint, and all-star route tests
+npm test                  # Lives, power-ups, physics, and all-star route tests
 npm run build             # TypeScript and production build
 npm run test:browser       # Desktop + mobile Chromium smoke tests
 npm run ios:sync
