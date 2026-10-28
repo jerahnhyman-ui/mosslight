@@ -2,86 +2,135 @@ import "@fontsource/dm-sans/400.css";
 import "@fontsource/dm-sans/500.css";
 import "@fontsource/dm-sans/600.css";
 import "@fontsource/dm-sans/700.css";
-import "@fontsource/space-mono/400.css";
 import "./style.css";
 import { Game } from "./game/engine";
 import { levels } from "./game/levels";
 import { Renderer } from "./game/renderer";
+import { Controls } from "./controls";
 import { AudioPlayer } from "./audio";
 import { readSave, writeSave } from "./storage";
 
-const icons = {
-  menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
-  arrow: '<path d="M5 12h14m-6-6 6 6-6 6"/>',
-  sound:
-    '<path d="m11 5-6 4H2v6h3l6 4zM15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/>',
-  muted: '<path d="m11 5-6 4H2v6h3l6 4zM16 9l6 6m0-6-6 6"/>',
-  pause: '<path d="M8 5v14M16 5v14"/>',
-  expand: '<path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/>',
-  close: '<path d="m6 6 12 12M6 18 18 6"/>',
+const paths = {
   leaf: '<path d="M19 4C8 2 3 7 5 14c7 3 13-1 14-10ZM4 20 14 9"/>',
-  check: '<path d="m5 12 4 4L19 6"/>',
-  flag: '<path d="M5 21V3m0 1c5-4 9 4 14 0v10c-5 4-9-4-14 0"/>',
+  arrow: '<path d="M5 12h14m-6-6 6 6-6 6"/>',
+  left: '<path d="m14 5-7 7 7 7"/>',
+  right: '<path d="m10 5 7 7-7 7"/>',
+  jump: '<path d="M12 20V4m-7 7 7-7 7 7"/>',
+  pause: '<path d="M8 5v14M16 5v14"/>',
+  play: '<path d="m8 4 12 8-12 8Z"/>',
+  close: '<path d="m6 6 12 12M6 18 18 6"/>',
+  menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
+  sound:
+    '<path d="m11 5-6 4H2v6h3l6 4ZM16 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/>',
+  muted: '<path d="m11 5-6 4H2v6h3l6 4ZM16 9l6 6m0-6-6 6"/>',
+  help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 8.5a2.5 2.5 0 0 1 5 0c0 2-2.5 2-2.5 4M12 16h.01"/>',
+  flag: '<path d="M5 21V3m0 1c5-3 9 3 14 0v10c-5 3-9-3-14 0"/>',
+  heart:
+    '<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/>',
 };
-function icon(name: keyof typeof icons, cls = "") {
-  return `<svg class="icon ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name]}</svg>`;
-}
-const seedIcon = '<span class="seed-icon" aria-hidden="true"></span>';
-const starIcon = '<span class="star-icon" aria-hidden="true">✦</span>';
+const icon = (name: keyof typeof paths) =>
+  `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name]}</svg>`;
+const $ = <T extends HTMLElement = HTMLElement>(selector: string) =>
+  document.querySelector<T>(selector)!;
 const save = readSave();
 const audio = new AudioPlayer();
 audio.enabled = save.sound;
-const $ = <T extends HTMLElement = HTMLElement>(query: string) =>
-  document.querySelector<T>(query)!;
 let selected = 0;
-let game = new Game(selected);
-let mode: "title" | "playing" | "paused" | "won" | "lost" = "title";
+let game = new Game(0);
+type Mode = "title" | "playing" | "paused" | "won" | "lost";
+let mode: Mode = "title";
+let toastUntil = 0;
 let helpReturn: HTMLElement | null = null;
-let lastOverlayMode = "";
-let gamepadJump = false;
-const input = { left: false, right: false, jump: false, jumpPressed: false };
-const heldKeys = new Set<string>();
-const touchHeld = new Map<number, string>();
 
 $("#app").innerHTML = `
-<div class="app-shell">
-  <header class="header">
-    <a class="brand" href="#" aria-label="Mosslight home"><img src="/icon.svg" alt="" /><span>mosslight<span class="brand-dot">.</span></span></a>
-    <nav aria-label="Main navigation"><a class="nav-link active" href="#play">Play</a><a class="nav-link" href="#journey">The worlds</a><button class="nav-link help-button">How to play ${icon("arrow")}</button></nav>
-    <div class="header-end"><span class="offline"><i></i> A little escape</span><button class="icon-button sound-button" aria-label="Mute sound" title="Toggle sound"></button></div>
+<main class="game-app" id="play" data-mode="title" data-theme="meadow">
+  <div class="scene-wrap"><canvas id="game" width="960" height="540" tabindex="0" aria-label="Mosslight platformer. Move with arrow keys or A and D. Hold Space to jump higher. P pauses."></canvas></div>
+  <header class="topbar">
+    <button class="brand" aria-label="Choose a world">${icon("leaf")}<span>Mosslight<span class="brand-dot">.</span></span></button>
+    <div class="world-location"><span class="world-number">01</span><span id="world-label">Sunlit Meadow</span></div>
+    <div class="toolbar-actions"><button class="round-button sound-button" aria-label="Mute sound" title="Sound"></button><button class="round-button help-button" aria-label="How to play" title="How to play">${icon("help")}</button><button class="round-button" id="pause-button" aria-label="Pause game" title="Pause (P)">${icon("pause")}</button><button class="round-button" id="menu-button" aria-label="Game menu" title="Worlds and settings">${icon("menu")}</button></div>
   </header>
-  <main>
-    <section class="intro" aria-labelledby="page-title"><div><p class="eyebrow">SMALL HERO. WILD WORLD.</p><h1 id="page-title">Adventure grows here.</h1><p>A pocket-sized platformer with a little heart and a lot to explore.</p></div><div class="intro-badge"><span class="spark">✳</span><span>Take a breath.<br>Take a leap.</span></div></section>
-    <section class="game-shell" id="play" aria-label="Mosslight platform game">
-      <div class="game-toolbar"><div class="location"><span class="live-dot"></span><span id="world-label"></span><span class="location-divider">/</span><span class="world-sub">THE SUNSEED TRAIL</span></div><div class="toolbar-actions"><span class="best-label" id="best-label"></span><button class="icon-button" id="pause-button" aria-label="Pause game" title="Pause (P)">${icon("pause")}</button><button class="icon-button" id="menu-button" aria-label="Game menu" title="Worlds and settings">${icon("menu")}</button><button class="icon-button" id="fullscreen-button" aria-label="Enter full screen" title="Full screen">${icon("expand")}</button></div></div>
-      <div class="game-viewport">
-        <canvas id="game" width="960" height="540" tabindex="0" aria-label="Mosslight platformer. Move with arrow keys or A and D. Jump with Space, W or up. P pauses."></canvas>
-        <div class="hud" hidden><div class="hud-left"><span class="hud-item">${seedIcon}<span id="coin-count">00</span><span class="hud-total" id="coin-total"></span></span><span class="hud-item">${starIcon}<span id="star-count">0</span><span class="hud-total">/ 3</span></span></div><div class="hud-right"><span id="health" aria-label="3 hearts">♥ ♥ ♥</span><span class="hud-time" id="timer">00:00</span></div></div>
-        <div id="overlay" class="game-overlay"></div>
-        <div class="touch-controls" hidden><div class="touch-dpad"><button data-control="left" aria-label="Move left">←</button><button data-control="right" aria-label="Move right">→</button></div><button class="touch-jump" data-control="jump" aria-label="Jump">↑<span>JUMP</span></button></div>
-        <span class="checkpoint-toast" role="status" hidden>⚑ A little place to begin again</span>
-      </div>
-      <div class="game-footer"><span><span class="footer-star">✧</span><span id="game-hint">Find the sunseeds. Follow your curiosity.</span></span><button class="help-button control-hint"><kbd>←</kbd><kbd>→</kbd><span>move</span><kbd>SPACE</kbd><span>jump</span><span class="help-circle">?</span></button></div>
-    </section>
-    <section class="journey" id="journey" aria-labelledby="journey-title"><div class="section-heading"><div><p class="eyebrow">ONE LITTLE HERO. THREE LITTLE WORLDS.</p><h2 id="journey-title">Choose your next wonder.</h2></div><span class="journey-progress" id="journey-progress">0 / 3 trails complete</span></div><div class="world-grid" id="world-grid"></div></section>
-    <footer class="footer"><span>${icon("leaf")} A little joy, one jump at a time.</span><span>An original adventure by Mountaineer Apps<span class="footer-dot">·</span>v1.0</span></footer>
-  </main>
-</div>
-<dialog id="help-dialog" aria-labelledby="help-title"><button class="icon-button dialog-close" aria-label="Close instructions">${icon("close")}</button><p class="eyebrow">YOUR POCKET FIELD GUIDE</p><h2 id="help-title">A few little pointers.</h2><p>Help Pip bring the light back. Gather sunseeds and find the glowing portal at the end of each trail.</p><div class="guide-grid"><div><span class="guide-symbol">↔</span><h3>Wander a little</h3><p>Use <kbd>←</kbd> <kbd>→</kbd> or <kbd>A</kbd> <kbd>D</kbd> to move.</p></div><div><span class="guide-symbol">↑</span><h3>Take a leap</h3><p>Hold <kbd>SPACE</kbd>, <kbd>W</kbd> or <kbd>↑</kbd> for a higher jump.</p></div><div><span class="guide-symbol gold">✦</span><h3>Find the hidden light</h3><p>Collect three golden stars in every world. Jump on beetles to bounce.</p></div><div><span class="guide-symbol">⚑</span><h3>Make yourself at home</h3><p>Flags save your place during a run. You have three hearts to reach the portal.</p></div></div><p class="guide-note">On a touch screen, use the on-screen arrows and jump button. A connected gamepad works too. Press P or Esc to pause. Best scores stay on this device.</p><button class="primary-button close-guide">Let’s wander ${icon("arrow")}</button></dialog>
-<dialog id="menu-dialog" aria-labelledby="menu-title"><button class="icon-button menu-close" aria-label="Close game menu">${icon("close")}</button><p class="eyebrow">A WORLD OF LITTLE POSSIBILITIES</p><h2 id="menu-title">Where shall we wander?</h2><div id="menu-worlds"></div><div class="menu-settings"><button class="menu-sound"></button><button class="menu-help">${icon("leaf")} How to play</button></div></dialog>
+  <div class="hud" hidden>
+    <div class="collectibles"><span class="hud-pill"><span class="seed-symbol" aria-hidden="true"></span><b id="coin-count">00</b><span id="coin-total"></span></span><span class="hud-pill stars-pill"><span class="star-symbol" aria-hidden="true">★</span><b id="star-count">0</b><span>/ 3</span></span></div>
+    <div class="vitals"><span id="health" aria-label="3 hearts remaining"></span><span id="timer">00:00</span></div>
+    <div class="trail-track" aria-label="Trail progress"><span></span></div>
+  </div>
+  <div id="overlay" class="game-overlay"></div>
+  <div class="world-strip" id="world-strip" aria-label="Choose a world"></div>
+  <div class="touch-controls" hidden>
+    <div class="movement-control"><div class="touch-dpad" data-direction="0"><button data-control="left" data-direction="-1" aria-label="Move left" aria-pressed="false">${icon("left")}</button><span class="dpad-divider"></span><button data-control="right" data-direction="1" aria-label="Move right" aria-pressed="false">${icon("right")}</button></div><span class="control-caption">SLIDE TO MOVE</span></div>
+    <div class="jump-control"><button class="touch-jump" data-control="jump" aria-label="Jump" aria-pressed="false">${icon("jump")}<span>JUMP</span></button><span class="control-caption">HOLD TO GO HIGHER</span></div>
+  </div>
+  <div class="checkpoint-toast" role="status" hidden>${icon("flag")} Checkpoint reached!</div>
+  <p class="rotate-tip">↻ Turn sideways for a bigger adventure</p>
+  <div class="keyboard-hint"><span><kbd>←</kbd><kbd>→</kbd> move</span><span><kbd>SPACE</kbd> jump</span><span><kbd>P</kbd> pause</span></div>
+</main>
+<dialog id="menu-dialog" aria-labelledby="menu-title"><button class="round-button menu-close" aria-label="Close game menu">${icon("close")}</button><p class="eyebrow">THE SUNSEED TRAILS</p><h2 id="menu-title">Choose your adventure.</h2><p class="dialog-description">Three little worlds. A whole lot to discover.</p><div id="menu-worlds"></div><div class="menu-settings"><button class="menu-sound"></button><button class="menu-help">${icon("help")} Controls</button><span id="journey-progress"></span></div></dialog>
+<dialog id="help-dialog" aria-labelledby="help-title"><button class="round-button dialog-close" aria-label="Close instructions">${icon("close")}</button><p class="eyebrow">MEET YOUR MOVES</p><h2 id="help-title">Little hero. Big leaps.</h2><div class="guide-grid"><div><span class="guide-symbol">↔</span><h3>Move your way</h3><p>Slide your left thumb across the arrows to steer. On a keyboard, use <kbd>←</kbd> <kbd>→</kbd> or <kbd>A</kbd> <kbd>D</kbd>.</p></div><div><span class="guide-symbol coral">↑</span><h3>Make the jump</h3><p>Tap for a short hop. Hold for a higher leap. Use your right thumb, <kbd>Space</kbd>, or the A button on a gamepad.</p></div><div><span class="guide-symbol gold">★</span><h3>Find the light</h3><p>Gather sunseeds, find all three stars, and reach the glowing portal. Bounce on beetles from above.</p></div><div><span class="guide-symbol">⚑</span><h3>Keep exploring</h3><p>Flags save your place during a run. You have three hearts. Pause whenever you need a break.</p></div></div><button class="primary-button close-guide">Got it ${icon("arrow")}</button></dialog>
 `;
+const app = $(".game-app");
 const canvas = $<HTMLCanvasElement>("#game");
 const renderer = new Renderer(canvas);
 const overlay = $("#overlay");
 const hud = $(".hud");
 const dialog = $<HTMLDialogElement>("#help-dialog");
 const menuDialog = $<HTMLDialogElement>("#menu-dialog");
-function formatTime(seconds: number) {
-  return `${Math.floor(seconds / 60)
+const controls = new Controls(
+  $(".touch-dpad"),
+  $(".touch-jump"),
+  () => mode === "playing" && !dialog.open && !menuDialog.open,
+  () => audio.unlock(),
+  () => {
+    if (dialog.open || menuDialog.open) return;
+    if (mode === "playing") pause();
+    else if (mode === "paused") resume();
+  },
+);
+const formatTime = (seconds: number) =>
+  `${Math.floor(seconds / 60)
     .toString()
     .padStart(2, "0")}:${Math.floor(seconds % 60)
     .toString()
     .padStart(2, "0")}`;
+
+function worldArt(index: number) {
+  const colors = [
+    ["#83e1ee", "#e1f6bf", "#62cfa3", "#1c9d78"],
+    ["#6768bb", "#c9b5f2", "#9687cf", "#5463a0"],
+    ["#76c9ed", "#daf5e9", "#9ecbcd", "#4f9faf"],
+  ][index];
+  return `<svg class="world-art" viewBox="0 0 240 130" aria-hidden="true"><defs><linearGradient id="sky-${index}" x2="0" y2="1"><stop stop-color="${colors[0]}"/><stop offset="1" stop-color="${colors[1]}"/></linearGradient></defs><rect width="240" height="130" rx="16" fill="url(#sky-${index})"/><circle cx="181" cy="34" r="18" fill="#fff5b6"/><path d="M0 87Q40 16 90 88Q138 40 191 81Q224 58 240 78V130H0" fill="${colors[2]}"/><path d="M0 112Q66 62 123 110Q178 71 240 101V130H0" fill="${colors[3]}"/><path d="M0 119Q74 112 133 119T240 119V130H0" fill="#207357"/><g fill="#fff" opacity=".8"><ellipse cx="50" cy="34" rx="24" ry="8"/><ellipse cx="59" cy="28" rx="14" ry="10"/></g><path d="m113 78 4 8 9 1-7 6 2 9-8-5-8 5 2-9-7-6 9-1Z" fill="#ffdb73"/></svg>`;
+}
+function updateWorlds() {
+  $("#world-strip").innerHTML = levels
+    .map(
+      (level, i) =>
+        `<button class="world-tab ${selected === i ? "selected" : ""}" data-world="${i}" aria-pressed="${selected === i}"><span class="tab-number">0${i + 1}</span><span><small>${selected === i ? "YOUR NEXT ADVENTURE" : "EXPLORE"}</small><strong>${level.name}</strong></span><span class="tab-stars" aria-label="${save.progress[i].stars} stars">${[0, 1, 2].map((n) => `<i class="${n < save.progress[i].stars ? "earned" : ""}">★</i>`).join("")}</span></button>`,
+    )
+    .join("");
+  document
+    .querySelectorAll<HTMLButtonElement>("[data-world]")
+    .forEach((button) =>
+      button.addEventListener("click", () =>
+        chooseWorld(Number(button.dataset.world)),
+      ),
+    );
+  $("#menu-worlds").innerHTML = levels
+    .map(
+      (level, i) =>
+        `<button class="menu-world ${selected === i ? "selected" : ""}" data-menu-world="${i}">${worldArt(i)}<span class="menu-world-info"><small>WORLD 0${i + 1}</small><strong>${level.name}</strong><span>${save.progress[i].completed ? "Trail completed" : ["A bright beginning", "Follow the fireflies", "Head for the clouds"][i]} <b>${"★".repeat(save.progress[i].stars)}${"☆".repeat(3 - save.progress[i].stars)}</b></span></span>${icon("arrow")}</button>`,
+    )
+    .join("");
+  document
+    .querySelectorAll<HTMLButtonElement>("[data-menu-world]")
+    .forEach((button) =>
+      button.addEventListener("click", () => {
+        menuDialog.close();
+        chooseWorld(Number(button.dataset.menuWorld));
+      }),
+    );
+  $("#journey-progress").textContent =
+    `${save.progress.filter((item) => item.completed).length} / 3 trails complete`;
 }
 function updateSound() {
   $(".sound-button").innerHTML = icon(audio.enabled ? "sound" : "muted");
@@ -93,75 +142,20 @@ function updateSound() {
   $(".menu-sound").innerHTML =
     `${icon(audio.enabled ? "sound" : "muted")} Sound ${audio.enabled ? "on" : "off"}`;
 }
-function worldArt(index: number) {
-  const palettes = [
-    ["#e1ebd5", "#b6cdb3", "#6a9680", "#e6bb60"],
-    ["#e7dfe9", "#b2a7c1", "#726885", "#f2ca88"],
-    ["#e4eaf0", "#bcced3", "#6e9498", "#ecbc64"],
-  ];
-  const [sky, far, near, sun] = palettes[index];
-  return `<svg viewBox="0 0 180 110" class="world-art" role="img" aria-label="${["Green meadow with a golden sun", "Purple woodland under the moon", "Blue mountain peaks"][index]}"><rect width="180" height="110" fill="${sky}"/><circle cx="136" cy="30" r="15" fill="${sun}"/><path d="M0 79 22 56 42 62 68 27 103 65 128 52 180 81v29H0" fill="${far}"/><path d="M0 85 27 78 55 84 85 67 119 85 153 66 180 78v32H0" fill="${near}"/><path d="M0 98h180v12H0" fill="#365b4b"/><path d="M0 96h180v5H0" fill="#91af6f"/><path d="M25 79h8v17h-8zm-8-21h24v24H17zm5-10h15v14H22z" fill="${near}"/><path d="M109 83h12v15h-12zm2-4h8v5h-8z" fill="#d1e9a0"/><path d="M118 86h3v3h-3" fill="#25493e"/><path d="M145 84h4v5h-4zm-2 2h8v2h-8" fill="#f7d887"/>${index === 2 ? '<path d="m68 27-13 18 13-4 12 5z" fill="#f7f7ec"/>' : ""}</svg>`;
-}
-function updateWorlds() {
-  $("#world-grid").innerHTML = levels
-    .map((level, index) => {
-      const p = save.progress[index];
-      return `<button class="world-card ${selected === index ? "selected" : ""}" data-world="${index}" aria-pressed="${selected === index}">${worldArt(index)}<span class="world-info"><span class="world-kicker">WORLD 0${index + 1}<span class="world-status">${p.completed ? icon("check") : selected === index ? "SELECTED" : ""}</span></span><strong>${level.name}</strong><span class="world-description">${["A sunlit start to something good.", "A little magic after sundown.", "There’s wonder a little higher."][index]}</span><span class="world-stars" aria-label="${p.stars} of 3 stars collected">${[0, 1, 2].map((i) => `<span class="${p.stars > i ? "collected" : ""}">✦</span>`).join("")}<span class="world-action">${p.completed ? "Wander again" : selected === index ? "Ready to explore" : "Explore world"} ${icon("arrow")}</span></span></span></button>`;
-    })
-    .join("");
-  $("#journey-progress").textContent =
-    `${save.progress.filter((p) => p.completed).length} / 3 trails complete`;
-  document
-    .querySelectorAll<HTMLButtonElement>("[data-world]")
-    .forEach((button) =>
-      button.addEventListener("click", () => {
-        chooseWorld(Number(button.dataset.world));
-        $("#play").scrollIntoView({ behavior: "smooth", block: "center" });
-      }),
-    );
-}
-function showMenu() {
-  if (mode === "playing") pause();
-  $("#menu-worlds").innerHTML = levels
-    .map(
-      (level, i) =>
-        `<button class="menu-world ${i === selected ? "selected" : ""}" data-menu-world="${i}">${worldArt(i)}<span><small>WORLD 0${i + 1}</small><strong>${level.name}</strong></span>${icon("arrow")}</button>`,
-    )
-    .join("");
-  document
-    .querySelectorAll<HTMLButtonElement>("[data-menu-world]")
-    .forEach((button) =>
-      button.addEventListener("click", () => {
-        menuDialog.close();
-        chooseWorld(Number(button.dataset.menuWorld));
-      }),
-    );
-  menuDialog.showModal();
-}
-function resetInput() {
-  heldKeys.clear();
-  touchHeld.clear();
-  Object.assign(input, {
-    left: false,
-    right: false,
-    jump: false,
-    jumpPressed: false,
-  });
-  gamepadJump = false;
-}
 function chooseWorld(index: number) {
   selected = index;
   game = new Game(index);
   mode = "title";
-  resetInput();
-  lastOverlayMode = "";
+  toastUntil = 0;
+  controls.reset();
   updateWorlds();
   updateUI();
 }
 function start() {
   game = new Game(selected);
   mode = "playing";
-  resetInput();
+  toastUntil = 0;
+  controls.reset();
   audio.unlock();
   updateUI();
   canvas.focus({ preventScroll: true });
@@ -169,19 +163,19 @@ function start() {
 function pause() {
   if (mode !== "playing") return;
   mode = "paused";
-  resetInput();
+  controls.reset();
   updateUI();
 }
 function resume() {
   mode = "playing";
-  resetInput();
+  controls.reset();
   audio.unlock();
   updateUI();
   canvas.focus({ preventScroll: true });
 }
 function finish() {
-  if (game.state === "won") {
-    mode = "won";
+  mode = game.state === "won" ? "won" : "lost";
+  if (mode === "won") {
     const previous = save.progress[selected];
     previous.completed = true;
     previous.stars = Math.max(previous.stars, game.collectedStars);
@@ -192,52 +186,47 @@ function finish() {
         : Math.min(previous.bestTime, game.elapsed);
     writeSave(save);
     updateWorlds();
-  } else mode = "lost";
-  resetInput();
+  }
+  controls.reset();
   updateUI();
 }
 function updateUI() {
-  $("#world-label").textContent =
-    `0${selected + 1}  ${game.level.name.toUpperCase()}`;
-  const best = save.progress[selected].bestTime;
-  $("#best-label").textContent =
-    best === null ? "A NEW ADVENTURE" : `BEST ${formatTime(best)}`;
+  app.dataset.mode = mode;
+  app.dataset.theme = game.level.theme;
+  $("#world-label").textContent = game.level.name;
+  $(".world-number").textContent = `0${selected + 1}`;
   hud.hidden = mode === "title";
   $(".touch-controls").hidden = mode !== "playing";
-  $<HTMLButtonElement>("#pause-button").disabled =
+  $("#world-strip").hidden = mode !== "title";
+  $("#pause-button").hidden =
     mode === "title" || mode === "won" || mode === "lost";
+  $("#pause-button").innerHTML = icon(mode === "paused" ? "play" : "pause");
   $("#pause-button").setAttribute(
     "aria-label",
     mode === "paused" ? "Resume game" : "Pause game",
   );
-  $("#game-hint").textContent =
-    mode === "playing"
-      ? "Hold jump a little longer to reach a little higher."
-      : "Find the sunseeds. Follow your curiosity.";
-  if (lastOverlayMode === mode) return;
-  lastOverlayMode = mode;
   overlay.hidden = mode === "playing";
-  overlay.className = `game-overlay ${mode === "title" ? "title-overlay" : "modal-overlay"}`;
   if (mode === "playing") {
     overlay.innerHTML = "";
+    updateHUD();
     return;
   }
   if (mode === "title") {
-    overlay.innerHTML = `<div class="title-content"><span class="adventure-tag"><span></span> YOUR NEXT LITTLE ADVENTURE</span><h2>Follow<br>the light<span>.</span></h2><p>A curious little sprout.<br>A world waiting to be discovered.</p><button class="primary-button" id="start-button">${save.progress[selected].completed ? "Wander again" : "Let’s wander"} ${icon("arrow")}</button><span class="title-note">No rush. Just a little wonder.</span></div><div class="meet-pip"><span>Meet Pip.</span><svg viewBox="0 0 80 45" aria-hidden="true"><path d="M70 5Q26 2 13 34m13-5-14 7-1-15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></div><div class="scene-label">${icon("leaf")} ${game.level.subtitle}</div>`;
+    overlay.innerHTML = `<div class="title-content"><p class="eyebrow"><span class="eyebrow-dot"></span> THE SUNSEED TRAILS</p><h1>A little hero.<br><span>A wild adventure.</span></h1><p class="title-description">Big leaps. Hidden treasures.<br>A bright new world around every bend.</p><button class="primary-button" id="start-button">${icon("play")}<span>Play ${game.level.name}</span></button><div class="title-footnote"><span>★</span> Find all 3 hidden stars</div></div><div class="hero-callout"><span>Hey, I’m Pip!</span><svg viewBox="0 0 70 50" aria-hidden="true"><path d="M5 5q42-6 48 32m-12-7 13 10 7-15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg></div>`;
     $("#start-button").addEventListener("click", start);
   } else if (mode === "paused") {
-    overlay.innerHTML = `<div class="result-panel"><span class="result-symbol">☁</span><p class="eyebrow">A MOMENT TO BREATHE</p><h2>The world can wait.</h2><p>Your adventure will be right here.</p><button class="primary-button" id="resume-button">Keep wandering ${icon("arrow")}</button><div class="panel-links"><button id="restart-button">Start over</button><button id="home-button">Choose a world</button></div></div>`;
+    overlay.innerHTML = `<div class="result-panel"><span class="panel-badge">${icon("pause")}</span><p class="eyebrow">TAKE A BREATHER</p><h2>Adventure can wait.</h2><p>Ready when you are.</p><button class="primary-button" id="resume-button">${icon("play")} Keep exploring</button><div class="panel-links"><button id="restart-button">Restart trail</button><button id="home-button">Choose a world</button></div></div>`;
     $("#resume-button").addEventListener("click", resume);
     bindPanel();
   } else if (mode === "won") {
-    overlay.innerHTML = `<div class="result-panel"><div class="result-stars" aria-label="${game.collectedStars} of 3 stars">${[0, 1, 2].map((i) => `<span class="${game.collectedStars > i ? "earned" : ""}">✦</span>`).join("")}</div><p class="eyebrow">A LITTLE LIGHT, RESTORED</p><h2>${selected === 2 ? "Look how far you’ve grown." : "Wonderfully wandered."}</h2><p>${game.level.name} is a little brighter because of you.</p><div class="result-stats"><span>${seedIcon}<b>${game.collectedCoins}</b> sunseeds</span><span><b>${formatTime(game.elapsed)}</b> trail time</span></div><button class="primary-button" id="next-button">${selected < 2 ? "On to the next wonder" : "Back to the beginning"} ${icon("arrow")}</button><div class="panel-links"><button id="restart-button">Explore again</button><button id="home-button">Choose a world</button></div></div>`;
+    overlay.innerHTML = `<div class="result-panel"><div class="result-stars" aria-label="${game.collectedStars} of 3 stars">${[0, 1, 2].map((i) => `<span class="${i < game.collectedStars ? "earned" : ""}">★</span>`).join("")}</div><p class="eyebrow">TRAIL COMPLETE!</p><h2>You brought the sunshine.</h2><div class="result-stats"><span><b>${game.collectedCoins}</b>sunseeds</span><span><b>${formatTime(game.elapsed)}</b>trail time</span></div><button class="primary-button" id="next-button">${selected < 2 ? "Next adventure" : "Play again"} ${icon("arrow")}</button><div class="panel-links"><button id="restart-button">Replay trail</button><button id="home-button">Choose a world</button></div></div>`;
     $("#next-button").addEventListener("click", () => {
       chooseWorld((selected + 1) % levels.length);
       start();
     });
     bindPanel();
   } else {
-    overlay.innerHTML = `<div class="result-panel"><span class="result-symbol">☘</span><p class="eyebrow">EVERY SPROUT STARTS SOMEWHERE</p><h2>Another little leap?</h2><p>Some paths take a little practice.<br>There’s a whole world cheering you on.</p><button class="primary-button" id="retry-button">Try again ${icon("arrow")}</button><div class="panel-links"><button id="home-button">Choose a world</button></div></div>`;
+    overlay.innerHTML = `<div class="result-panel"><span class="panel-badge">${icon("leaf")}</span><p class="eyebrow">ONE MORE ADVENTURE?</p><h2>You’ve got this, Pip.</h2><p>A fresh start is just a leap away.</p><button class="primary-button" id="retry-button">Try again ${icon("arrow")}</button><div class="panel-links"><button id="home-button">Choose a world</button></div></div>`;
     $("#retry-button").addEventListener("click", start);
     $("#home-button").addEventListener("click", showMenu);
   }
@@ -248,9 +237,15 @@ function bindPanel() {
   $("#restart-button").addEventListener("click", start);
   $("#home-button").addEventListener("click", showMenu);
 }
+function showMenu() {
+  pause();
+  controls.reset();
+  menuDialog.showModal();
+}
 function showHelp() {
   helpReturn = document.activeElement as HTMLElement;
-  if (mode === "playing") pause();
+  pause();
+  controls.reset();
   dialog.showModal();
 }
 function hideHelp() {
@@ -258,196 +253,88 @@ function hideHelp() {
   helpReturn?.focus({ preventScroll: true });
 }
 $("#menu-button").addEventListener("click", showMenu);
+$(".brand").addEventListener("click", showMenu);
 $(".menu-close").addEventListener("click", () => menuDialog.close());
-$(".menu-sound").addEventListener("click", () => $(".sound-button").click());
 $(".menu-help").addEventListener("click", () => {
   menuDialog.close();
   showHelp();
 });
-$(".brand").addEventListener("click", (e) => {
-  e.preventDefault();
-  chooseWorld(selected);
-});
-$(".sound-button").addEventListener("click", () => {
+$(".help-button").addEventListener("click", showHelp);
+$(".dialog-close").addEventListener("click", hideHelp);
+$(".close-guide").addEventListener("click", hideHelp);
+function toggleSound() {
   audio.enabled = !audio.enabled;
   save.sound = audio.enabled;
   writeSave(save);
   audio.unlock();
   if (audio.enabled) audio.play("coin");
   updateSound();
-});
+}
+$(".sound-button").addEventListener("click", toggleSound);
+$(".menu-sound").addEventListener("click", toggleSound);
 $("#pause-button").addEventListener("click", () =>
   mode === "paused" ? resume() : pause(),
 );
-document
-  .querySelectorAll(".help-button")
-  .forEach((button) => button.addEventListener("click", showHelp));
-$(".dialog-close").addEventListener("click", hideHelp);
-$(".close-guide").addEventListener("click", hideHelp);
-dialog.addEventListener("click", (event) => {
-  if (event.target === dialog) {
-    const r = dialog.getBoundingClientRect();
-    if (
-      event.clientX < r.left ||
-      event.clientX > r.right ||
-      event.clientY < r.top ||
-      event.clientY > r.bottom
-    )
-      hideHelp();
-  }
-});
-$("#fullscreen-button").addEventListener("click", async () => {
-  try {
-    if (document.fullscreenElement) await document.exitFullscreen();
-    else if ($("#play").requestFullscreen) await $("#play").requestFullscreen();
-    else $("#play").classList.toggle("expanded");
-  } catch {
-    $("#play").classList.toggle("expanded");
-  }
-});
-document.addEventListener("fullscreenchange", () => {
-  $("#fullscreen-button").setAttribute(
-    "aria-label",
-    document.fullscreenElement ? "Exit full screen" : "Enter full screen",
-  );
-});
-window.addEventListener("keydown", (event) => {
-  if (
-    dialog.open ||
-    menuDialog.open ||
-    event.metaKey ||
-    event.ctrlKey ||
-    event.altKey
-  )
-    return;
-  if (
-    [
-      "ArrowLeft",
-      "ArrowRight",
-      "ArrowUp",
-      "Space",
-      "KeyA",
-      "KeyD",
-      "KeyW",
-    ].includes(event.code)
-  ) {
-    if (mode !== "playing") return;
-    event.preventDefault();
-    if (
-      !heldKeys.has(event.code) &&
-      ["ArrowUp", "Space", "KeyW"].includes(event.code)
-    )
-      input.jumpPressed = true;
-    heldKeys.add(event.code);
-  }
-  if (event.repeat) return;
-  if (event.code === "KeyP" || event.code === "Escape") {
-    event.preventDefault();
-    if (mode === "playing") pause();
-    else if (mode === "paused") resume();
-  }
-  if (event.code === "Enter" && event.target === canvas) {
-    event.preventDefault();
-    if (mode === "title" || mode === "lost") start();
-  }
-});
-window.addEventListener("keyup", (event) => {
-  heldKeys.delete(event.code);
-});
 window.addEventListener("blur", () => {
-  resetInput();
+  controls.reset();
   pause();
 });
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
-    resetInput();
+    controls.reset();
     pause();
   }
 });
-document
-  .querySelectorAll<HTMLButtonElement>("[data-control]")
-  .forEach((button) => {
-    button.addEventListener("pointerdown", (event) => {
-      event.preventDefault();
-      button.setPointerCapture(event.pointerId);
-      const control = button.dataset.control!;
-      touchHeld.set(event.pointerId, control);
-      if (control === "jump") input.jumpPressed = true;
-      button.classList.add("pressed");
-      audio.unlock();
-    });
-    const release = (event: PointerEvent) => {
-      touchHeld.delete(event.pointerId);
-      button.classList.remove("pressed");
-    };
-    button.addEventListener("pointerup", release);
-    button.addEventListener("pointercancel", release);
-    button.addEventListener("lostpointercapture", release);
-  });
-function readInput() {
-  const touch = [...touchHeld.values()];
-  const pad = navigator.getGamepads?.().find((p) => p !== null);
-  const padJump = !!pad?.buttons[0]?.pressed;
-  if (padJump && !gamepadJump) {
-    input.jumpPressed = true;
-    audio.unlock();
+window.addEventListener("keydown", (event) => {
+  if (
+    event.code === "Enter" &&
+    event.target === canvas &&
+    (mode === "title" || mode === "lost")
+  )
+    start();
+});
+const setText = (selector: string, value: string) => {
+  const el = $(selector);
+  if (el.textContent !== value) el.textContent = value;
+};
+let lastHealth = -1;
+function updateHUD() {
+  setText("#coin-count", String(game.collectedCoins).padStart(2, "0"));
+  setText("#coin-total", `/ ${game.coins.length}`);
+  setText("#star-count", String(game.collectedStars));
+  setText("#timer", formatTime(game.elapsed));
+  if (lastHealth !== game.health) {
+    lastHealth = game.health;
+    $("#health").innerHTML = [0, 1, 2]
+      .map(
+        (i) =>
+          `<span class="${i < game.health ? "" : "empty-heart"}">${icon("heart")}</span>`,
+      )
+      .join("");
+    $("#health").setAttribute("aria-label", `${game.health} hearts remaining`);
   }
-  gamepadJump = padJump;
-  input.left =
-    heldKeys.has("ArrowLeft") ||
-    heldKeys.has("KeyA") ||
-    touch.includes("left") ||
-    (pad?.axes[0] ?? 0) < -0.25 ||
-    !!pad?.buttons[14]?.pressed;
-  input.right =
-    heldKeys.has("ArrowRight") ||
-    heldKeys.has("KeyD") ||
-    touch.includes("right") ||
-    (pad?.axes[0] ?? 0) > 0.25 ||
-    !!pad?.buttons[15]?.pressed;
-  input.jump =
-    heldKeys.has("Space") ||
-    heldKeys.has("ArrowUp") ||
-    heldKeys.has("KeyW") ||
-    touch.includes("jump") ||
-    padJump;
+  $(".trail-track span").style.transform =
+    `scaleX(${Math.max(0, Math.min(1, game.player.x / game.level.goal.x))})`;
 }
 let last = performance.now();
-let accumulator = 0;
-let toastUntil = 0;
 const reducedMotion = window.matchMedia(
   "(prefers-reduced-motion: reduce)",
 ).matches;
 function frame(now: number) {
-  const delta = Math.min((now - last) / 1000, 0.1);
+  const delta = (now - last) / 1000;
   last = now;
+  const input = controls.read();
+  if (mode === "title" && input.jumpPressed && !dialog.open && !menuDialog.open)
+    start();
   if (mode === "playing") {
-    readInput();
-    accumulator += delta;
-    while (accumulator >= 1 / 120) {
-      game.update(1 / 120, input);
-      input.jumpPressed = false;
-      accumulator -= 1 / 120;
-      for (const event of game.events) {
-        audio.play(event);
-        if (event === "checkpoint") toastUntil = now + 2800;
-      }
-      if (game.state !== "playing") {
-        finish();
-        break;
-      }
+    game.update(delta, input);
+    for (const event of game.events) {
+      audio.play(event);
+      if (event === "checkpoint") toastUntil = now + 2300;
     }
-    $("#coin-count").textContent = String(game.collectedCoins).padStart(2, "0");
-    $("#coin-total").textContent = `/ ${game.coins.length}`;
-    $("#star-count").textContent = String(game.collectedStars);
-    $("#health").innerHTML = Array.from(
-      { length: 3 },
-      (_, i) =>
-        `<span class="${i < game.health ? "" : "empty-heart"}">♥</span>`,
-    ).join(" ");
-    $("#health").setAttribute("aria-label", `${game.health} hearts remaining`);
-    $("#timer").textContent = formatTime(game.elapsed);
-  } else accumulator = 0;
+    updateHUD();
+    if (game.state !== "playing") finish();
+  }
   $(".checkpoint-toast").hidden = mode !== "playing" || now > toastUntil;
   renderer.render(
     game,
@@ -456,7 +343,7 @@ function frame(now: number) {
   );
   requestAnimationFrame(frame);
 }
-updateSound();
 updateWorlds();
+updateSound();
 updateUI();
 requestAnimationFrame(frame);
