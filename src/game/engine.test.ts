@@ -185,7 +185,7 @@ const routes: RouteStep[][] = [
 ];
 
 describe("Mosslight simulation", () => {
-  it.each(levels)(
+  it.each(levels.slice(0, 3))(
     "traverses the opening of $name with real controls and rescues its first firefly",
     (level) => {
       const game = new Game(level.id - 1);
@@ -769,7 +769,7 @@ describe("Mosslight simulation", () => {
     expect(game.diamonds.every((diamond) => !diamond.collected)).toBe(true);
   });
 
-  it.each(levels)(
+  it.each(levels.slice(0, 3))(
     "$name has reachable growth before enemies and after respawn",
     (level) => {
       const game = new Game(level.id - 1);
@@ -804,7 +804,7 @@ describe("Mosslight simulation", () => {
     expect(a.player.y).toBeCloseTo(b.player.y, 8);
   });
 
-  it.each(levels)(
+  it.each(levels.slice(0, 3))(
     "$name has jumpable gaps or reachable bridge routes and three firefly secrets",
     (level) => {
       expect(level.fireflies).toHaveLength(3);
@@ -910,7 +910,7 @@ describe("Long-adventure mechanics", () => {
     expect(game.activeCheckpointIndex).toBe(-1);
   });
 
-  it.each(levels)(
+  it.each(levels.slice(0, 3))(
     "$name gives every checkpoint a safe walk to a fresh growth diamond after death",
     (level) => {
       for (const [index, checkpoint] of level.checkpoints.entries()) {

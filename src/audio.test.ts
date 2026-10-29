@@ -81,6 +81,60 @@ afterEach(() => {
 });
 
 describe("audio playback lifecycle", () => {
+  it.each(["windmill", "hive"] as const)(
+    "plays %s music and restores it after star power",
+    (theme) => {
+      const audio = new AudioPlayer();
+      audio.unlock();
+      audio.setMusic(theme, true);
+      const initial = firstFrequency(context().oscillators[0]!);
+      const afterTheme = context().oscillators.length;
+      audio.setMusic(theme, true, true);
+      expect(firstFrequency(context().oscillators[afterTheme]!)).not.toBe(
+        initial,
+      );
+      const afterStar = context().oscillators.length;
+      audio.setMusic(theme, true);
+      expect(firstFrequency(context().oscillators[afterStar]!)).toBe(initial);
+      expect(vi.getTimerCount()).toBe(1);
+      audio.suspend();
+    },
+  );
+
+  it("plays expansion cues gently, coalesces repeated pickups and respects mute and pause", () => {
+    const audio = new AudioPlayer();
+    audio.unlock();
+    for (const event of [
+      "feather",
+      "feather-refill",
+      "feather-empty",
+      "portal",
+      "mechanism",
+      "hive-discovered",
+      "secret-complete",
+      "hoop",
+      "soft-landing",
+      "minigame-result",
+    ]) {
+      const before = context().oscillators.length;
+      audio.play(event);
+      expect(context().oscillators.length, event).toBeGreaterThan(before);
+    }
+    const beforeRepeat = context().oscillators.length;
+    audio.play("hoop");
+    expect(context().oscillators.length).toBe(beforeRepeat);
+    vi.advanceTimersByTime(150);
+    audio.play("hoop");
+    expect(context().oscillators.length).toBeGreaterThan(beforeRepeat);
+    audio.enabled = false;
+    const muted = context().oscillators.length;
+    audio.play("secret-complete");
+    expect(context().oscillators.length).toBe(muted);
+    audio.enabled = true;
+    audio.suspend();
+    audio.play("portal");
+    expect(context().oscillators.length).toBe(muted);
+  });
   it("waits for a gesture, then keeps only one music scheduler across frame updates", () => {
     const audio = new AudioPlayer();
     audio.setMusic("meadow", true);

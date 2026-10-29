@@ -1,6 +1,6 @@
 # Windmill Garden encounters
 
-Status: design proposal for implementation review. None of the encounters, scores, rewards, or new save fields below exists in the shipped game. Numerical values are initial tuning hypotheses, not playtest measurements. Movement and feather behavior are defined in [flight.md](flight.md); world placement is defined in [world.md](world.md).
+Status: implemented encounter and activity contract. Automated input routes cover the guardian and Gold hoop completion. Numerical values remain initial tuning choices; human-playtest targets below are not measured results. Movement and feather behavior are defined in [flight.md](flight.md); world placement is defined in [world.md](world.md).
 
 ## What the existing game supports
 
@@ -137,7 +137,7 @@ Course width is 7,200 px with continuous floor top y=470. Use the ordinary horiz
 | Landing pad        | x=520–720, top y=390, width 200     | Safe refill and landing bonus             |
 | Ground link        | x=720–900, top y=470                | Reset rhythm before the next cell         |
 
-Spawn at x=40 with feet on y=470; finish gate at x=7,140. Hoops are non-solid markers; striking their flower rim never damages or stops Pip. The nominal inner-edge launch to nearest legal landing-center span is approximately 288 px for small Pip; this is a geometry estimate, not a measured flight trace. The actual descending path may land farther into the 200 px pad. The preliminary layout must be verified against the final glide and acceleration before art is fixed.
+Spawn at player-left x=180 with feet on the first launch pad at y=390, visible above the largest directional controls during the countdown; finish gate at x=7,140. Hoops are non-solid markers; striking their flower rim never damages or stops Pip. The nominal inner-edge launch to nearest legal landing-center span is approximately 288 px for small Pip; this is a geometry estimate, not a measured flight trace. The actual descending path may land farther into the 200 px pad. The preliminary layout must be verified against the final glide and acceleration before art is fixed.
 
 The descending hoop deliberately tests horizontal control: A to B is 140 px across and 110 px down. Armed glide capped at 180 px/s needs at least 0.61 seconds to descend that far, while full-right speed covers the horizontal gap in 0.47 seconds. Release lift and ease the movement thumb toward neutral, then steer into B; holding full right is not the intended clean route. Show a curved descending dotted guide and a short first-cell hint, “Ease your steering to line up the lower hoop.” Do not require simultaneous rapid taps or precision reversal. If real-phone traces find braking unreliable, move B and its landing pad together farther right and revise cell spacing before tightening medal scores.
 

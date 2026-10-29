@@ -1,6 +1,6 @@
 # Wind Feather: flight contract
 
-Design proposal for the first expansion; no behavior in this document is implemented yet. Numbers below are initial tuning hypotheses, not playtest results. Route layout lives in [world.md](world.md); guardian and hoop rules live in [encounters.md](encounters.md).
+Flight contract for the implemented expansion. Numbers below remain initial tuning values, not physical-device playtest results. Route layout lives in [world.md](world.md); guardian and hoop rules live in [encounters.md](encounters.md).
 
 ## Intent and existing behavior
 

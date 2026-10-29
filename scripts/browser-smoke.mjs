@@ -284,7 +284,7 @@ async function jumpToX(page, targetX, goalX = MEADOW_GOAL_X) {
 const jumpToMeadowX = (page, targetX) => jumpToX(page, targetX);
 async function readStoredSave(page) {
   return page.evaluate(() =>
-    JSON.parse(localStorage.getItem("mosslight-save-v2") || "null"),
+    JSON.parse(localStorage.getItem("mosslight-save-v3") || "null"),
   );
 }
 async function checkStarPickupVisibility(page, label) {
@@ -671,13 +671,14 @@ try {
   await expect(secrets.locator("#firefly-count")).toHaveText("1");
   const rescued = await secrets.evaluate(
     () =>
-      JSON.parse(localStorage.getItem("mosslight-save-v2")).progress[0]
-        .fireflies,
+      JSON.parse(localStorage.getItem("mosslight-save-v3")).worlds[
+        "world.sunlit-meadow"
+      ].rescuedFireflies,
   );
   expect(
     rescued,
     "the actual firefly pickup is saved before completing the trail",
-  ).toEqual([0]);
+  ).toEqual(["world.sunlit-meadow.firefly.0"]);
   await secrets.screenshot({
     path: "artifacts/adventure-firefly-rescue.png",
     fullPage: true,
@@ -1029,6 +1030,8 @@ try {
 
   const garden = await rulesPage(browser, []);
   await garden.getByRole("button", { name: "Game menu", exact: true }).click();
+  await expect(garden.locator("#journal-hive")).toBeDisabled();
+  await expect(garden.locator("#journal-hoops")).toBeDisabled();
   for (const index of [0, 1, 2])
     await expect(garden.locator(`[data-challenge="${index}"]`)).toBeDisabled();
   await garden.locator("#visit-grove").click();
@@ -1059,11 +1062,12 @@ try {
   // Restore an explicitly seeded earned-progress fixture to exercise unlocked
   // rewards. Actual pickup persistence is covered by the real route above.
   await garden.evaluate(() => {
-    const saved = JSON.parse(localStorage.getItem("mosslight-save-v2") || "{}");
-    saved.progress ??= [{}, {}, {}];
-    saved.progress[0].fireflies = [0, 1, 2];
+    // A fresh installation may not have written a snapshot yet. This is an
+    // intentional v2 migration fixture, not a simulated collectible pickup.
+    const saved = { progress: [{ fireflies: [0, 1, 2] }, {}, {}] };
     saved.wallet = 500;
     saved.lifetimeCoins = 500;
+    localStorage.removeItem("mosslight-save-v3");
     localStorage.setItem("mosslight-save-v2", JSON.stringify(saved));
   });
   await garden.reload();
@@ -1125,7 +1129,7 @@ try {
   await garden.locator('[data-menu-world="0"]').click();
   await garden.locator("#start-button").click();
   await garden.clock.runFor(64);
-  await expect(garden.locator("#run-mode")).toHaveText("Time Trial");
+  await expect(garden.locator("#run-mode")).toHaveText("Timed");
   await expect(garden.locator("#life-count")).toHaveText("3");
   await garden.getByRole("button", { name: "Game menu", exact: true }).click();
   await garden.locator('[data-challenge="0"]').click();
@@ -1162,10 +1166,14 @@ try {
   await garden.keyboard.up("ArrowRight");
   await expect(garden.locator(".challenge-medal")).toBeVisible();
   const challengeSave = await readStoredSave(garden);
-  expect(challengeSave.challenges[0].completed).toBe(true);
-  expect(challengeSave.challenges[0].bestTime).toBeGreaterThan(0);
+  expect(challengeSave.challenges["challenge.sunlit-meadow"].completed).toBe(
+    true,
+  );
   expect(
-    challengeSave.progress[0].garden.timed.completed,
+    challengeSave.challenges["challenge.sunlit-meadow"].bestTime,
+  ).toBeGreaterThan(0);
+  expect(
+    challengeSave.worlds["world.sunlit-meadow"].garden.timed.completed,
     "challenge records never overwrite world boss records",
   ).toBe(false);
   await garden.screenshot({
@@ -1175,6 +1183,98 @@ try {
   await garden.close();
   console.log(
     "PASS living garden: real coin earning/no frame duplication, locked/unlocked challenges, playable grove, cosmetic purchases/equip/reload, persisted modes, actual-input challenge finish and separate records",
+  );
+
+  // Seed the prior Meadow completion only to open the new world. Feather
+  // pickup, flying, and the activity unlock below use actual browser input.
+  const windmill = await browser.newPage({
+    viewport: { width: 844, height: 390 },
+    isMobile: true,
+    hasTouch: true,
+  });
+  captureErrors(windmill);
+  await windmill.addInitScript(() => {
+    localStorage.setItem(
+      "mosslight-save-v2",
+      JSON.stringify({
+        progress: [
+          { garden: { classic: { completed: true, bestTime: 80 } } },
+          {},
+          {},
+        ],
+      }),
+    );
+  });
+  const windmillStart = new Date("2026-01-01T00:00:00Z");
+  await windmill.clock.install({ time: windmillStart });
+  await windmill.clock.pauseAt(new Date(windmillStart.getTime() + 1000));
+  await windmill.goto(baseURL);
+  await windmill
+    .getByRole("button", { name: "Game menu", exact: true })
+    .click();
+  await expect(windmill.locator('[data-menu-world="3"]')).toBeEnabled();
+  await windmill.locator('[data-menu-world="3"]').click();
+  await expect(windmill.locator("#world-label")).toHaveText("Windmill Garden");
+  await windmill.locator("#start-button").click();
+  await windmill.clock.runFor(64);
+  await windmill.keyboard.down("ArrowRight");
+  await advanceUntil(
+    windmill,
+    async () => windmill.locator("#feather-meter").isVisible(),
+    "feather pickup",
+  );
+  await windmill.keyboard.up("ArrowRight");
+  await windmill.clock.runFor(200);
+  await expect(windmill.locator("#feather-label")).toHaveText("Ready");
+  await windmill.keyboard.down("Space");
+  await windmill.clock.runFor(200);
+  await windmill.keyboard.up("Space");
+  await windmill.clock.runFor(50);
+  await windmill.keyboard.down("Space");
+  await windmill.clock.runFor(450);
+  await windmill.keyboard.up("Space");
+  await expect(windmill.locator(".feather-segments")).not.toHaveText("▰▰▰▰");
+  await checkLayout(windmill, "Windmill Garden flight phone HUD");
+  await screenshot(windmill, "windmill-flight-phone");
+  expect((await readStoredSave(windmill)).unlocks.windFeatherDiscovered).toBe(
+    true,
+  );
+  await windmill
+    .getByRole("button", { name: "Game menu", exact: true })
+    .click();
+  await expect(windmill.locator("#journal-hoops")).toBeEnabled();
+  await windmill.locator("#journal-hoops").click();
+  await windmill.clock.runFor(3200);
+  await expect(windmill.locator("#activity-hud")).toBeVisible();
+  await expect(windmill.locator("#activity-hoops")).toHaveText("0 / 16 hoops");
+  await checkLayout(windmill, "Petal Post phone HUD");
+  await screenshot(windmill, "petal-post-phone");
+  const courseTouch = await windmill.context().newCDPSession(windmill);
+  const courseRight = await controlCenter(windmill, "right", 1);
+  const courseJump = await controlCenter(windmill, "jump", 2);
+  await courseTouch.send("Input.dispatchTouchEvent", {
+    type: "touchStart",
+    touchPoints: [courseRight, courseJump],
+  });
+  await windmill.clock.runFor(450);
+  await courseTouch.send("Input.dispatchTouchEvent", {
+    type: "touchEnd",
+    touchPoints: [],
+  });
+  expect(
+    await trailProgress(windmill),
+    "two-thumb input moves through the activity",
+  ).toBeGreaterThan(0.01);
+  await windmill.clock.runFor(60000);
+  await expect(windmill.locator("#petal-retry")).toBeVisible();
+  await windmill.locator("#petal-retry").click();
+  await windmill.clock.runFor(3200);
+  await expect(windmill.locator("#activity-hoops")).toHaveText("0 / 16 hoops");
+  await expect(windmill.locator("#activity-clock")).toHaveText(/60s|59s/);
+  await neutralControls(windmill);
+  await windmill.close();
+  console.log(
+    "PASS Windmill Garden: migrated unlock, keyboard feather pickup and lift, persistence, two-thumb Petal Post input, timeout and retry on phone viewport",
   );
 
   // This is deliberately a CSS fixture, not a simulated boss win. The engine

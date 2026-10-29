@@ -1,6 +1,6 @@
 # Windmill Garden — world and secret-level blueprint
 
-Status: design for implementation, not implemented content. Dimensions, timing, difficulty and pacing below are initial tuning hypotheses. [Flight](flight.md) owns flight physics; [encounters](encounters.md) owns the guardian and Grove minigame. This document owns world and beehive layout, puzzle conditions, traversal, checkpoints and discovery.
+Status: implemented world blueprint. Geometry is covered by automated input routes; timing, difficulty and pacing below remain initial human-playtest hypotheses. [Flight](flight.md) owns flight physics; [encounters](encounters.md) owns the guardian and Grove minigame. This document owns world and beehive layout, puzzle conditions, traversal, checkpoints and discovery.
 
 ## Baseline and scope
 

@@ -14,7 +14,8 @@ export class Controls {
   private keys = new Set<string>();
   private movement = new Map<number, Direction>();
   private jumps = new Set<number>();
-  private pendingJump = false;
+  private jumpEdges: boolean[] = [];
+  private aggregateJump = false;
   private padJump = false;
   private padPause = false;
 
@@ -58,12 +59,13 @@ export class Controls {
       event.preventDefault();
       jumpButton.setPointerCapture(event.pointerId);
       this.jumps.add(event.pointerId);
-      this.pendingJump = true;
+      this.captureJump();
       this.paint();
       this.unlock();
     });
     const releaseJump = (event: PointerEvent) => {
       this.jumps.delete(event.pointerId);
+      this.captureJump();
       this.paint();
     };
     for (const type of ["pointerup", "pointercancel", "lostpointercapture"])
@@ -87,17 +89,27 @@ export class Controls {
       )
         return;
       event.preventDefault();
-      if (
-        !event.repeat &&
-        !this.keys.has(event.code) &&
-        jumpKeys.has(event.code)
-      )
-        this.pendingJump = true;
+      if (event.repeat) return;
       this.keys.add(event.code);
+      this.captureJump();
       this.unlock();
     });
-    window.addEventListener("keyup", (event) => this.keys.delete(event.code));
+    window.addEventListener("keyup", (event) => {
+      this.keys.delete(event.code);
+      this.captureJump();
+    });
     window.addEventListener("blur", () => this.reset());
+  }
+
+  private captureJump() {
+    const held =
+      this.jumps.size > 0 ||
+      [...this.keys].some((key) => jumpKeys.has(key)) ||
+      this.padJump;
+    if (held !== this.aggregateJump) {
+      this.aggregateJump = held;
+      this.jumpEdges.push(held);
+    }
   }
 
   private move(event: PointerEvent) {
@@ -132,7 +144,12 @@ export class Controls {
     this.keys.clear();
     this.movement.clear();
     this.jumps.clear();
-    this.pendingJump = false;
+    this.jumpEdges = [];
+    // Sample even if rendering stopped while the page was hidden.
+    const pad = navigator.getGamepads?.().find((item) => item?.connected);
+    this.padJump = !!pad?.buttons[0]?.pressed;
+    this.padPause = !!pad?.buttons[9]?.pressed;
+    this.aggregateJump = this.padJump;
     // Preserve gamepad edge state: a held button must be released before retriggering.
     for (const id of movementIDs) {
       if (this.movementPad.hasPointerCapture(id))
@@ -149,11 +166,9 @@ export class Controls {
     const pad = navigator.getGamepads?.().find((item) => item?.connected);
     const padJump = !!pad?.buttons[0]?.pressed;
     const padPause = !!pad?.buttons[9]?.pressed;
-    if (padJump && !this.padJump) {
-      this.pendingJump = true;
-      this.unlock();
-    }
+    if (padJump && !this.padJump) this.unlock();
     this.padJump = padJump;
+    this.captureJump();
     if (padPause && !this.padPause) this.togglePause();
     this.padPause = padPause;
     let direction: Direction = 0;
@@ -169,9 +184,10 @@ export class Controls {
         this.jumps.size > 0 ||
         [...this.keys].some((key) => jumpKeys.has(key)) ||
         padJump,
-      jumpPressed: this.pendingJump,
+      jumpPressed: this.jumpEdges.includes(true),
+      jumpEdges: this.jumpEdges,
     };
-    this.pendingJump = false;
+    this.jumpEdges = [];
     return result;
   }
 }

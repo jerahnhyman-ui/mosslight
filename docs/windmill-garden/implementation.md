@@ -1,6 +1,6 @@
 # Terra implementation handoff
 
-Status: design proposal; none of this expansion is implemented yet. Baseline: TestFlight build 16, main commit `01f7a098e2b7d6d8b4c3c4e8cacecdcd54e9217e`. Numeric targets are prototype hypotheses, not measured playtest results.
+Status: implemented in this branch; see the [verification guide](../WINDMILL_GARDEN.md). Baseline: TestFlight build 16, main commit `01f7a098e2b7d6d8b4c3c4e8cacecdcd54e9217e`. Numeric targets are prototype hypotheses, not measured playtest results.
 
 Read the [overview](README.md), [flight contract](flight.md), [world and puzzles](world.md), and [guardian and minigame](encounters.md) together. This document owns integration, persistence and release acceptance. The feature documents own geometry, control timing and encounter rules.
 
@@ -112,11 +112,11 @@ Checkpoint retries use authored safe spawn points. Preserve the current mechanis
 6. **Hoop course and presentation.** Add unique hoop targets, finish/timeout scoring, medals, one-time decoration, journal, art and audio. Validate the score thresholds against playable traces.
 7. **Integrated release.** Run gameplay, browser, migration and native preflight checks; then a native archive and TestFlight processing for the exact release commit. Follow [the release guide](../TESTFLIGHT.md).
 
-Astra reviews the integrated route and encounter evidence against these rules; Terra implements, measures and fixes it. Update the design with measured tuning changes so it does not describe a different game. Merge and ship the integrated implementation only after its checks pass. This design-only branch does not require a new TestFlight build.
+Astra reviews the integrated route and encounter evidence against these rules; Terra implements, measures and fixes it. Update the design with measured tuning changes so it does not describe a different game. Merge and ship the integrated implementation only after its checks pass. The implementation release requires a verified native archive and TestFlight assignment.
 
 ## Acceptance matrix
 
-These are future implementation checks. They have not been executed by creating this design package.
+These are implementation and release acceptance checks. Automated coverage and remaining physical-device checks are distinguished in the verification guide.
 
 | ID  | Required evidence                                                                                                                                                                                            |
 | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |

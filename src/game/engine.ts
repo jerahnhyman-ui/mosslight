@@ -9,7 +9,8 @@ import {
 import {
   createBoss,
   stepBoss,
-  warnBoss,
+  hitBoss,
+  retryBoss,
   type BossState,
   type BossHazard,
 } from "./bosses";
@@ -21,6 +22,7 @@ export type GameInput = {
   right: boolean;
   jump: boolean;
   jumpPressed: boolean;
+  jumpEdges?: boolean[];
 };
 export type Player = Rect & {
   form: "small" | "big";
@@ -91,7 +93,7 @@ export class Game {
   readonly mode: RunMode;
   boss: BossState | null = null;
   hazards: BossHazard[] = [];
-  outfit: "leaf" | "berry" | "moon" = "leaf";
+  outfit: "leaf" | "berry" | "moon" | "cosmetic.bee_scarf" = "leaf";
   groveDecorations: string[] = [];
   rescuedTotal = 0;
   player!: Player;
@@ -112,12 +114,59 @@ export class Game {
   deaths = 0;
   activeCheckpointIndex = -1;
   events: string[] = [];
+  puzzleState = this.newPuzzleState();
+  secretCompleted = false;
+  portalReady: string | null = null;
+  requestedPortal: string | null = null;
+  minigame = this.newMinigame();
+  private hiveTicks = 0;
+  private airborneMin = Infinity;
+  private padTicks = new Map<string, number>();
+  private portalBlocked = false;
+  private portalTicks = 0;
+  countdown = 0;
+  hasWindFeather = false;
+  liftRemaining = 0;
+  liftActive = false;
+  glideArmed = false;
+  private liftTicks = 0;
+  private stableTicks = 0;
+  private jumpHeld = false;
+  private inputHeld = false;
+  private pendingEdges: boolean[] = [];
+  private flightNeedsRelease = false;
   private accumulator = 0;
   private coyote = 0;
   private jumpBuffer = 0;
   private jumpCanShorten = false;
   private hurtLock = 0;
   private blockedCarriers = new Set<PlatformState>();
+
+  private newPuzzleState() {
+    return {
+      wind: "WEST" as "WEST" | "EAST",
+      brake: "HELD" as "HELD" | "RELEASED",
+      water: "LOW" as "LOW" | "HIGH",
+      shutter: "HIVE" as "HIVE" | "BRIDGE",
+      vaneGateOpen: false,
+      sluiceGateOpen: false,
+      lightGateOpen: false,
+      workshopGateOpen: false,
+      hiveDiscovered: false,
+      flowers: { A: false, B: false, C: false },
+    };
+  }
+  private newMinigame() {
+    return {
+      score: 0,
+      hoops: new Set<string>(),
+      centered: 0,
+      pads: new Set<string>(),
+      finished: false,
+      complete: false,
+      medal: "none" as "none" | "bronze" | "silver" | "gold",
+    };
+  }
 
   get checkpointActive() {
     return this.activeCheckpointIndex >= 0;
@@ -141,6 +190,16 @@ export class Game {
 
   restart() {
     this.state = "playing";
+    this.puzzleState = this.newPuzzleState();
+    this.secretCompleted = false;
+    this.portalReady = this.requestedPortal = null;
+    this.minigame = this.newMinigame();
+    this.countdown = this.level.kind === "minigame" ? 3 : 0;
+    this.portalTicks = 0;
+    this.hiveTicks = 0;
+    this.airborneMin = Infinity;
+    this.padTicks.clear();
+    this.portalBlocked = false;
     this.lives = MAX_LIVES;
     this.collectedCoins = 0;
     this.coinsTowardLife = 0;
@@ -174,6 +233,23 @@ export class Game {
         respawnRemaining: 0,
       };
     });
+    for (const gate of this.level.gates ?? [])
+      this.platforms.push({
+        ...gate,
+        kind: "ground",
+        baseX: gate.x,
+        baseY: gate.y,
+        previousX: gate.x,
+        previousY: gate.y,
+        broken: false,
+        awakened: true,
+        crumbleRemaining: -1,
+        respawnRemaining: 0,
+      });
+    const reed = this.platforms.find(
+      (tile) => tile.id === "windmill.reed-screen",
+    );
+    if (reed) reed.broken = true;
     this.coins = this.level.coins.map((c) => ({ ...c, collected: false }));
     this.stars = this.level.stars.map((c) => ({ ...c, collected: false }));
     this.fireflies = this.level.fireflies.map((c) => ({
@@ -199,6 +275,7 @@ export class Game {
       squashed: 0,
     }));
     this.spawn();
+    if (this.level.kind === "minigame") this.equipFeather();
   }
 
   private spawn() {
@@ -221,14 +298,84 @@ export class Game {
     this.jumpCanShorten = false;
     this.hurtLock = 0;
     this.blockedCarriers.clear();
+    this.hasWindFeather = false;
+    this.liftTicks = 0;
+    this.liftRemaining = 0;
+    this.glideArmed = false;
+    this.stableTicks = 0;
+    this.clearInput();
+    this.flightNeedsRelease = false;
+  }
+
+  clearInput() {
+    this.pendingEdges = [];
+    this.jumpBuffer = 0;
+    this.liftActive = false;
+    this.flightNeedsRelease = true;
+    this.jumpHeld = false;
+    this.inputHeld = false;
+  }
+
+  transferPlayerFrom(source: Game, anchor: { x: number; feetY: number }) {
+    this.resize(source.player.form);
+    this.outfit = source.outfit;
+    this.groveDecorations = [...source.groveDecorations];
+    this.rescuedTotal = source.rescuedTotal;
+    Object.assign(this.player, {
+      x: anchor.x,
+      y: anchor.feetY - this.player.h,
+      vx: 0,
+      vy: 0,
+      grounded: true,
+      invulnerable: 1.5,
+    });
+    this.lives = source.lives;
+    if (source.deaths > this.deaths)
+      for (const diamond of this.diamonds) diamond.collected = false;
+    this.deaths = source.deaths;
+    this.elapsed = source.elapsed;
+    this.collectedCoins = source.collectedCoins;
+    this.coinsTowardLife = source.coinsTowardLife;
+    this.collectedStars = source.collectedStars;
+    this.starPowerRemaining = source.starPowerRemaining;
+    this.hasWindFeather = source.hasWindFeather;
+    this.liftTicks = source.liftTicks;
+    this.liftRemaining = this.liftTicks * STEP;
+    this.stableTicks = 0;
+    this.glideArmed = false;
+    this.clearInput();
+    this.portalBlocked = true;
+  }
+
+  private equipFeather() {
+    this.hasWindFeather = true;
+    this.liftTicks = 144;
+    this.liftRemaining = 1.2;
+    this.events.push("feather");
   }
 
   update(dt: number, input: GameInput) {
     this.events = [];
-    if (this.state !== "playing" || !Number.isFinite(dt) || dt <= 0) return;
+    if (
+      this.state !== "playing" ||
+      this.minigame.finished ||
+      !Number.isFinite(dt) ||
+      dt <= 0
+    )
+      return;
     this.accumulator += Math.min(dt, 0.1);
-    if (input.jumpPressed) this.jumpBuffer = JUMP_BUFFER_TIME;
-    while (this.accumulator + 1e-10 >= STEP && this.state === "playing") {
+    if (input.jumpEdges) {
+      this.pendingEdges.push(...input.jumpEdges);
+    } else {
+      if (input.jump !== this.inputHeld) this.pendingEdges.push(input.jump);
+      else if (input.jumpPressed) this.pendingEdges.push(true);
+    }
+    this.inputHeld = input.jump;
+    while (
+      this.accumulator + 1e-10 >= STEP &&
+      this.state === "playing" &&
+      !this.minigame.finished
+    ) {
       const lostLife = this.tick(input);
       this.accumulator = Math.max(0, this.accumulator - STEP);
       if (lostLife) {
@@ -240,6 +387,16 @@ export class Game {
 
   private tick(input: GameInput) {
     const p = this.player;
+    const previousCenterX = p.x + p.w / 2,
+      previousCenterY = p.y + p.h / 2;
+    if (this.countdown > 0) {
+      this.countdown = Math.max(0, this.countdown - STEP);
+      if (this.countdown < 1e-8) {
+        this.countdown = 0;
+        this.clearInput();
+      }
+      return;
+    }
     this.elapsed += STEP;
     if (this.starPowerRemaining > 0) {
       this.starPowerRemaining = Math.max(0, this.starPowerRemaining - STEP);
@@ -262,38 +419,103 @@ export class Game {
       p.vx = approach(p.vx, direction * MAX_SPEED, acceleration * STEP);
       if (direction) p.facing = direction;
     }
+    for (const edge of this.pendingEdges.splice(0)) {
+      this.jumpHeld = edge;
+      if (!edge) {
+        this.liftActive = false;
+        this.flightNeedsRelease = false;
+      } else {
+        if (this.portalReady && p.grounded && Math.abs(p.vx) <= 20) {
+          this.requestedPortal = this.portalReady;
+          this.portalReady = null;
+          this.portalTicks = 0;
+          this.portalBlocked = true;
+          this.jumpBuffer = 0;
+          this.events.push("portal");
+          continue;
+        }
+        this.jumpBuffer = JUMP_BUFFER_TIME;
+        if (p.grounded || this.coyote > 0)
+          this.tryJump({ ...input, jump: input.jump });
+        else if (
+          input.jump &&
+          this.hasWindFeather &&
+          this.liftTicks > 0 &&
+          !this.flightNeedsRelease &&
+          this.hurtLock === 0
+        ) {
+          this.jumpBuffer = 0;
+          this.glideArmed = true;
+          this.liftActive = true;
+          this.jumpCanShorten = false;
+        }
+      }
+    }
+    if (!input.jump && !this.jumpHeld) this.flightNeedsRelease = false;
     this.tryJump(input);
     if (this.jumpCanShorten && !input.jump) {
       p.vy = Math.max(p.vy, SHORT_JUMP);
       this.jumpCanShorten = false;
     }
     if (p.vy >= 0) this.jumpCanShorten = false;
-    p.vy = Math.min(900, p.vy + (p.vy < 0 ? GRAVITY : FALL_GRAVITY) * STEP);
+    if (
+      this.liftActive &&
+      input.jump &&
+      this.liftTicks > 0 &&
+      this.hurtLock === 0
+    ) {
+      if (p.vy < -170) p.vy = Math.min(-170, p.vy + GRAVITY * STEP);
+      else p.vy = approach(Math.min(p.vy, 180), -170, 1200 * STEP);
+      this.liftTicks--;
+      this.liftRemaining = this.liftTicks * STEP;
+      if (!this.liftTicks) {
+        this.liftActive = false;
+        this.flightNeedsRelease = true;
+        this.events.push("feather-empty");
+      }
+    } else {
+      p.vy = Math.min(900, p.vy + (p.vy < 0 ? GRAVITY : FALL_GRAVITY) * STEP);
+      if (this.glideArmed && this.hurtLock === 0) p.vy = Math.min(p.vy, 180);
+    }
 
     p.x += p.vx * STEP;
     this.resolveHorizontal(p.vx);
     p.x = Math.max(0, Math.min(this.level.width - p.w, p.x));
-    if (this.boss && this.boss.state !== "defeated")
-      p.x = Math.min(p.x, this.boss.maxX + this.boss.w + 26 - p.w);
+    if (this.boss && this.boss.state !== "defeated") {
+      if (this.boss.kind === "millkeeper") {
+        if (this.boss.state !== "dormant")
+          p.x = Math.max(this.boss.minX, Math.min(this.boss.maxX - p.w, p.x));
+      } else p.x = Math.min(p.x, this.boss.maxX + this.boss.w + 26 - p.w);
+    }
     const oldBottom = p.y + p.h;
+    if (!p.grounded) this.airborneMin = Math.min(this.airborneMin, oldBottom);
     const oldTop = p.y;
     p.y += p.vy * STEP;
     p.grounded = false;
+    let rechargeSupport = false;
     for (const tile of this.platforms) {
       if (!active(tile) || this.blockedCarriers.has(tile) || !overlaps(p, tile))
         continue;
       const previousTop =
         tile.kind === "moving" ? Math.max(tile.previousY, tile.y) : tile.y;
       if (p.vy >= 0 && oldBottom <= previousTop + 1) {
+        if (!p.grounded && this.airborneMin <= tile.y - 16)
+          this.landOnActuators(tile.y);
         p.y = tile.y - p.h;
         p.vy = 0;
         p.grounded = true;
+        rechargeSupport = tile.kind !== "mushroom" && tile.kind !== "crumble";
+        if (tile.kind !== "mushroom") {
+          this.liftActive = false;
+          this.glideArmed = false;
+        }
         this.jumpCanShorten = false;
         if (tile.kind === "mushroom") {
           p.vy = MUSHROOM_BOUNCE;
           p.grounded = false;
           this.coyote = 0;
           this.jumpBuffer = 0;
+          this.cancelFlightForBounce();
           this.events.push("bounce");
         } else if (tile.kind === "crumble" && tile.crumbleRemaining < 0) {
           tile.crumbleRemaining = CRUMBLE_WARNING;
@@ -310,8 +532,21 @@ export class Game {
         }
       }
     }
-    if (p.grounded) this.tryJump(input);
+    if (p.grounded) {
+      this.airborneMin = Infinity;
+      this.tryJump(input);
+    }
+    if (p.grounded && rechargeSupport && this.hasWindFeather) {
+      this.stableTicks++;
+      if (this.stableTicks === 24 && this.liftTicks < 144) {
+        this.liftTicks = 144;
+        this.liftRemaining = 1.2;
+        this.events.push("feather-refill");
+      }
+    } else this.stableTicks = 0;
     if (p.y > 660) return this.loseLife();
+    this.updateExpansion(previousCenterX, previousCenterY);
+    if (this.minigame.finished) return;
 
     for (const coin of this.coins) {
       if (
@@ -389,11 +624,14 @@ export class Game {
         p.grounded = false;
         this.coyote = 0;
         this.jumpCanShorten = false;
+        this.cancelFlightForBounce();
       } else if (this.hurt(enemy)) return true;
     }
     if (this.updateBoss(oldBottom)) return true;
     if (
       this.level.kind !== "grove" &&
+      this.level.kind !== "secret" &&
+      this.level.kind !== "minigame" &&
       (!this.boss || this.boss.state === "defeated") &&
       overlaps(p, {
         x: this.level.goal.x,
@@ -406,6 +644,194 @@ export class Game {
       p.vx = 0;
       this.events.push("win");
     }
+  }
+
+  private landOnActuators(y: number) {
+    const center = this.player.x + this.player.w / 2;
+    const q = this.puzzleState;
+    for (const m of this.level.mechanisms ?? []) {
+      if (Math.abs(center - m.x) > (m.w ?? 64) / 2 || Math.abs(y - m.y) > 2)
+        continue;
+      switch (m.kind) {
+        case "wind":
+          q.wind = q.wind === "WEST" ? "EAST" : "WEST";
+          break;
+        case "brake":
+          q.brake = q.brake === "HELD" ? "RELEASED" : "HELD";
+          break;
+        case "water":
+          q.water = q.water === "LOW" ? "HIGH" : "LOW";
+          break;
+        case "shutter":
+          q.shutter = q.shutter === "HIVE" ? "BRIDGE" : "HIVE";
+          break;
+        case "sluice":
+          if (q.water === "HIGH") q.sluiceGateOpen = true;
+          break;
+        case "receiver":
+          if (q.water === "HIGH" && q.shutter === "BRIDGE")
+            q.lightGateOpen = true;
+          break;
+        case "flower":
+          if (m.flower) q.flowers[m.flower] = true;
+          break;
+      }
+      this.events.push("mechanism");
+    }
+    if (q.wind === "EAST" && q.brake === "RELEASED") q.vaneGateOpen = true;
+  }
+
+  private updateExpansion(previousX: number, previousY: number) {
+    const p = this.player,
+      q = this.puzzleState;
+    const cx = p.x + p.w / 2,
+      cy = p.y + p.h / 2;
+    for (const fountain of this.level.featherFountains ?? []) {
+      if (
+        !this.hasWindFeather &&
+        p.grounded &&
+        Math.abs(cx - fountain.x) < 35 &&
+        Math.abs(p.y + p.h - fountain.y) < 3
+      )
+        this.equipFeather();
+    }
+    if (
+      q.wind === "WEST" &&
+      q.water === "LOW" &&
+      q.shutter === "HIVE" &&
+      this.level.contentId === "world.windmill-garden" &&
+      cx >= 6720 &&
+      cx < 7680
+    ) {
+      if (++this.hiveTicks >= 120 && !q.hiveDiscovered) {
+        q.hiveDiscovered = true;
+        this.events.push("hive-discovered");
+      }
+    } else this.hiveTicks = 0;
+    const target = this.level.flightTarget;
+    if (
+      target &&
+      this.glideArmed &&
+      Math.hypot(cx - target.x, cy - target.y) <= Math.min(20, target.radius)
+    )
+      q.workshopGateOpen = true;
+    for (const gate of this.level.gates ?? []) {
+      const tile = this.platforms.find((t) => t.id === gate.id);
+      if (!tile) continue;
+      tile.broken =
+        gate.condition === "vane"
+          ? q.vaneGateOpen
+          : gate.condition === "sluice"
+            ? q.sluiceGateOpen
+            : gate.condition === "light"
+              ? q.lightGateOpen
+              : gate.condition === "workshop"
+                ? q.workshopGateOpen
+                : q.flowers.A && q.flowers.B && q.flowers.C;
+    }
+    const reed = this.platforms.find((t) => t.id === "windmill.reed-screen");
+    if (reed)
+      reed.broken = q.water === "LOW" || (reed.broken && overlaps(p, reed));
+    const portals = this.level.portals ?? [];
+    const near = portals.find(
+      (portal) =>
+        p.grounded &&
+        cx >= portal.x &&
+        cx <= portal.x + portal.w &&
+        Math.abs(p.y + p.h - portal.y) < 3 &&
+        (!portal.requires ||
+          (portal.requires === "discovery"
+            ? q.hiveDiscovered
+            : this.secretCompleted)),
+    );
+    if (!near) {
+      this.portalBlocked = false;
+      this.portalTicks = 0;
+      this.portalReady = null;
+    } else if (!this.portalBlocked && Math.abs(p.vx) <= 20) {
+      this.portalTicks++;
+      this.portalReady = this.portalTicks >= 42 ? near.target : null;
+    } else {
+      this.portalTicks = 0;
+      this.portalReady = null;
+    }
+    if (
+      this.level.kind === "secret" &&
+      !this.secretCompleted &&
+      overlaps(p, {
+        x: this.level.goal.x,
+        y: this.level.goal.y - 95,
+        w: 60,
+        h: 95,
+      })
+    ) {
+      this.secretCompleted = true;
+      this.events.push("secret-complete");
+    }
+    if (this.level.kind !== "minigame") return;
+    for (const hoop of this.level.hoops ?? []) {
+      if (
+        this.minigame.hoops.has(hoop.id) ||
+        (previousX - hoop.x) * (cx - hoop.x) > 0 ||
+        previousX === cx
+      )
+        continue;
+      const y =
+        previousY +
+        ((cy - previousY) * (hoop.x - previousX)) / (cx - previousX);
+      if (Math.abs(y - hoop.y) <= 32) {
+        this.minigame.hoops.add(hoop.id);
+        this.minigame.score += 100;
+        if (Math.abs(y - hoop.y) <= 12) {
+          this.minigame.centered++;
+          this.minigame.score += 25;
+        }
+        this.events.push("hoop");
+      }
+    }
+    for (const pad of this.level.landingPads ?? []) {
+      const count = (this.level.hoops ?? []).filter(
+        (h) => h.cell === pad.cell && this.minigame.hoops.has(h.id),
+      ).length;
+      const settled =
+        p.grounded &&
+        Math.abs(p.y + p.h - pad.y) < 2 &&
+        cx >= pad.x &&
+        cx <= pad.x + pad.w &&
+        count === 2;
+      const ticks = settled ? (this.padTicks.get(pad.id) ?? 0) + 1 : 0;
+      this.padTicks.set(pad.id, ticks);
+      if (ticks >= 24 && !this.minigame.pads.has(pad.id)) {
+        this.minigame.pads.add(pad.id);
+        this.minigame.score += 50;
+        this.events.push("soft-landing");
+      }
+    }
+    if (cx >= this.level.goal.x && this.elapsed <= 60 + 1e-8)
+      this.finishMinigame(true);
+    else if (this.elapsed >= 60 - 1e-8) this.finishMinigame(false);
+  }
+
+  private finishMinigame(complete: boolean) {
+    const m = this.minigame;
+    if (!complete) this.elapsed = Math.min(this.elapsed, 60);
+    m.finished = true;
+    m.complete = complete;
+    if (complete)
+      m.score += Math.max(
+        0,
+        Math.min(200, Math.floor((60 - this.elapsed) * 10)),
+      );
+    m.medal =
+      m.score >= 2300 && m.hoops.size === 16 && complete && this.elapsed <= 45
+        ? "gold"
+        : m.score >= 1750 && complete
+          ? "silver"
+          : m.score >= 800
+            ? "bronze"
+            : "none";
+    this.player.vx = this.player.vy = 0;
+    this.events.push("minigame-result");
   }
 
   private wakePlants() {
@@ -449,6 +875,7 @@ export class Game {
     this.coyote = 0;
     this.jumpBuffer = 0;
     this.jumpCanShorten = false;
+    this.clearInput();
     this.hurtLock = 0.22;
     return false;
   }
@@ -458,15 +885,33 @@ export class Game {
     if (!boss) return false;
     const p = this.player;
     const previousY = boss.y;
-    stepBoss(boss, STEP, p, this.hazards, this.events);
+    stepBoss(boss, STEP, p, this.hazards, this.events, {
+      hasFeather: this.hasWindFeather,
+      flightActivated: this.glideArmed,
+    });
+    if (
+      boss.state !== "dormant" &&
+      boss.state !== "defeated" &&
+      boss.millState !== "transition" &&
+      overlaps(p, boss)
+    ) {
+      const stomp = p.vy > 0 && oldBottom <= previousY + 12;
+      const powered = this.starPowerRemaining > 0;
+      if ((stomp && boss.state === "recover") || powered) {
+        hitBoss(boss, p, this.hazards, this.events);
+        if (stomp || !powered) this.bounceOffBoss(boss);
+      } else if (stomp) this.bounceOffBoss(boss);
+      else if (this.hurt(boss)) return true;
+    }
     for (const hazard of this.hazards) {
       hazard.remaining = Math.max(0, hazard.remaining - STEP);
       hazard.x += hazard.vx * STEP;
       hazard.y += hazard.vy * STEP;
       if (
         hazard.remaining <= 0 ||
-        hazard.x < boss.minX - 30 ||
-        hazard.x > boss.maxX + boss.w + 30
+        (hazard.kind === "sweep"
+          ? hazard.x + hazard.w <= boss.minX || hazard.x >= boss.maxX
+          : hazard.x < boss.minX - 30 || hazard.x > boss.maxX + boss.w + 30)
       ) {
         hazard.remaining = 0;
         continue;
@@ -477,39 +922,16 @@ export class Game {
       }
     }
     this.hazards = this.hazards.filter((hazard) => hazard.remaining > 0);
-    if (
-      boss.state === "dormant" ||
-      boss.state === "defeated" ||
-      !overlaps(p, boss)
-    )
-      return false;
-    const stomp = p.vy > 0 && oldBottom <= previousY + 12;
-    const powered = this.starPowerRemaining > 0;
-    if ((stomp && boss.state === "recover") || powered) {
-      if (boss.invulnerable <= 0) {
-        boss.health--;
-        boss.invulnerable = 1.35;
-        this.hazards = [];
-        this.events.push("boss-hit");
-        if (boss.health <= 0) {
-          boss.health = 0;
-          boss.state = "defeated";
-          boss.stateTime = 0;
-          this.events.push("boss-defeat");
-        } else {
-          boss.phase = boss.maxHealth - boss.health + 1;
-          warnBoss(boss, p, this.events);
-        }
-      }
-      if (stomp || !powered) this.bounceOffBoss(boss);
-    } else if (stomp) {
-      // Armored phases safely bounce Pip away; the folded/panting recovery is the opening.
-      this.bounceOffBoss(boss);
-    } else if (this.hurt(boss)) return true;
     return false;
   }
 
+  private cancelFlightForBounce() {
+    this.liftActive = false;
+    this.flightNeedsRelease = true;
+  }
+
   private bounceOffBoss(boss: BossState) {
+    this.cancelFlightForBounce();
     this.player.y = boss.y - this.player.h;
     this.player.vy = -490;
     this.player.grounded = false;
@@ -530,7 +952,13 @@ export class Game {
         rider = tile;
       tile.previousX = tile.x;
       tile.previousY = tile.y;
-      if (tile.motion) {
+      if (tile.id === "windmill.lily") {
+        tile.y = approach(
+          tile.y,
+          this.puzzleState.water === "HIGH" ? 330 : 450,
+          150 * STEP,
+        );
+      } else if (tile.motion) {
         const offset =
           Math.sin(
             (this.elapsed / Math.max(0.1, tile.motion.period)) * Math.PI * 2 +
@@ -770,11 +1198,17 @@ export class Game {
     this.events.push("life-lost");
     this.hazards = [];
     if (this.boss && this.boss.state !== "defeated" && this.level.boss)
-      this.boss = createBoss(this.level.boss);
+      this.boss = retryBoss(
+        this.level.boss,
+        this.boss,
+        this.mode === "relaxed",
+      );
     for (const diamond of this.diamonds) diamond.collected = false;
     // Clouds must be available on retry. Broken coin caches stay broken so rewards
     // cannot be farmed, just as ordinary collected coins stay collected after death.
     for (const platform of this.platforms) {
+      if (platform.id === "windmill.lily")
+        platform.y = this.puzzleState.water === "HIGH" ? 330 : 450;
       if (platform.kind === "crumble") {
         platform.crumbleRemaining = -1;
         platform.respawnRemaining = 0;

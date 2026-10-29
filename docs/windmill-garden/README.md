@@ -1,6 +1,6 @@
 # Mosslight: Windmill Garden
 
-**Astra design package for Terra implementation.** This proposal extends TestFlight build 16; it is not a shipped update. The design was grounded in the current game code and reviewed across flight, world and encounter design. Physics values, coordinates, score thresholds and playtime targets still require implementation and playtesting.
+**Astra design package, implemented by Terra in this branch.** See the [implementation and verification guide](../WINDMILL_GARDEN.md). This document records the expansion contracts and original pacing hypotheses. Automated routes now exercise the implementation; physical-device feel and first-time playtime targets remain to be evaluated. TestFlight status is verified separately.
 
 The expansion gives Pip a new way to travel, then builds a complete adventure around learning it: powered flight and glide, reversible garden machinery, branching routes, a discoverable beehive, a guardian that tests different skills, and a replayable flight activity at home.
 

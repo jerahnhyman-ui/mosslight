@@ -1,7 +1,7 @@
 import { Capacitor } from "@capacitor/core";
 import { Haptics, ImpactStyle, NotificationType } from "@capacitor/haptics";
 
-type Theme = "meadow" | "dusk" | "alpine";
+type Theme = "meadow" | "dusk" | "alpine" | "windmill" | "hive";
 type MusicScene = "trail" | "boss" | "grove";
 type ScoreName = Theme | "star" | "boss" | "grove";
 type Score = {
@@ -15,6 +15,54 @@ type Voice = { oscillator: OscillatorNode; gain: GainNode };
 // Original eight-bar themes. All sound is synthesized locally, so the score
 // works offline and adds no downloaded media or background playback session.
 const scores: Record<ScoreName, Score> = {
+  windmill: {
+    bpm: 108,
+    voice: "triangle",
+    melody: [
+      [77, null, 81, 84, 81, 79, 77, null],
+      [74, null, 77, 81, 79, null, 77, 74],
+      [72, 76, 79, null, 81, 79, 76, null],
+      [77, null, 81, 79, 77, null, 72, null],
+      [81, null, 84, 89, 86, 84, 81, null],
+      [79, null, 77, 74, 77, null, 81, null],
+      [76, 79, 84, null, 82, 79, 76, null],
+      [77, null, 81, 84, 77, null, null, null],
+    ].flat(),
+    chords: [
+      [41, 45, 48],
+      [38, 41, 45],
+      [36, 40, 43],
+      [41, 45, 48],
+      [41, 45, 48],
+      [38, 41, 45],
+      [36, 40, 43],
+      [41, 45, 48],
+    ],
+  },
+  hive: {
+    bpm: 86,
+    voice: "sine",
+    melody: [
+      [79, null, 83, null, 86, null, 83, null],
+      [81, null, 79, null, 76, null, null, null],
+      [74, null, 78, null, 81, null, 78, null],
+      [79, null, 76, null, 74, null, null, null],
+      [83, null, 86, null, 90, null, 86, null],
+      [84, null, 81, null, 79, null, null, null],
+      [78, null, 81, null, 84, null, 81, null],
+      [79, null, 83, null, 79, null, null, null],
+    ].flat(),
+    chords: [
+      [43, 47, 50],
+      [40, 43, 47],
+      [38, 42, 45],
+      [43, 47, 50],
+      [40, 43, 47],
+      [48, 52, 55],
+      [38, 42, 45],
+      [43, 47, 50],
+    ],
+  },
   meadow: {
     bpm: 104,
     voice: "triangle",
@@ -182,6 +230,16 @@ const effects: Record<string, number[]> = {
   equip: [523, 659],
   win: [523, 659, 784, 1047],
   lose: [300, 240, 160],
+  feather: [523, 698, 880],
+  "feather-refill": [660, 880],
+  "feather-empty": [440, 330],
+  portal: [392, 523, 784],
+  mechanism: [330, 440],
+  "hive-discovered": [523, 659, 784, 1047],
+  "secret-complete": [523, 659, 784, 1047],
+  hoop: [784, 1047],
+  "soft-landing": [440, 587],
+  "minigame-result": [523, 659, 784, 1047],
 };
 const midi = (note: number) => 440 * 2 ** ((note - 69) / 12);
 
@@ -295,14 +353,22 @@ export class AudioPlayer {
     }
     // Several plants can wake on one step. Keep their shared flourish gentle;
     // the warning and impact cues remain audible over the music.
-    const cooldown =
-      event === "awaken" || event === "hopper-bounce"
-        ? 0.12
-        : event === "enemy-break"
-          ? 0.075
-          : event === "boss-warning"
-            ? 0.18
-            : 0;
+    const cooldown = [
+      "awaken",
+      "hopper-bounce",
+      "feather",
+      "feather-refill",
+      "feather-empty",
+      "mechanism",
+      "hoop",
+      "soft-landing",
+    ].includes(event)
+      ? 0.12
+      : event === "enemy-break"
+        ? 0.075
+        : event === "boss-warning"
+          ? 0.18
+          : 0;
     if (cooldown) {
       const last = this.lastEffectAt.get(event) ?? -Infinity;
       if (this.context.currentTime - last < cooldown) return;
@@ -322,13 +388,38 @@ export class AudioPlayer {
       "awaken",
       "hopper-bounce",
       "equip",
+      "feather",
+      "feather-refill",
+      "feather-empty",
+      "portal",
+      "mechanism",
+      "hoop",
+      "soft-landing",
     ].includes(event);
-    const bell = ["firefly", "awaken", "purchase", "unlock", "equip"].includes(
-      event,
-    );
-    const flourish = ["firefly", "win", "boss-defeat", "unlock"].includes(
-      event,
-    );
+    const bell = [
+      "firefly",
+      "awaken",
+      "purchase",
+      "unlock",
+      "equip",
+      "feather",
+      "feather-refill",
+      "portal",
+      "hive-discovered",
+      "secret-complete",
+      "hoop",
+      "soft-landing",
+      "minigame-result",
+    ].includes(event);
+    const flourish = [
+      "firefly",
+      "win",
+      "boss-defeat",
+      "unlock",
+      "hive-discovered",
+      "secret-complete",
+      "minigame-result",
+    ].includes(event);
     for (const [index, frequency] of notes.entries()) {
       this.note(
         frequency,
