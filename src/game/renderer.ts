@@ -3004,6 +3004,54 @@ export class Renderer {
   private platform(r: Game["platforms"][number], p: Palette, time: number) {
     const c = this.ctx;
     const { x, y, w, h } = r;
+    if (r.id?.startsWith("windmill.vane-sail")) {
+      // A canvas sail rides the wind. Its straight upper rim and ends match
+      // the collision box, so Pip can see exactly where it is safe to land.
+      this.rounded(x, y, w, h, 5, "#f7e7bb", "#a97648");
+      c.save();
+      c.beginPath();
+      c.rect(x + 3, y + 3, w - 6, h - 6);
+      c.clip();
+      for (let xx = x + 16; xx < x + w; xx += 32) {
+        this.line(
+          [
+            [xx, y + 3],
+            [xx - 13, y + h - 3],
+          ],
+          "#d7b97c",
+          2,
+        );
+      }
+      c.restore();
+      this.line(
+        [
+          [x + 2, y + 1],
+          [x + w - 2, y + 1],
+        ],
+        "#fff8da",
+        3,
+      );
+      this.line(
+        [
+          [x + 6, y + h - 2],
+          [x + w - 6, y + h - 2],
+        ],
+        "#a97648",
+        3,
+      );
+      for (const offset of [13, w - 13]) {
+        this.ellipse(x + offset, y + h - 2, 3, 3, "#8e613e");
+        this.line(
+          [
+            [x + offset, y + h],
+            [x + offset, y + h + 8],
+          ],
+          "#c7a273",
+          2,
+        );
+      }
+      return;
+    }
     if (r.id?.startsWith("moonpool.rock.")) {
       // Keep the visible sides and top aligned with the solid collision box.
       this.rounded(x, y, w, h, 3, "#527d7b", "#365f60");

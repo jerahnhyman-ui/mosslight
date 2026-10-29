@@ -150,24 +150,10 @@ const puzzles: Record<SkySecretTarget, SkyPuzzle> = {
     ],
   },
   "sky-cloudtop": {
-    mechanisms: [
-      { id: "sky.cloudtop.rain", kind: "water", x: 550, y: 255 },
-      { id: "sky.cloudtop.sluice", kind: "sluice", x: 1100, y: 255 },
-    ],
-    gates: [
-      {
-        id: "gate.sky-cloudtop",
-        condition: "sluice",
-        x: 1850,
-        y: -800,
-        w: 24,
-        h: 1460,
-      },
-    ],
     tutorials: [
       {
-        x: 200,
-        text: "Wake the rain handle, then land on the latch to open the cloud gate.",
+        x: 900,
+        text: "Ride the drifting clouds across the open sky. Land to recharge your feather.",
       },
     ],
   },
@@ -188,45 +174,83 @@ function skySecret(
     theme: "cloud",
     width: 2300,
     spawn: { x: 80, y: 392 },
-    platforms: [
-      { x: 0, y: 430, w: 2300, h: 230, kind: "ground" },
-      cloud(`${target}.approach.a`, 300, 340, 160),
-      cloud(`${target}.switch.a`, 470, 255, 160),
-      {
-        ...cloud(`${target}.drift`, 740, 340, 160),
-        motion: { axis: "x", range: 45, period: 4.5 },
-      },
-      cloud(`${target}.switch.b`, 1020, 255, 160),
-      cloud(`${target}.approach.c`, 1280, 340, 160),
-      cloud(`${target}.switch.c`, 1520, 255, 160),
-      recover(target, 210),
-      recover(target, 900),
-    ],
-    coins: [
-      { x: 510, y: 220 },
-      { x: 550, y: 220 },
-      { x: 590, y: 220 },
-      { x: 1060, y: 220 },
-      { x: 1100, y: 220 },
-      { x: 1140, y: 220 },
-      { x: 1560, y: 220 },
-      { x: 1600, y: 220 },
-      { x: 1640, y: 220 },
-    ],
+    platforms:
+      target === "sky-cloudtop"
+        ? [
+            { x: 0, y: 430, w: 1080, h: 230, kind: "ground" },
+            { x: 1850, y: 430, w: 450, h: 230, kind: "ground" },
+            cloud(`${target}.approach.a`, 300, 340, 160),
+            cloud(`${target}.approach.b`, 470, 255, 160),
+            {
+              ...cloud(`${target}.drift.a`, 1155, 350, 130),
+              motion: { axis: "x", range: 50, period: 4.5 },
+            },
+            {
+              ...cloud(`${target}.drift.b`, 1395, 285, 130),
+              motion: { axis: "x", range: 55, period: 5, phase: Math.PI },
+            },
+            {
+              ...cloud(`${target}.drift.c`, 1640, 350, 130),
+              motion: { axis: "x", range: 50, period: 4.5, phase: Math.PI / 2 },
+            },
+            recover(target, 210),
+            recover(target, 900),
+          ]
+        : [
+            { x: 0, y: 430, w: 2300, h: 230, kind: "ground" },
+            cloud(`${target}.approach.a`, 300, 340, 160),
+            cloud(`${target}.switch.a`, 470, 255, 160),
+            {
+              ...cloud(`${target}.drift`, 740, 340, 160),
+              motion: { axis: "x", range: 45, period: 4.5 },
+            },
+            cloud(`${target}.switch.b`, 1020, 255, 160),
+            cloud(`${target}.approach.c`, 1280, 340, 160),
+            cloud(`${target}.switch.c`, 1520, 255, 160),
+            recover(target, 210),
+            recover(target, 900),
+          ],
+    coins:
+      target === "sky-cloudtop"
+        ? [
+            { x: 510, y: 220 },
+            { x: 550, y: 220 },
+            { x: 590, y: 220 },
+            { x: 1220, y: 245 },
+            { x: 1460, y: 180 },
+            { x: 1705, y: 245 },
+          ]
+        : [
+            { x: 510, y: 220 },
+            { x: 550, y: 220 },
+            { x: 590, y: 220 },
+            { x: 1060, y: 220 },
+            { x: 1100, y: 220 },
+            { x: 1140, y: 220 },
+            { x: 1560, y: 220 },
+            { x: 1600, y: 220 },
+            { x: 1640, y: 220 },
+          ],
     stars: [],
     diamonds: [],
     fireflies: [],
-    enemies: [
-      { kind: "beetle", x: 690, y: 402, minX: 640, maxX: 730 },
-      { kind: "hopper", x: 1460, y: 402, minX: 1410, maxX: 1500 },
-    ],
+    enemies:
+      target === "sky-cloudtop"
+        ? [{ kind: "beetle", x: 690, y: 402, minX: 640, maxX: 730 }]
+        : [
+            { kind: "beetle", x: 690, y: 402, minX: 640, maxX: 730 },
+            { kind: "hopper", x: 1460, y: 402, minX: 1410, maxX: 1500 },
+          ],
     checkpoints: [
       { x: 80, y: 430 },
       { x: 900, y: 430 },
     ],
     sections: [
       { x: 0, name: "Cloud Landing" },
-      { x: 850, name: "Sky Garden" },
+      {
+        x: 850,
+        name: target === "sky-cloudtop" ? "Raincloud Crossing" : "Sky Garden",
+      },
       { x: 1900, name: "Hidden Clearing" },
     ],
     ...puzzles[target],
@@ -268,6 +292,6 @@ export const skySecretLevels: Record<SkySecretTarget, Level> = {
     "sky-cloudtop",
     26,
     "Raincloud Sanctuary",
-    "Guide the rain above Cloudtop Crossing.",
+    "Ride the drifting clouds above Cloudtop Crossing.",
   ),
 };

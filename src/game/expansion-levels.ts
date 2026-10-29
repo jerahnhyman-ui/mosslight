@@ -55,9 +55,16 @@ export const windmillLevel: Level = withRewardBlocks({
     floor(1, 380, 490, 420),
     shelf(1, 620, 310, 180),
     floor(1, 800, 310, 160),
-    floor(2, 0, 430, 960),
+    // Cross Vane Court by riding the drifting sail over a real gap. The
+    // checkpoint and bump block at the approach make retries fair.
+    floor(2, 0, 430, 300),
+    floor(2, 860, 430, 100),
     shelf(2, 160, 350, 180),
-    shelf(2, 400, 270, 180),
+    {
+      ...shelf(2, 440, 350, 160),
+      id: "windmill.vane-sail",
+      motion: { axis: "x", range: 65, period: 4.5 },
+    },
     shelf(2, 680, 270, 220),
     floor(3, 0, 430, 960),
     shelf(3, 0, 270, 220),
@@ -159,8 +166,6 @@ export const windmillLevel: Level = withRewardBlocks({
     { x: 11632, y: 470 },
   ],
   mechanisms: [
-    { id: "wind.court", kind: "wind", x: 2120, y: 430 },
-    { id: "brake.court", kind: "brake", x: 2380, y: 270 },
     { id: "water.court", kind: "water", x: 4000, y: 430 },
     { id: "sluice.court", kind: "sluice", x: 4640, y: 270 },
     { id: "water.reeds", kind: "water", x: 5440, y: 490 },
@@ -172,7 +177,6 @@ export const windmillLevel: Level = withRewardBlocks({
     { id: "shutter.porch", kind: "shutter", x: 7200, y: 430 },
   ],
   gates: [
-    { id: "gate.vane", condition: "vane", x: 2820, y: 0, w: 24, h: 660 },
     { id: "gate.sluice", condition: "sluice", x: 5700, y: 0, w: 24, h: 660 },
     { id: "gate.light", condition: "light", x: 6660, y: 0, w: 24, h: 660 },
     {
@@ -224,7 +228,7 @@ export const windmillLevel: Level = withRewardBlocks({
       x: 1100,
       text: "Bump the feather block. Jump, let go, then hold Jump again to fly.",
     },
-    { x: 2040, text: "Jump onto a handle to turn it." },
+    { x: 2040, text: "Ride the moving sail, then jump to the far ledge." },
     { x: 7280, text: "West wind. Low water. Light toward the hive." },
     { x: 9700, text: "Lift to the flower. Let go to land." },
     {

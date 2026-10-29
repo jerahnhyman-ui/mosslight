@@ -287,10 +287,9 @@ describe("Hidden sky routes", () => {
   );
 
   it.each(
-    Object.entries(skySecretLevels) as [
-      SkySecretTarget,
-      (typeof skySecretLevels)[SkySecretTarget],
-    ][],
+    Object.entries(skySecretLevels).filter(
+      ([target]) => target !== "sky-cloudtop",
+    ) as [SkySecretTarget, (typeof skySecretLevels)[SkySecretTarget]][],
   )(
     "keeps %s gate shut until its own sky puzzle is solved",
     (target, level) => {
@@ -311,6 +310,84 @@ describe("Hidden sky routes", () => {
       expect(gate().broken).toBe(true);
     },
   );
+
+  it("crosses Raincloud Sanctuary by riding drifting clouds, then reaches the return portal", () => {
+    const game = new Game(0, { level: skySecretLevels["sky-cloudtop"] });
+    walkTo(game, 220, 430);
+    tick(game, { ...idle, jump: true, jumpPressed: true });
+    for (let n = 0; n < 100 && !game.hasWindFeather; n++)
+      tick(game, { ...idle, jump: true });
+    expect(game.hasWindFeather).toBe(true);
+    tick(game, idle, 100);
+    jumpTo(game, 580, 800, 430);
+    walkTo(game, 1000, 430);
+    expect(game.activeCheckpointIndex).toBe(1);
+
+    for (const suffix of ["a", "b", "c"]) {
+      const tile = game.platforms.find(
+        (p) => p.id === `cloud.sky-cloudtop.drift.${suffix}`,
+      )!;
+      expect(tile.motion).toBeDefined();
+      const destination = () => tile.x + tile.w / 2 - game.player.w / 2;
+      tick(game, {
+        ...steer(game, destination()),
+        jump: true,
+        jumpPressed: true,
+      });
+      for (let i = 0; i < 24; i++)
+        tick(game, { ...steer(game, destination()), jump: true });
+      tick(game, steer(game, destination()));
+      let landed = false;
+      for (let i = 0; i < 600; i++) {
+        tick(game, { ...steer(game, destination()), jump: true });
+        if (
+          game.player.grounded &&
+          Math.abs(game.player.y + game.player.h - tile.y) < 1 &&
+          game.player.x + game.player.w > tile.x &&
+          game.player.x < tile.x + tile.w
+        ) {
+          landed = true;
+          break;
+        }
+      }
+      expect(
+        landed,
+        `land on drifting cloud ${suffix}: ${game.player.x}, ${game.player.y}`,
+      ).toBe(true);
+      tick(game, idle, 100);
+      expect(game.player.grounded).toBe(true);
+      expect(game.liftRemaining).toBeCloseTo(1.2);
+    }
+    flyTo(game, 1930, 430);
+    walkTo(game, 2050, 430);
+    expect(game.secretCompleted).toBe(true);
+    walkTo(game, 2190, 430);
+    tick(game, idle, 50);
+    expect(game.portalReady).toBe("return");
+    tick(game, { ...idle, jump: true, jumpPressed: true });
+    expect(game.requestedPortal).toBe("return");
+    expect(game.deaths).toBe(0);
+  });
+
+  it("retries the Raincloud crossing from its checkpoint and re-earns a feather", () => {
+    const game = new Game(0, {
+      level: skySecretLevels["sky-cloudtop"],
+      mode: "relaxed",
+    });
+    game.enemies = [];
+    walkTo(game, 1000, 430);
+    expect(game.activeCheckpointIndex).toBe(1);
+    for (let i = 0; i < 900 && game.deaths === 0; i++)
+      tick(game, { ...idle, right: true });
+    expect(game.deaths).toBe(1);
+    expect(game.hasWindFeather).toBe(false);
+    tick(game, idle, 30);
+    expect(game.player.x).toBeCloseTo(900);
+    tick(game, { ...idle, jump: true, jumpPressed: true });
+    for (let n = 0; n < 100 && !game.hasWindFeather; n++)
+      tick(game, { ...idle, jump: true });
+    expect(game.hasWindFeather).toBe(true);
+  });
 
   it.each(
     Object.entries(skySecretLevels) as [

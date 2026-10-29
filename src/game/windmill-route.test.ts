@@ -243,6 +243,32 @@ function completeHive(g: Game) {
 }
 
 describe("Windmill Garden real-input routes", () => {
+  it("returns a fallen player to the sail checkpoint with a recoverable feather", () => {
+    const g = new Game(3);
+    settle(g);
+    walk(g, 1184, 430);
+    jump(g, 1184, 430);
+    jump(g, 1600, 310, true);
+    walk(g, 1750, 310);
+    walk(g, 2000, 430);
+    expect(g.activeCheckpointIndex).toBe(1);
+    // Walking straight at the crossing is not a bypass; a fall returns to
+    // the checkpoint and removes the feather as in ordinary play.
+    for (let i = 0; i < 900 && g.deaths === 0; i++)
+      step(g, { ...idle, right: true });
+    expect(g.deaths).toBe(1);
+    expect(g.hasWindFeather).toBe(false);
+    settle(g);
+    walk(g, 2040, 430);
+    jump(g, 2040, 430);
+    expect(g.hasWindFeather).toBe(true);
+    walk(g, 2120, 430);
+    jump(g, 2180, 350);
+    jump(g, 2420, 350);
+    jump(g, 2700, 270, true);
+    expect(g.deaths).toBe(1);
+  });
+
   it("completes the world, hive detour, all fireflies and guardian using only inputs", () => {
     const g = new Game(3);
     settle(g);
@@ -254,12 +280,8 @@ describe("Windmill Garden real-input routes", () => {
     walk(g, 1750, 310);
     walk(g, 2000, 430);
     walk(g, 2120, 430);
-    jump(g, 2120, 430, false, true);
-    expect(g.puzzleState.wind).toBe("EAST");
     jump(g, 2180, 350);
-    jump(g, 2380, 270);
-    jump(g, 2380, 270, false, true);
-    expect(g.puzzleState.vaneGateOpen).toBe(true);
+    jump(g, 2420, 350);
     jump(g, 2700, 270, true);
     jump(g, 3350, 250, true);
     walk(g, 3390, 250);
@@ -297,6 +319,8 @@ describe("Windmill Garden real-input routes", () => {
     walk(g, 6800, 430);
     walk(g, 6880, 430);
     jump(g, 6880, 430, false, true);
+    jump(g, 6880, 430, false, true);
+    expect(g.puzzleState.wind).toBe("WEST");
     walk(g, 7040, 430);
     jump(g, 7040, 430, false, true);
     walk(g, 7200, 430);
