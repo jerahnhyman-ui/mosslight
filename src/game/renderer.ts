@@ -4075,6 +4075,7 @@ export class Renderer {
         size,
         pose,
         outfit,
+        danger,
         flight,
       );
       return;
@@ -4351,7 +4352,7 @@ export class Renderer {
     c.restore();
   }
 
-  /** Poppy uses Pip's exact collision box and movement, with her own ladybug art. */
+  /** Poppy is a flower-crowned garden sprite with Pip's movement and collision box. */
   private poppyHero(
     x: number,
     y: number,
@@ -4364,6 +4365,7 @@ export class Renderer {
     size: number,
     pose: "normal" | "hurt" | "won" | "lost",
     outfit: "leaf" | "berry" | "moon" | "cosmetic.bee_scarf",
+    danger: boolean,
     flight: "none" | "ready" | "lift" | "glide",
   ) {
     const c = this.ctx;
@@ -4375,25 +4377,41 @@ export class Renderer {
         : Math.sin(time * 2.5) * 0.6
       : 0;
     const hurt = pose === "hurt" || pose === "lost";
+    const celebration = pose === "won";
+    const outfitColor =
+      outfit === "moon"
+        ? "#829ac5"
+        : outfit === "berry"
+          ? "#a95e89"
+          : "#d87892";
+    const outfitLight =
+      outfit === "moon"
+        ? "#c4d8ed"
+        : outfit === "berry"
+          ? "#e4a1b9"
+          : "#f4bdc1";
     const scarf =
       outfit === "cosmetic.bee_scarf"
         ? "#f2c552"
         : outfit === "moon"
-          ? "#b8d0f1"
-          : outfit === "berry"
-            ? "#efb8d3"
-            : "#ffcf80";
+          ? "#e6dba7"
+          : "#e6bd72";
     c.save();
     c.translate(x, y);
     c.scale(size, size);
     if (grounded) this.ellipse(0, -0.5, 17, 3, "rgba(28,80,50,.2)");
     c.scale(facing < 0 ? -1 : 1, 1);
     c.rotate(hurt ? -0.06 : running ? Math.min(0.075, Math.abs(vx) / 4000) : 0);
-    if (pose === "won") c.translate(0, -Math.abs(Math.sin(time * 5)) * 3);
+    if (celebration) c.translate(0, -Math.abs(Math.sin(time * 5)) * 3);
     const squash =
       landing > 0 ? Math.sin((landing / 0.14) * Math.PI) * 0.09 : 0;
     const rise = !grounded && vy < -180 ? Math.min(0.07, -vy / 10000) : 0;
     c.scale(1 + squash - rise, 1 - squash + rise);
+    if (!grounded && vy > 260) {
+      const flutter = 5 + Math.abs(Math.sin(time * 30)) * 8;
+      this.ellipse(-17, -23, flutter, 7, "rgba(255,239,242,.72)", "#d79bab", 1);
+      this.ellipse(14, -23, flutter, 7, "rgba(255,239,242,.72)", "#d79bab", 1);
+    }
     if (flight !== "none") {
       c.save();
       c.translate(-15, -25 + bob);
@@ -4414,92 +4432,193 @@ export class Renderer {
         2,
       );
       c.restore();
+      if (flight === "lift") {
+        for (let i = 0; i < 3; i++)
+          this.line(
+            [
+              [-21 - i * 4, -5 + i * 7],
+              [-25 - i * 4, 2 + i * 7],
+            ],
+            "rgba(225,255,246,.8)",
+            2,
+          );
+      }
     }
-    if (!grounded) {
-      const flutter = 5 + Math.abs(Math.sin(time * 24)) * 5;
-      this.ellipse(-15, -24, flutter, 7, "rgba(255,241,225,.75)", "#e9b9aa", 1);
-      this.ellipse(14, -24, flutter, 7, "rgba(255,241,225,.75)", "#e9b9aa", 1);
+    // A little scarf and satchel mark her as Pip's fellow garden explorer.
+    c.beginPath();
+    c.moveTo(-9, -26 + bob);
+    c.quadraticCurveTo(
+      -22,
+      -26 + Math.sin(time * 8) * 2,
+      -29 - Math.abs(vx) / 90,
+      -18 + bob,
+    );
+    c.lineTo(-22, -17 + bob);
+    c.lineTo(-24, -12 + bob);
+    c.quadraticCurveTo(-14, -15, -7, -22);
+    c.closePath();
+    c.fillStyle = scarf;
+    c.fill();
+    if (outfit === "cosmetic.bee_scarf") {
+      this.line(
+        [
+          [-16, -24],
+          [-18, -18],
+        ],
+        "#66513b",
+        3,
+      );
+      this.line(
+        [
+          [-23, -22],
+          [-25, -17],
+        ],
+        "#66513b",
+        3,
+      );
     }
-    // Her red, spotted shell and rounded antennae keep her recognizable at phone scale.
-    this.line(
-      [
-        [-8, -7],
-        [-10 - stride * 4, -2],
-      ],
-      "#513d3b",
-      5,
-    );
-    this.line(
-      [
-        [7, -7],
-        [9 + stride * 4, -2],
-      ],
-      "#513d3b",
-      5,
-    );
-    this.ellipse(-1, -17 + bob, 15, 14, "#e76a65", "#8f4143", 2);
-    this.line(
-      [
-        [0, -30 + bob],
-        [0, -7 + bob],
-      ],
-      "#9c4749",
-      1.5,
-    );
-    this.ellipse(-8, -22 + bob, 3.1, 3.1, "#5d4144");
-    this.ellipse(7, -24 + bob, 3, 3, "#5d4144");
-    this.ellipse(-6, -12 + bob, 2.7, 2.7, "#5d4144");
-    this.ellipse(8, -12 + bob, 2.7, 2.7, "#5d4144");
+    this.rounded(-18, -26 + bob, 9, 18, 4, "#bf874c", "#936b43");
     this.line(
       [
         [-12, -20 + bob],
-        [-17, (pose === "won" ? -35 : -13 + stride * 3) + bob],
+        [
+          -17,
+          celebration
+            ? -36 + Math.sin(time * 8) * 3
+            : hurt
+              ? -27
+              : !grounded
+                ? -26
+                : -12 + stride * 3,
+        ],
       ],
-      "#a75550",
+      "#a75e78",
       5,
     );
+    this.rounded(
+      -12 - stride * 4,
+      !grounded && vy < 0 ? -10 : -7,
+      11,
+      7,
+      3,
+      "#775369",
+    );
+    this.rounded(
+      2 + stride * 4,
+      !grounded && vy < 0 ? -13 : -7,
+      11,
+      7,
+      3,
+      "#775369",
+    );
+    this.ellipse(0, -16 + bob, 12, 14, outfitColor, "#99566f", 2);
+    this.ellipse(2, -15 + bob, 7, 9, outfitLight);
     this.line(
       [
         [11, -20 + bob],
-        [16, (pose === "won" ? -35 : -13 - stride * 3) + bob],
+        [
+          15,
+          celebration
+            ? -40 + Math.sin(time * 8) * 3
+            : hurt
+              ? -28
+              : !grounded
+                ? -29
+                : -12 - stride * 3,
+        ],
       ],
-      "#a75550",
+      outfitColor,
       5,
     );
-    this.ellipse(0, -34 + bob, 15, 13, "#c95e5b", "#8f4143", 2);
-    this.ellipse(2, -32 + bob, 12, 10, "#fff0d4");
-    this.ellipse(-3, -33 + bob, 2.6, hurt ? 1 : 3.6, "#53433e");
-    this.ellipse(7, -33 + bob, 2.6, hurt ? 1 : 3.6, "#53433e");
-    this.ellipse(-6, -27 + bob, 2.3, 1.4, "#f4a5a0");
-    this.ellipse(11, -27 + bob, 2.3, 1.4, "#f4a5a0");
+    this.ellipse(
+      15,
+      celebration
+        ? -39 + Math.sin(time * 8) * 3
+        : hurt
+          ? -27
+          : !grounded
+            ? -28
+            : -11 - stride * 3,
+      3.2,
+      3.7,
+      "#ffe5c7",
+    );
+    // A petal hood and flower crown distinguish Poppy while keeping the sprite silhouette.
+    this.ellipse(0, -33 + bob, 16, 14, outfitColor, "#99566f", 2);
+    this.ellipse(2, -31 + bob, 12.5, 10.5, "#fff1c9");
+    this.ellipse(-9, -36 + bob, 3.4, 7.3, outfitLight);
+    const blink = hurt || Math.sin(time * 0.72) > 0.996;
+    if (blink) {
+      this.line(
+        [
+          [-5, -32 + bob],
+          [-1, -32 + bob],
+        ],
+        "#53464f",
+        1.7,
+      );
+      this.line(
+        [
+          [5, -32 + bob],
+          [9, -32 + bob],
+        ],
+        "#53464f",
+        1.7,
+      );
+    } else {
+      this.ellipse(-3, -32 + bob, 2.7, 3.8, "#53464f");
+      this.ellipse(7, -32 + bob, 2.7, 3.8, "#53464f");
+      this.ellipse(-2.2, -33.5 + bob, 0.9, 1.1, "#ffffff");
+      this.ellipse(7.8, -33.5 + bob, 0.9, 1.1, "#ffffff");
+    }
+    this.ellipse(-7.5, -27 + bob, 2.4, 1.4, "#f3b39a");
+    this.ellipse(11, -27 + bob, 2.4, 1.4, "#f3b39a");
+    c.beginPath();
+    c.moveTo(1, -26 + bob);
+    c.quadraticCurveTo(
+      3,
+      (hurt ? -29 : celebration ? -21.5 : -23.3) + bob,
+      5.5,
+      -26 + bob,
+    );
+    c.strokeStyle = "#8f6d5b";
+    c.lineWidth = 1.3;
+    c.lineCap = "round";
+    c.stroke();
+    this.rounded(-11, -23 + bob, 24, 5, 2.5, scarf);
+    this.ellipse(10, -21 + bob, 3, 3, scarf);
+    if (outfit === "berry") {
+      for (let i = 0; i < 3; i++)
+        this.ellipse(-7 + i * 4, -47 + bob, 3.2, 3.2, "#b94f76", "#8b456a", 1);
+    } else if (outfit === "moon") {
+      this.ellipse(-7, -43 + bob, 4, 4, "#fff0b3");
+      this.ellipse(-5, -44 + bob, 3.3, 3.3, outfitColor);
+    }
+    const sway = Math.sin(time * (danger ? 9 : 4)) * 1.1 + vx / 300;
+    const crownBob = bob - (danger ? 6 : 0);
     this.line(
       [
-        [0, -26 + bob],
-        [3, -24 + bob],
-        [6, -26 + bob],
+        [0, -45 + bob],
+        [sway, -51 + crownBob],
       ],
-      "#8f6d5b",
-      1.3,
+      "#5f9363",
+      2.5,
     );
-    this.line(
-      [
-        [-8, -45 + bob],
-        [-12, -53 + bob],
-      ],
-      "#684545",
-      2,
-    );
-    this.line(
-      [
-        [7, -45 + bob],
-        [11, -53 + bob],
-      ],
-      "#684545",
-      2,
-    );
-    this.ellipse(-12, -53 + bob, 2.5, 2.5, "#684545");
-    this.ellipse(11, -53 + bob, 2.5, 2.5, "#684545");
-    this.rounded(-11, -23 + bob, 23, 5, 2.5, scarf);
+    this.leaf(sway, -49 + crownBob, 8, -0.95, "#78b86b");
+    this.leaf(sway, -49 + crownBob, 7, 1.15, "#4f995f");
+    for (let i = 0; i < 5; i++) {
+      const angle = (i * Math.PI * 2) / 5 - Math.PI / 2;
+      this.ellipse(
+        sway + Math.cos(angle) * 4,
+        -53 + crownBob + Math.sin(angle) * 4,
+        3.4,
+        3.4,
+        "#ffd1dc",
+        "#d787a0",
+        0.7,
+      );
+    }
+    this.ellipse(sway, -53 + crownBob, 2.5, 2.5, "#f4c65e");
     c.restore();
   }
 

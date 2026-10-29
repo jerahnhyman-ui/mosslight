@@ -186,7 +186,7 @@ const groveDialog = $<HTMLDialogElement>("#grove-dialog");
 let activityOpen = false;
 const characterChoice = document.createElement("div");
 characterChoice.className = "mode-choice";
-characterChoice.innerHTML = `<label for="character-choice">Play as</label><select id="character-choice"><option value="pip">Pip</option><option value="poppy">Poppy</option></select><small>Both friends have the same moves and abilities.</small>`;
+characterChoice.innerHTML = `<label for="character-choice">Play as</label><select id="character-choice"><option value="pip">Pip</option><option value="poppy">Poppy — garden sprite</option></select><small>Both friends have the same moves and abilities.</small>`;
 $(".adventure-choices").prepend(characterChoice);
 const characterSelect = $<HTMLSelectElement>("#character-choice");
 characterSelect.value = save.selectedCharacter;

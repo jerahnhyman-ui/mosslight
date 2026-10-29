@@ -1,6 +1,6 @@
 # The living garden
 
-Mosslight follows Pip and Poppy, two playable friends waking an enormous garden with light. Both use the same movement and abilities.
+Mosslight follows Pip and Poppy, two playable garden sprites waking an enormous garden with light. Both use the same movement and abilities.
 The game uses movement, jumping, exploration, and readable enemy behavior; new
 interactions do not require another touch button.
 
