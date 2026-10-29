@@ -108,6 +108,8 @@ kbd {
   pointer-events: none;
 }
 canvas {
+  --scene-safe-top: 0px;
+  --scene-safe-bottom: 0px;
   display: block;
   width: min(
     calc(100vw - var(--safe-left) - var(--safe-right)),
@@ -120,6 +122,19 @@ canvas {
   flex-shrink: 0;
   outline: 0;
   touch-action: none;
+}
+/* Landscape phones use the entire display. HUD and controls retain their own
+   safe-area insets while the scenery extends behind notches and the home bar. */
+@media (orientation: landscape) {
+  .scene-wrap {
+    inset: 0;
+  }
+  canvas {
+    --scene-safe-top: var(--safe-top);
+    --scene-safe-bottom: var(--safe-bottom);
+    width: 100%;
+    height: 100%;
+  }
 }
 .topbar {
   position: absolute;
@@ -2751,7 +2766,6 @@ select:focus-visible {
 }
 .game-app[data-run-kind="grove"] .coin-meter,
 .game-app[data-run-kind="grove"] .vitals,
-.game-app[data-run-kind="grove"] .power-state,
 .game-app[data-run-kind="grove"] .trail-track,
 .game-app[data-run-kind="grove"] #checkpoint-count {
   display: none;

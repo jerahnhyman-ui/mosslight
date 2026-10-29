@@ -17,8 +17,7 @@ npm ci
 npm run dev
 ```
 
-Open the local URL Vite prints. The game fills the screen, with a trail picker
-on the title screen and worlds, sound, and instructions in the game menu.
+Open the local URL Vite prints. In landscape, the game fills the display edge to edge and shows more of the world on wider screens, with proportional artwork and controls inside the safe areas. A trail picker sits on the title screen; worlds, sound, and instructions are in the game menu.
 Move with **← / →** or **A / D**; jump with **Space**, **W**, or **↑**.
 Tap jump for a short hop, or hold it for a higher leap. **P / Esc** pauses.
 On touch screens, slide your left thumb across the direction pad without lifting,
@@ -38,7 +37,7 @@ animated characters, and collectible/landing effects.
 - **Firefly Hollow** adds moving leaf platforms and climbing routes.
 - **Cloudtop Crossing** features cloud bridges that warn before crumbling and
   return after a short delay.
-- **Windmill Garden** opens after beating the Meadow guardian. Learn powered feather flight, change wind/water/light mechanisms, follow three firefly branches, and discover a separate beehive level.
+- **Windmill Garden** opens after beating the Meadow guardian. Put feather flight to work, change wind/water/light mechanisms, follow three firefly branches, and discover a separate beehive level.
 - Walking beetles, hopping grasshoppers, and charging beetles each have distinct
   movement. Charging beetles signal before rushing. Every bug can be squashed
   by landing on it; star power also squashes bugs on contact.
@@ -87,7 +86,7 @@ iOS plugin when supported.
 
 - In Classic and Timed modes, start each trail small with **3 lives**. Falling into a gap always costs one
   life, including while big or using star power.
-- **Wind Feathers let Pip fly.** Jump, release, then hold Jump again to rise. Release to glide and land to refill. Shrinking retains the feather; losing a life drops it, with free replacements at flight checkpoints.
+- **Wind Feathers let Pip fly in every world.** Find a feather plant on the opening path, before any guardian; the Home Grove has one for safe practice too. Jump, release, then hold Jump again to rise. Release to glide and land to refill. The camera follows high flights in the original trails and grove. Shrinking retains the feather; losing a life drops it, with free replacements at every world checkpoint. Challenge rooms keep their original jumping rules.
 - **Diamonds make Pip big.** A bug hit then shrinks Pip without taking a life.
   A hit while small costs a life. A brief grace period after shrinking or
   respawning prevents one collision from counting as several hits.

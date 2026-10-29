@@ -1047,6 +1047,7 @@ export const levels: Level[] = [
   ...trails.map((trail, index) => {
     const guardian = guardians[index]!;
     const checkpointX = trail.goal.x - 70;
+    const checkpoints = [...trail.checkpoints, { x: checkpointX, y: 430 }];
     return {
       ...trail,
       contentId: [
@@ -1060,7 +1061,10 @@ export const levels: Level[] = [
         { x: trail.width + 100, name: guardian.section },
       ],
       platforms: [...trail.platforms, ground(trail.width, 1100)],
-      checkpoints: [...trail.checkpoints, { x: checkpointX, y: 430 }],
+      checkpoints,
+      // Flight is available on the opening safe floor, before any guardian.
+      // A free replacement at each retry spawn keeps a lost feather recoverable.
+      featherFountains: [{ x: 280, y: 430 }, ...checkpoints],
       diamonds: [...trail.diamonds, { x: checkpointX + 55, y: 400 }],
       coins: [...trail.coins, ...row(trail.width + 900, 392, 4)],
       boss: {
@@ -1093,6 +1097,7 @@ export const groveLevel: Level = {
   theme: "meadow",
   width: 1900,
   spawn: { x: 110, y: 392 },
+  featherFountains: [{ x: 280, y: 430 }],
   platforms: [
     ground(0, 1900),
     wakingPlant(310, 340, 150),

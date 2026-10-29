@@ -15,7 +15,7 @@ The current source establishes the integration constraints:
 
 ## Ownership, charge and presentation state
 
-Store feather ownership independently of `player.form`: `hasWindFeather`, `liftRemaining` in seconds, `glideArmed`, `liftActive`, `stableGroundTime`, and the Jump edge/arming state. These are transient run state. Permanent `windFeatherDiscovered` records the first pickup and unlocks the Home Grove hoop activity; it does not grant the feather in old worlds or give a permanent physics upgrade.
+Store feather ownership independently of `player.form`: `hasWindFeather`, `liftRemaining` in seconds, `glideArmed`, `liftActive`, `stableGroundTime`, and the Jump edge/arming state. These are transient run state. Permanent `windFeatherDiscovered` records the first pickup and unlocks the Home Grove hoop activity; it does not automatically equip a new run. Feather plants on the opening path and at each world checkpoint supply the ability in all four worlds; the Home Grove also supplies one for practice. The three challenge rooms retain their original jumping rules.
 
 The UI derives these states; a large new state-machine framework is unnecessary:
 
@@ -77,7 +77,7 @@ Mushroom bounces, enemies, the guardian, crumble platforms, side/ceiling contact
 
 Mushrooms, enemy stomps and guardian bounces keep their current impulses. They cancel active lift and require a new release/press to resume it; they preserve ownership, remaining charge and the already-armed glide. Spend no fuel during the forced bounce unless the player deliberately reactivates lift. Growth preserves the existing collision/feet rules and does not alter fuel, lift acceleration, glide or horizontal speed.
 
-Use ordinary solid collision for roof contact; set upward velocity to zero as today. Holding lift against a roof spends fuel, pushing downward afterward still follows collision physics, and contact never refills. Do not use a screen clamp, invisible death ceiling, or new camera system. Author visible solid canopy/trellis roofs where high launches or mushroom combinations could send Pip above the viewport. A useful roof underside is y64, with the foliage rendered at its collision edge. Open-sky sections must be verified against their actual highest launch/bounce, not just their floor height. Required targets should occupy the readable middle of the screen rather than the top HUD band.
+Use ordinary solid collision for roof contact; set upward velocity to zero as today. Holding lift against a roof spends fuel, pushing downward afterward still follows collision physics, and contact never refills. Do not use a screen clamp or invisible death ceiling. The original trails and Home Grove use vertical camera follow for high feather flights; Windmill Garden and its activities keep their authored canopy and camera framing. Author visible solid canopy/trellis roofs where high launches or mushroom combinations could send Pip above the viewport. A useful roof underside is y64, with the foliage rendered at its collision edge. Open-sky sections must be verified against their actual highest launch/bounce, not just their floor height. Required targets should occupy the readable middle of the screen rather than the top HUD band.
 
 ## Damage, stars and the existing economy
 

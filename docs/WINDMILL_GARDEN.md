@@ -6,7 +6,7 @@ This branch implements the flight expansion described in the [design package](wi
 
 Defeat the Sunlit Meadow guardian in any adventure mode to unlock Windmill Garden. Existing saves with a current Meadow guardian completion qualify immediately. The new world has twelve exploration rooms, a guardian arena, eight checkpoints and three fireflies.
 
-Collect a Wind Feather, jump, release Jump, then press and hold Jump again to rise. Release to glide. A brief stable landing refills lift. Ordinary held jumps remain ordinary jumps. Shrinking retains the feather; losing a life drops it. Free feather plants are available at the new world's checkpoints and before required flight.
+Collect a Wind Feather, jump, release Jump, then press and hold Jump again to rise. Release to glide. A brief stable landing refills lift. Ordinary held jumps remain ordinary jumps. Shrinking retains the feather; losing a life drops it. Free feather plants are available near the entrance and at every checkpoint in all four worlds, plus the Home Grove for practice. Windmill Garden remains unlocked by the Meadow guardian, but the feather itself is available from the first adventure.
 
 Jump onto marked handles to change wind, water, the mill brake and light routing. Follow the connecting pipes and symbols. Solved main-path gates stay open for the run. The pollen mural hints at the beehive entrance: west wind, low water, light toward the hive. Stand still on the revealed portal and press Jump when its prompt appears.
 

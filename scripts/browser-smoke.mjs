@@ -1,6 +1,7 @@
 import { chromium, expect } from "@playwright/test";
 import { existsSync, mkdirSync } from "node:fs";
 import { spawn } from "node:child_process";
+import { checkFlightCamera } from "./flight-camera-smoke.mjs";
 
 // Exercise the shipped bundle with real keyboard and browser touch events.
 const server = spawn(
@@ -28,6 +29,7 @@ async function checkLayout(page, label) {
   const dimensions = await page.evaluate(() => {
     const canvas = document.querySelector("#game");
     const box = canvas.getBoundingClientRect();
+    const transform = canvas.getContext("2d").getTransform();
     return {
       viewport: { width: innerWidth, height: innerHeight },
       document: {
@@ -41,6 +43,10 @@ async function checkLayout(page, label) {
         height: box.height,
         backingWidth: canvas.width,
         backingHeight: canvas.height,
+        worldWidth: Number(canvas.dataset.viewportWidth),
+        worldHeight: Number(canvas.dataset.viewportHeight),
+        pixelScaleX: (transform.a * box.width) / canvas.width,
+        pixelScaleY: (transform.d * box.height) / canvas.height,
       },
       hud: [".coin-meter", ".stars-pill", ".power-state", ".vitals"]
         .map((selector) => {
@@ -76,10 +82,44 @@ async function checkLayout(page, label) {
     dimensions.document.height,
     `${label}: vertical document overflow`,
   ).toBeLessThanOrEqual(dimensions.viewport.height + 1);
+  if (dimensions.viewport.width > dimensions.viewport.height) {
+    for (const [actual, expected, edge] of [
+      [dimensions.canvas.x, 0, "left"],
+      [dimensions.canvas.y, 0, "top"],
+      [dimensions.canvas.width, dimensions.viewport.width, "width"],
+      [dimensions.canvas.height, dimensions.viewport.height, "height"],
+    ]) {
+      expect(
+        Math.abs(actual - expected),
+        `${label}: landscape canvas fills viewport ${edge}`,
+      ).toBeLessThanOrEqual(1);
+    }
+  } else {
+    expect(
+      Math.abs(dimensions.canvas.width / dimensions.canvas.height - 16 / 9),
+      `${label}: portrait retains the contained 16:9 scene`,
+    ).toBeLessThan(0.01);
+  }
   expect(
-    Math.abs(dimensions.canvas.width / dimensions.canvas.height - 16 / 9),
-    `${label}: canvas aspect ratio`,
-  ).toBeLessThan(0.01);
+    dimensions.canvas.worldWidth,
+    `${label}: world viewport width`,
+  ).toBeGreaterThan(0);
+  expect(
+    dimensions.canvas.worldHeight,
+    `${label}: world viewport height`,
+  ).toBeGreaterThan(0);
+  expect(
+    dimensions.canvas.width / dimensions.canvas.worldWidth,
+    `${label}: viewport metadata preserves uniform world scale`,
+  ).toBeCloseTo(dimensions.canvas.height / dimensions.canvas.worldHeight, 6);
+  expect(
+    dimensions.canvas.pixelScaleX,
+    `${label}: rendered sprites are not stretched`,
+  ).toBeCloseTo(dimensions.canvas.pixelScaleY, 6);
+  expect(
+    dimensions.canvas.pixelScaleX,
+    `${label}: actual canvas transform matches world viewport`,
+  ).toBeCloseTo(dimensions.canvas.width / dimensions.canvas.worldWidth, 6);
   expect(
     dimensions.canvas.x,
     `${label}: canvas left edge`,
@@ -150,15 +190,22 @@ async function controlCenter(page, name, id) {
 }
 async function checkSpawnVisibility(page, label) {
   const position = await page.evaluate(() => {
-    const canvas = document.querySelector("#game").getBoundingClientRect();
+    const element = document.querySelector("#game");
+    const canvas = element.getBoundingClientRect();
+    const viewportWidth = Number(element.dataset.viewportWidth);
+    const viewportHeight = Number(element.dataset.viewportHeight);
+    const cameraX = Number(element.dataset.cameraX);
+    const cameraY = Number(element.dataset.cameraY);
     const dpad = document.querySelector(".touch-dpad").getBoundingClientRect();
-    // All trails spawn Pip at (95, 392), with feet at y=430. Include the
+    // Original trails spawn Pip at (95, 392), with feet at y=430. Include the
     // rendered character's outline, which is wider than the collision box.
-    const heroLeft = canvas.left + (87 / 960) * canvas.width;
-    const heroRight = canvas.left + (131 / 960) * canvas.width;
+    const heroLeft =
+      canvas.left + ((87 - cameraX) / viewportWidth) * canvas.width;
+    const heroRight =
+      canvas.left + ((131 - cameraX) / viewportWidth) * canvas.width;
     return {
       overlapsHorizontally: heroLeft < dpad.right && heroRight > dpad.left,
-      feet: canvas.top + (430 / 540) * canvas.height,
+      feet: canvas.top + ((430 - cameraY) / viewportHeight) * canvas.height,
       controlTop: dpad.top,
     };
   });
@@ -289,16 +336,30 @@ async function readStoredSave(page) {
 }
 async function checkStarPickupVisibility(page, label) {
   const overlaps = await page.evaluate(() => {
-    const canvas = document.querySelector("#game").getBoundingClientRect();
+    const element = document.querySelector("#game");
+    const canvas = element.getBoundingClientRect();
+    const viewportWidth = Number(element.dataset.viewportWidth);
+    const viewportHeight = Number(element.dataset.viewportHeight);
+    const cameraX = Number(element.dataset.cameraX);
+    const cameraY = Number(element.dataset.cameraY);
     const toast = document.querySelector("#game-toast").getBoundingClientRect();
-    // This real-keyboard route stops on the first upper ledge, feet at y=265.
-    // The settled follow camera places Pip around x=356. Reserve an expanded
-    // area for the full big sprite and its star aura, not just the hitbox.
+    // Read actual horizontal progress from the HUD and project the full sprite
+    // and star aura through the current camera. This route lands at feet y=265.
+    const progress = Number(
+      document
+        .querySelector(".trail-track span")
+        .style.transform.match(/scaleX\(([^)]+)\)/)[1],
+    );
+    const playerX = progress * 12140;
+    const x = (world) =>
+      canvas.left + ((world - cameraX) / viewportWidth) * canvas.width;
+    const y = (world) =>
+      canvas.top + ((world - cameraY) / viewportHeight) * canvas.height;
     const hero = {
-      left: canvas.left + (310 / 960) * canvas.width,
-      right: canvas.left + (400 / 960) * canvas.width,
-      top: canvas.top + (175 / 540) * canvas.height,
-      bottom: canvas.top + (280 / 540) * canvas.height,
+      left: x(playerX - 25),
+      right: x(playerX + 65),
+      top: y(175),
+      bottom: y(280),
     };
     return (
       toast.left < hero.right &&
@@ -363,7 +424,125 @@ try {
     headless: true,
     args: ["--no-sandbox"],
   });
+  await checkFlightCamera(browser);
   mkdirSync("artifacts", { recursive: true });
+  // Fresh installations can discover flight without first beating a guardian.
+  // These routes use the real keyboard/touch controls and visible flight HUD.
+  for (const [selection, label] of [
+    [0, "Sunlit Meadow"],
+    [1, "Firefly Hollow"],
+    [2, "Cloudtop Crossing"],
+    ["grove", "Home Grove"],
+  ]) {
+    const flight = await browser.newPage({
+      viewport: { width: 844, height: 390 },
+      isMobile: true,
+      hasTouch: true,
+      deviceScaleFactor: 2,
+    });
+    captureErrors(flight);
+    const flightStart = new Date("2026-01-01T00:00:00Z");
+    await flight.clock.install({ time: flightStart });
+    await flight.clock.pauseAt(new Date(flightStart.getTime() + 1000));
+    await flight.goto(baseURL);
+    await flight
+      .getByRole("button", { name: "Game menu", exact: true })
+      .click();
+    await expect(flight.locator('[data-menu-world="3"]')).toBeDisabled();
+    await expect(flight.locator("#journal-hoops")).toBeDisabled();
+    if (selection === "grove") {
+      await flight.locator("#visit-grove").click();
+    } else {
+      await flight.locator(`[data-menu-world="${selection}"]`).click();
+      await flight.locator("#start-button").click();
+    }
+    await flight.clock.runFor(64);
+    await expect(flight.locator("#feather-meter")).toBeHidden();
+
+    const touchFlight = selection === 0;
+    const flightTouch = touchFlight
+      ? await flight.context().newCDPSession(flight)
+      : null;
+    const sendFlightTouch = (type, touchPoints = []) =>
+      flightTouch.send("Input.dispatchTouchEvent", { type, touchPoints });
+    const flightRight = await controlCenter(flight, "right", 1);
+    const flightJump = await controlCenter(flight, "jump", 2);
+    if (touchFlight) await sendFlightTouch("touchStart", [flightRight]);
+    else await flight.keyboard.down("ArrowRight");
+    await advanceUntil(
+      flight,
+      () => flight.locator("#feather-meter").isVisible(),
+      `${label}: entrance feather pickup`,
+      2000,
+    );
+    if (touchFlight) await sendFlightTouch("touchEnd");
+    else await flight.keyboard.up("ArrowRight");
+    await flight.clock.runFor(200);
+    await expect(flight.locator("#feather-label")).toHaveText("Ready");
+    await expect(flight.locator(".feather-segments")).toHaveText("▰▰▰▰");
+    await expect(flight.locator("#game-toast")).toContainText("Wind Feather!");
+    const beforeFlight = await trailProgress(flight);
+
+    if (touchFlight)
+      await sendFlightTouch("touchStart", [flightRight, flightJump]);
+    else await flight.keyboard.down("Space");
+    await flight.clock.runFor(200);
+    // Holding a normal jump never spends lift. Release and press again in air.
+    await expect(flight.locator(".feather-segments")).toHaveText("▰▰▰▰");
+    if (touchFlight) {
+      // CDP touchEnd identifies the contacts to lift, not those still held.
+      await sendFlightTouch("touchEnd", [flightJump]);
+      await expect(flight.locator('[data-control="jump"]')).toHaveAttribute(
+        "aria-pressed",
+        "false",
+      );
+      await expect(flight.locator('[data-control="right"]')).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+    } else await flight.keyboard.up("Space");
+    await flight.clock.runFor(50);
+    if (touchFlight)
+      await sendFlightTouch("touchStart", [flightRight, flightJump]);
+    else await flight.keyboard.down("Space");
+    await flight.clock.runFor(450);
+    await expect(flight.locator("#feather-label")).toHaveText("Rise");
+    await expect(flight.locator(".feather-segments")).not.toHaveText("▰▰▰▰");
+    if (touchFlight) {
+      expect(
+        await trailProgress(flight),
+        "two thumbs steer Pip forward while the feather supplies lift",
+      ).toBeGreaterThan(beforeFlight + 100 / MEADOW_GOAL_X);
+    }
+    await checkLayout(flight, `${label}: early flight HUD`);
+    await screenshot(flight, `early-flight-${selection}`);
+    if (touchFlight) await sendFlightTouch("touchEnd");
+    else await flight.keyboard.up("Space");
+    await flight.clock.runFor(64);
+    await expect(flight.locator("#feather-label")).toHaveText("Glide");
+    await advanceUntil(
+      flight,
+      async () =>
+        (await flight.locator("#feather-label").textContent()) === "Ready" &&
+        (await flight.locator(".feather-segments").textContent()) === "▰▰▰▰",
+      `${label}: land and recharge`,
+    );
+    await neutralControls(flight);
+    expect((await readStoredSave(flight)).unlocks.windFeatherDiscovered).toBe(
+      true,
+    );
+    await flight.reload();
+    await flight
+      .getByRole("button", { name: "Game menu", exact: true })
+      .click();
+    await expect(flight.locator("#journal-hoops")).toBeEnabled();
+    await expect(flight.locator('[data-menu-world="3"]')).toBeDisabled();
+    await flight.close();
+    console.log(
+      `PASS ${label}: fresh-save feather pickup, ${touchFlight ? "two-thumb" : "keyboard"} lift/glide/recharge, persisted Petal Post unlock before a guardian win`,
+    );
+  }
+
   const desktop = await browser.newPage({
     viewport: { width: 1440, height: 900 },
   });
@@ -478,7 +657,8 @@ try {
     path: "artifacts/rules-small-phone.png",
     fullPage: true,
   });
-  await walkToMeadowX(rules, 225);
+  // Check diamond feedback before continuing to the new entrance feather plant.
+  await walkToMeadowX(rules, 180);
   await expect(rules.locator("#player-form")).toHaveText("Big");
   await expect(rules.locator(".power-state")).toHaveAttribute(
     "data-form",
@@ -488,12 +668,13 @@ try {
     "data-event",
     "grow",
   );
-  await expect(rules.locator("#coin-count")).not.toHaveText("00");
   await checkLayout(rules, "phone big Pip HUD");
   await rules.screenshot({
     path: "artifacts/rules-diamond-growth.png",
     fullPage: true,
   });
+  await walkToMeadowX(rules, 225);
+  await expect(rules.locator("#coin-count")).not.toHaveText("00");
   const earnedSave = await readStoredSave(rules);
   expect(
     earnedSave.wallet,
@@ -614,6 +795,7 @@ try {
     style.setProperty("--safe-left", "44px");
     style.setProperty("--safe-right", "44px");
     style.setProperty("--safe-bottom", "21px");
+    window.dispatchEvent(new Event("resize"));
   });
   await stars.clock.runFor(64);
   await checkLayout(
@@ -919,6 +1101,7 @@ try {
       style.setProperty("--safe-left", "44px");
       style.setProperty("--safe-right", "44px");
       style.setProperty("--safe-bottom", "21px");
+      window.dispatchEvent(new Event("resize"));
     });
     await settleLayout(settings);
     await checkLayout(settings, `max customized controls ${width}x${height}`);
@@ -1335,6 +1518,7 @@ try {
   );
 
   for (const [label, width, height] of [
+    ["large-phone", 932, 430],
     ["small-phone", 568, 320],
     ["portrait", 390, 844],
     ["tablet", 1194, 834],
@@ -1360,11 +1544,12 @@ try {
     await mobile.locator('[data-menu-world="1"]').tap();
     await expect(mobile.locator("#world-label")).toHaveText("Firefly Hollow");
     console.log(
-      `PASS ${label}: contained 16:9 canvas, no document overflow, touch target size, accessible world selection`,
+      `PASS ${label}: ${width > height ? "full-screen landscape" : "contained portrait"} canvas, uniform artwork scale, no overflow, touch targets and world selection`,
     );
   }
   for (const [label, width, height] of [
     ["phone-safe-area", 844, 390],
+    ["large-phone-safe-area", 932, 430],
     ["small-phone-safe-area", 568, 320],
   ]) {
     await mobile.setViewportSize({ width, height });
@@ -1374,6 +1559,7 @@ try {
       style.setProperty("--safe-left", "44px");
       style.setProperty("--safe-right", "44px");
       style.setProperty("--safe-bottom", "21px");
+      window.dispatchEvent(new Event("resize"));
     });
     await mobile.locator("#start-button").tap();
     await checkLayout(mobile, label);
@@ -1398,7 +1584,7 @@ try {
     }
     await screenshot(mobile, `${label}-gameplay`);
     console.log(
-      `PASS ${label}: spawn visible, controls clear notch/home indicator, canvas contained`,
+      `PASS ${label}: full-screen scenery, uniform artwork, spawn visible, controls clear notch/home indicator`,
     );
   }
   expect(errors).toEqual([]);

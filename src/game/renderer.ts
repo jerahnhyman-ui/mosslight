@@ -132,7 +132,10 @@ const hash = (n: number) => {
 export class Renderer {
   readonly canvas: HTMLCanvasElement;
   readonly ctx: CanvasRenderingContext2D;
+  viewportWidth = WIDTH;
+  viewportHeight = HEIGHT;
   cameraX = 0;
+  cameraY = 0;
   private previousTime = 0;
   private previousGame: Game | null = null;
   private previousElapsed = -1;
@@ -154,6 +157,8 @@ export class Renderer {
   private particles: Particle[] = [];
   private landing = 0;
   private needsResize = true;
+  private framingChanged = true;
+  private baseCameraY = 0;
   private pixelRatio = 0;
   private cameraLead = WIDTH * 0.15;
   private bouncePulse = 0;
@@ -167,29 +172,48 @@ export class Renderer {
     new ResizeObserver(() => {
       this.needsResize = true;
     }).observe(canvas);
+    window.addEventListener("resize", () => {
+      this.needsResize = true;
+    });
     this.resize();
   }
 
-  /** The world stays 960×540; only the backing store follows display density. */
+  /** Keep one uniform world scale; wider screens reveal more of the trail. */
   resize() {
     const bounds = this.canvas.getBoundingClientRect();
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const width = Math.max(
-      1,
-      Math.min(1920, Math.round((bounds.width || WIDTH) * dpr)),
-    );
-    const height = Math.max(
-      1,
-      Math.min(1080, Math.round((bounds.height || HEIGHT) * dpr)),
-    );
+    const cssWidth = bounds.width || WIDTH;
+    const cssHeight = bounds.height || HEIGHT;
+    const style = getComputedStyle(this.canvas);
+    const inset = (name: string) =>
+      Math.max(0, parseFloat(style.getPropertyValue(name)) || 0);
+    const safeTop = inset("--scene-safe-top");
+    const safeBottom = inset("--scene-safe-bottom");
+    const worldScale = Math.max(1, cssHeight - safeTop - safeBottom) / HEIGHT;
+    this.viewportWidth = cssWidth / worldScale;
+    this.viewportHeight = cssHeight / worldScale;
+    this.baseCameraY = -safeTop / worldScale;
+    const backingScale = Math.min(dpr, 1920 / cssWidth, 1080 / cssHeight);
+    const width = Math.max(1, Math.round(cssWidth * backingScale));
+    const height = Math.max(1, Math.round(cssHeight * backingScale));
     if (this.canvas.width !== width || this.canvas.height !== height) {
       this.canvas.width = width;
       this.canvas.height = height;
     }
-    this.ctx.setTransform(width / WIDTH, 0, 0, height / HEIGHT, 0, 0);
+    this.ctx.setTransform(
+      width / this.viewportWidth,
+      0,
+      0,
+      height / this.viewportHeight,
+      0,
+      0,
+    );
     this.ctx.imageSmoothingEnabled = true;
     this.pixelRatio = dpr;
     this.needsResize = false;
+    this.framingChanged = true;
+    this.canvas.dataset.viewportWidth = String(this.viewportWidth);
+    this.canvas.dataset.viewportHeight = String(this.viewportHeight);
   }
 
   render(game: Game, time: number, titleMode = false, restoration = 0) {
@@ -198,12 +222,14 @@ export class Renderer {
       this.pixelRatio !== Math.min(window.devicePixelRatio || 1, 2)
     )
       this.resize();
+    const reframed = this.framingChanged;
+    this.framingChanged = false;
     const c = this.ctx;
     c.setTransform(
-      this.canvas.width / WIDTH,
+      this.canvas.width / this.viewportWidth,
       0,
       0,
-      this.canvas.height / HEIGHT,
+      this.canvas.height / this.viewportHeight,
       0,
       0,
     );
@@ -239,47 +265,106 @@ export class Renderer {
       this.landing = 0;
       this.formChange = 0;
       this.bouncePulse = 0;
-      this.cameraLead = WIDTH * 0.15 * game.player.facing;
+      this.cameraLead = this.viewportWidth * 0.15 * game.player.facing;
     } else if (respawned) {
       this.particles = [];
       this.landing = 0;
       this.formChange = 0;
       this.previousForm = game.player.form;
       this.previousGrounded = false;
-      this.cameraLead = WIDTH * 0.15 * game.player.facing;
+      this.cameraLead = this.viewportWidth * 0.15 * game.player.facing;
     }
     // Ease the lookahead separately from the camera. Turning reveals the path
     // behind Pip without abruptly dragging the whole world across the screen.
-    const wantedLead = WIDTH * 0.15 * game.player.facing;
+    const wantedLead = this.viewportWidth * 0.15 * game.player.facing;
+    if (reframed) this.cameraLead = wantedLead;
     this.cameraLead +=
       (wantedLead - this.cameraLead) * (1 - Math.exp(-3.5 * dt));
+    const millArena =
+      game.boss?.kind === "millkeeper" &&
+      game.boss.state !== "dormant" &&
+      game.boss.state !== "defeated";
     const target = titleMode
       ? 0
-      : game.boss?.kind === "millkeeper" &&
-          game.boss.state !== "dormant" &&
-          game.boss.state !== "defeated"
-        ? Math.max(0, game.level.width - WIDTH)
+      : millArena && this.viewportWidth >= WIDTH
+        ? Math.max(0, game.level.width - this.viewportWidth)
         : Math.max(
-            0,
+            millArena ? game.level.width - WIDTH : 0,
             Math.min(
-              game.level.width - WIDTH,
-              game.player.x - WIDTH * 0.5 + this.cameraLead,
+              game.level.width - this.viewportWidth,
+              game.player.x - this.viewportWidth * 0.5 + this.cameraLead,
             ),
           );
     if (
       newGame ||
       respawned ||
       titleMode ||
-      Math.abs(target - this.cameraX) > 760
+      reframed ||
+      Math.abs(target - this.cameraX) > this.viewportWidth * 0.8
     )
       this.cameraX = target;
     else this.cameraX += (target - this.cameraX) * (1 - Math.exp(-9 * dt));
+    // The original trails and grove have open skies above their high branches.
+    // Follow feather-equipped Pip there without moving Windmill's authored
+    // trellis rooms, the guardian arena, or the separate challenge courses.
+    const followFlight =
+      game.hasWindFeather &&
+      (game.level.kind === "grove" ||
+        game.level.contentId === "world.sunlit-meadow" ||
+        game.level.contentId === "world.firefly-hollow" ||
+        game.level.contentId === "world.cloudtop-crossing");
+    const targetY =
+      !titleMode && followFlight
+        ? this.baseCameraY + Math.min(0, game.player.y - HEIGHT * 0.36)
+        : this.baseCameraY;
+    if (newGame || respawned || titleMode || reframed || !followFlight)
+      this.cameraY = targetY;
+    else {
+      this.cameraY += (targetY - this.cameraY) * (1 - Math.exp(-8 * dt));
+      // A fast mushroom launch must not outrun the eased camera into the HUD.
+      this.cameraY = Math.min(
+        this.cameraY,
+        this.baseCameraY + game.player.y - 90,
+        this.baseCameraY,
+      );
+      if (
+        Math.abs(this.cameraY - this.baseCameraY) < 0.1 &&
+        targetY === this.baseCameraY
+      )
+        this.cameraY = this.baseCameraY;
+    }
+    this.canvas.dataset.cameraX = String(this.cameraX);
+    this.canvas.dataset.cameraY = String(this.cameraY);
     const camera = this.cameraX;
-    const titleFloor = game.level.platforms.find(
-      (platform) =>
-        platform.kind === "ground" && platform.x + platform.w >= 775,
-    );
-    const titleX = Math.max(730, (titleFloor?.x ?? 0) + 50);
+    const preferredTitleX = this.viewportWidth * 0.76;
+    let titleX = preferredTitleX;
+    let titleGround = 430;
+    if (titleMode) {
+      let nearest = Infinity;
+      for (const platform of game.level.platforms) {
+        if (
+          platform.kind !== "ground" ||
+          platform.id?.startsWith("trellis.") ||
+          platform.id?.startsWith("gate.")
+        )
+          continue;
+        // Choose safe ground within the visible screen, even when the preferred
+        // title position falls over a gap or the next bank is offscreen.
+        const left = Math.max(platform.x + 60, 60);
+        const right = Math.min(
+          platform.x + platform.w - 60,
+          this.viewportWidth - 60,
+        );
+        if (left > right) continue;
+        const candidate = Math.max(left, Math.min(right, preferredTitleX));
+        const distance = Math.abs(candidate - preferredTitleX);
+        if (distance < nearest) {
+          nearest = distance;
+          titleX = candidate;
+          titleGround = platform.y;
+        }
+      }
+    }
     this.landing = Math.max(0, this.landing - dt);
     this.formChange = Math.max(0, this.formChange - dt);
     this.bouncePulse = Math.max(0, this.bouncePulse - dt);
@@ -291,7 +376,7 @@ export class Renderer {
     this.background(p, game.level.theme, time, camera);
     this.restoredLight(Math.max(0, Math.min(1, restoration)), time, camera);
     c.save();
-    c.translate(-camera, 0);
+    c.translate(-camera, -this.cameraY);
 
     // The trees sit on actual ground sections; no scenery suggests a floor over a pit.
     for (const platform of game.platforms) {
@@ -304,7 +389,7 @@ export class Renderer {
         continue;
       for (let i = 0; i < Math.floor(platform.w / 330); i++) {
         const x = platform.x + 205 + i * 330;
-        if (x > camera - 160 && x < camera + WIDTH + 160) {
+        if (x > camera - 160 && x < camera + this.viewportWidth + 160) {
           if (!titleMode || x > 500) this.tree(x, platform.y, p, x, time);
         }
       }
@@ -316,7 +401,7 @@ export class Renderer {
       this.treasuryRooms(game, time);
       this.expansionScenery(game, time);
     }
-    if (titleMode) this.tree(titleX + 45, 430, p, 19, time, 1.2);
+    if (titleMode) this.tree(titleX + 45, titleGround, p, 19, time, 1.2);
     for (const platform of game.platforms) {
       if (
         platform.broken ||
@@ -325,7 +410,7 @@ export class Renderer {
         continue;
       if (
         platform.x + platform.w < camera - 30 ||
-        platform.x > camera + WIDTH + 30
+        platform.x > camera + this.viewportWidth + 30
       )
         continue;
       if (titleMode && platform.kind !== "ground") continue;
@@ -367,17 +452,18 @@ export class Renderer {
             : [game.boss.maxX + game.boss.w + 26];
         for (const gateX of gates) {
           if (this.visible(gateX, 40)) {
+            const gateTop = Math.min(0, this.cameraY);
             this.rounded(
               gateX - 5,
-              0,
+              gateTop,
               10,
-              game.boss.groundY,
+              game.boss.groundY - gateTop,
               4,
               "rgba(211,238,153,.22)",
             );
             this.line(
               [
-                [gateX, 0],
+                [gateX, gateTop],
                 [gateX, game.boss.groundY],
               ],
               "rgba(190,226,138,.65)",
@@ -499,10 +585,10 @@ export class Renderer {
       if (game.starPowerRemaining > 0)
         this.starAura(center, feet, size, game.starPowerRemaining, time, true);
     } else {
-      this.hero(titleX, 431, 0, 0, 1, true, time, 0, 2.9);
+      this.hero(titleX, titleGround + 1, 0, 0, 1, true, time, 0, 2.9);
       this.firefly(
         titleX + 96 + Math.sin(time * 0.8) * 18,
-        267 + Math.cos(time) * 11,
+        titleGround - 163 + Math.cos(time) * 11,
         time,
         1.3,
       );
@@ -511,12 +597,18 @@ export class Renderer {
     c.restore();
 
     // Sparse drifting lights provide movement without veiling the collision surfaces.
-    for (let i = 0; i < (game.level.theme === "dusk" ? 20 : 8); i++) {
+    const lightSpan = this.viewportWidth + 140;
+    const lightCount = Math.ceil(
+      (game.level.theme === "dusk" ? 20 : 8) * (this.viewportWidth / WIDTH),
+    );
+    for (let i = 0; i < lightCount; i++) {
       const x =
-        ((((hash(i + 40) * 1100 + time * (3 + hash(i) * 5) - camera * 0.12) %
-          1100) +
-          1100) %
-          1100) -
+        ((((hash(i + 40) * lightSpan +
+          time * (3 + hash(i) * 5) -
+          camera * 0.12) %
+          lightSpan) +
+          lightSpan) %
+          lightSpan) -
         60;
       const y = 125 + hash(i + 91) * 230 + Math.sin(time * 0.7 + i) * 9;
       c.globalAlpha = 0.3 + (Math.sin(time * 1.4 + i) + 1) * 0.15;
@@ -529,12 +621,15 @@ export class Renderer {
       wash.addColorStop(0.65, "rgba(239,255,227,.18)");
       wash.addColorStop(1, "rgba(239,255,227,0)");
       c.fillStyle = wash;
-      c.fillRect(0, 0, 650, HEIGHT);
+      c.fillRect(0, 0, 650, this.viewportHeight);
     }
   }
 
   private visible(x: number, margin: number) {
-    return x > this.cameraX - margin && x < this.cameraX + WIDTH + margin;
+    return (
+      x > this.cameraX - margin &&
+      x < this.cameraX + this.viewportWidth + margin
+    );
   }
 
   private ellipse(
@@ -620,22 +715,23 @@ export class Renderer {
 
   private background(p: Palette, theme: Theme, time: number, camera: number) {
     const c = this.ctx;
-    const sky = c.createLinearGradient(0, 0, 0, HEIGHT);
+    const sky = c.createLinearGradient(0, 0, 0, this.viewportHeight);
     sky.addColorStop(0, p.sky);
     sky.addColorStop(0.8, p.horizon);
     sky.addColorStop(1, p.middle);
     c.fillStyle = sky;
-    c.fillRect(0, 0, WIDTH, HEIGHT);
+    c.fillRect(0, 0, this.viewportWidth, this.viewportHeight);
     if (theme === "dusk") {
-      for (let i = 0; i < 35; i++) {
-        const x = (hash(i + 300) * 1100 - camera * 0.025 + 1100) % 1100;
+      const span = this.viewportWidth + 140;
+      for (let i = 0; i < Math.ceil((35 * this.viewportWidth) / WIDTH); i++) {
+        const x = (hash(i + 300) * span - camera * 0.025 + span) % span;
         const y = 28 + hash(i + 320) * 205;
         c.globalAlpha = 0.3 + hash(i + 41) * 0.5;
         this.ellipse(x, y, i % 4 ? 1.2 : 2.2, i % 4 ? 1.2 : 2.2, "#fff6dc");
       }
       c.globalAlpha = 1;
     }
-    const sunX = 757 - camera * 0.025;
+    const sunX = this.viewportWidth * 0.79 - camera * 0.025;
     this.ellipse(sunX, 97, 72, 72, "rgba(255,246,177,.13)");
     this.ellipse(sunX, 97, 55, 55, "rgba(255,246,177,.17)");
     this.ellipse(sunX, 97, 39, 39, p.sun);
@@ -654,8 +750,11 @@ export class Renderer {
         );
       }
     }
-    for (let i = 0; i < 5; i++) {
-      const x = ((i * 249 + time * 3 - camera * 0.065 + 1450) % 1450) - 160;
+    const cloudCount = Math.ceil((this.viewportWidth + 320) / 249);
+    const cloudSpan = cloudCount * 249;
+    for (let i = 0; i < cloudCount; i++) {
+      const x =
+        ((i * 249 + time * 3 - camera * 0.065 + cloudSpan) % cloudSpan) - 160;
       this.cloud(
         x,
         57 + hash(i + 9) * 110,
@@ -670,17 +769,20 @@ export class Renderer {
       const color = layer === 0 ? p.far : layer === 1 ? p.middle : p.near;
       for (
         let i = Math.floor(shift / spacing) - 1;
-        i <= Math.floor(shift / spacing) + 4;
+        i <=
+        Math.floor(shift / spacing) +
+          Math.ceil(this.viewportWidth / spacing) +
+          1;
         i++
       ) {
         const x = i * spacing - shift;
         const top = 209 + layer * 60 + hash(i + layer * 31) * 42;
         c.beginPath();
-        c.moveTo(x - 100, HEIGHT);
+        c.moveTo(x - 100, this.viewportHeight);
         if (theme === "alpine" && layer === 0) {
           c.lineTo(x + 82, top - 68);
           c.quadraticCurveTo(x + 97, top - 90, x + 111, top - 65);
-          c.lineTo(x + 330, HEIGHT);
+          c.lineTo(x + 330, this.viewportHeight);
         } else {
           c.bezierCurveTo(x - 95, top + 90, x + 5, top - 20, x + 116, top);
           c.bezierCurveTo(
@@ -689,7 +791,7 @@ export class Renderer {
             x + 260,
             top + 160,
             x + 400,
-            HEIGHT,
+            this.viewportHeight,
           );
         }
         c.closePath();
@@ -723,7 +825,7 @@ export class Renderer {
       }
     }
     // Small, distant evergreens stay in the background color family.
-    for (let i = -1; i < 13; i++) {
+    for (let i = -1; i < Math.ceil(this.viewportWidth / 100) + 2; i++) {
       const x = i * 100 - ((camera * 0.37) % 100);
       const y = 348 + hash(i + 76) * 35;
       const h = 33 + hash(i + 6) * 30;
@@ -828,15 +930,21 @@ export class Renderer {
     c.save();
     // A recovered forest grows warmer and fills with tiny lights; the terrain
     // stays high contrast at every progress level.
-    const glow = c.createRadialGradient(720, 100, 12, 720, 100, 370);
+    const glowX = this.viewportWidth * 0.75;
+    const glow = c.createRadialGradient(glowX, 100, 12, glowX, 100, 370);
     glow.addColorStop(0, `rgba(255,245,183,${0.18 * restoration})`);
     glow.addColorStop(1, "rgba(255,245,183,0)");
     c.fillStyle = glow;
-    c.fillRect(0, 0, WIDTH, 380);
-    for (let i = 0; i < Math.round(restoration * 24); i++) {
+    c.fillRect(0, 0, this.viewportWidth, 380);
+    const span = this.viewportWidth + 160;
+    for (
+      let i = 0;
+      i < Math.round(restoration * 24 * (this.viewportWidth / WIDTH));
+      i++
+    ) {
       const x =
-        ((((hash(i + 600) * 1120 - camera * 0.15 + time * 5) % 1120) + 1120) %
-          1120) -
+        ((((hash(i + 600) * span - camera * 0.15 + time * 5) % span) + span) %
+          span) -
         80;
       const y = 145 + hash(i + 690) * 220 + Math.sin(time + i) * 5;
       this.ellipse(x, y, 5, 5, "rgba(214,255,182,.12)");
@@ -849,7 +957,10 @@ export class Renderer {
   private gardenLandmarks(game: Game, time: number) {
     const c = this.ctx;
     for (const r of game.level.landmarks ?? []) {
-      if (r.x + r.w < this.cameraX - 80 || r.x > this.cameraX + WIDTH + 80)
+      if (
+        r.x + r.w < this.cameraX - 80 ||
+        r.x > this.cameraX + this.viewportWidth + 80
+      )
         continue;
       c.save();
       const x = r.x,
@@ -1387,7 +1498,7 @@ export class Renderer {
       c.lineWidth = 3;
       for (
         let x = Math.floor(this.cameraX / 80) * 80 - 80;
-        x < this.cameraX + WIDTH + 80;
+        x < this.cameraX + this.viewportWidth + 80;
         x += 80
       )
         for (let y = 90; y < 430; y += 70) {
@@ -1407,7 +1518,7 @@ export class Renderer {
       // Distant mill silhouettes move independently of the active mechanisms.
       for (
         let x = Math.floor(this.cameraX / 1000) * 1000 + 650;
-        x < this.cameraX + WIDTH + 400;
+        x < this.cameraX + this.viewportWidth + 400;
         x += 1000
       ) {
         this.rounded(x - 32, 290, 64, 110, 15, "#dfc18a");
@@ -2260,7 +2371,10 @@ export class Renderer {
   private treasuryRooms(game: Game, time: number) {
     const c = this.ctx;
     for (const room of game.level.rooms ?? []) {
-      if (room.x + room.w < this.cameraX || room.x > this.cameraX + WIDTH)
+      if (
+        room.x + room.w < this.cameraX ||
+        room.x > this.cameraX + this.viewportWidth
+      )
         continue;
       c.save();
       // This recessed backdrop sits behind the real walls and breakable entry.
@@ -2357,7 +2471,7 @@ export class Renderer {
       );
       for (
         let xx = Math.max(x + 12, this.cameraX - 40);
-        xx < Math.min(x + w, this.cameraX + WIDTH + 40);
+        xx < Math.min(x + w, this.cameraX + this.viewportWidth + 40);
         xx += 55
       ) {
         this.leaf(xx, y + h, 14, -0.8, "#a5ca6d");
@@ -2415,7 +2529,7 @@ export class Renderer {
       const first = Math.max(0, Math.floor((this.cameraX - x - 25) / 58));
       const last = Math.min(
         Math.ceil(w / 58),
-        Math.ceil((this.cameraX + WIDTH - x + 25) / 58),
+        Math.ceil((this.cameraX + this.viewportWidth - x + 25) / 58),
       );
       for (let i = first; i < last; i++) {
         for (let row = 0; row < 3; row++) {
