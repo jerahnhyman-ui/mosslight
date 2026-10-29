@@ -1,3 +1,10 @@
+import { windmillLevel } from "./expansion-levels";
+export {
+  windmillLevel,
+  beehiveLevel,
+  flowerHoopsLevel,
+} from "./expansion-levels";
+
 export interface Rect {
   x: number;
   y: number;
@@ -6,6 +13,7 @@ export interface Rect {
 }
 
 export type Platform = Rect & {
+  id?: string;
   kind:
     | "ground"
     | "platform"
@@ -29,7 +37,7 @@ export type EnemySpawn = {
   maxX: number;
 };
 
-export type BossKind = "stag" | "spider" | "moth";
+export type BossKind = "stag" | "spider" | "moth" | "millkeeper";
 export type BossSpec = {
   kind: BossKind;
   name: string;
@@ -52,10 +60,11 @@ export type Clue = {
 
 export interface Level {
   id: number;
+  contentId?: string;
   name: string;
   subtitle: string;
   width: number;
-  theme: "meadow" | "dusk" | "alpine";
+  theme: "meadow" | "dusk" | "alpine" | "windmill" | "hive";
   spawn: { x: number; y: number };
   platforms: Platform[];
   coins: { x: number; y: number }[];
@@ -64,10 +73,41 @@ export interface Level {
   enemies: EnemySpawn[];
   checkpoints: { x: number; y: number }[];
   sections: { x: number; name: string }[];
-  fireflies: { x: number; y: number }[];
+  fireflies: { x: number; y: number; id?: string }[];
   rooms?: (Rect & { name: string })[];
   goal: { x: number; y: number };
-  kind?: "world" | "grove" | "challenge";
+  kind?: "world" | "grove" | "challenge" | "secret" | "minigame";
+  featherFountains?: { x: number; y: number }[];
+  mechanisms?: {
+    id: string;
+    kind:
+      | "wind"
+      | "brake"
+      | "water"
+      | "shutter"
+      | "sluice"
+      | "receiver"
+      | "flower";
+    x: number;
+    y: number;
+    w?: number;
+    flower?: "A" | "B" | "C";
+  }[];
+  gates?: (Rect & {
+    id: string;
+    condition: "vane" | "sluice" | "light" | "workshop" | "hive";
+  })[];
+  portals?: {
+    id: string;
+    x: number;
+    y: number;
+    w: number;
+    target: "beehive" | "return";
+    requires?: "discovery" | "completion";
+  }[];
+  flightTarget?: { x: number; y: number; radius: number };
+  hoops?: { id: string; x: number; y: number; cell: number }[];
+  landingPads?: { id: string; x: number; y: number; w: number; cell: number }[];
   /** Gold-medal target in seconds for an optional challenge room. */
   challengeTime?: number;
   boss?: BossSpec;
@@ -1003,35 +1043,43 @@ const guardians: {
 /** Each trail ends with a quiet recovery clearing and a roomy, level arena.
  * Old firefly IDs and their routes remain stable for existing saved rescues.
  */
-export const levels: Level[] = trails.map((trail, index) => {
-  const guardian = guardians[index]!;
-  const checkpointX = trail.goal.x - 70;
-  return {
-    ...trail,
-    width: trail.width + 1100,
-    sections: [
-      ...trail.sections,
-      { x: trail.width + 100, name: guardian.section },
-    ],
-    platforms: [...trail.platforms, ground(trail.width, 1100)],
-    checkpoints: [...trail.checkpoints, { x: checkpointX, y: 430 }],
-    diamonds: [...trail.diamonds, { x: checkpointX + 55, y: 400 }],
-    coins: [...trail.coins, ...row(trail.width + 900, 392, 4)],
-    boss: {
-      kind: guardian.kind,
-      name: guardian.name,
-      x: trail.width + 540,
-      y: 430,
-      minX: trail.width + 100,
-      maxX: trail.width + 730,
-    },
-    tutorials: [
-      ...(trail.tutorials ?? []),
-      { x: checkpointX, text: guardian.hint },
-    ],
-    goal: { x: trail.width + 940, y: 430 },
-  };
-});
+export const levels: Level[] = [
+  ...trails.map((trail, index) => {
+    const guardian = guardians[index]!;
+    const checkpointX = trail.goal.x - 70;
+    return {
+      ...trail,
+      contentId: [
+        "world.sunlit-meadow",
+        "world.firefly-hollow",
+        "world.cloudtop-crossing",
+      ][index],
+      width: trail.width + 1100,
+      sections: [
+        ...trail.sections,
+        { x: trail.width + 100, name: guardian.section },
+      ],
+      platforms: [...trail.platforms, ground(trail.width, 1100)],
+      checkpoints: [...trail.checkpoints, { x: checkpointX, y: 430 }],
+      diamonds: [...trail.diamonds, { x: checkpointX + 55, y: 400 }],
+      coins: [...trail.coins, ...row(trail.width + 900, 392, 4)],
+      boss: {
+        kind: guardian.kind,
+        name: guardian.name,
+        x: trail.width + 540,
+        y: 430,
+        minX: trail.width + 100,
+        maxX: trail.width + 730,
+      },
+      tutorials: [
+        ...(trail.tutorials ?? []),
+        { x: checkpointX, text: guardian.hint },
+      ],
+      goal: { x: trail.width + 940, y: 430 },
+    };
+  }),
+  windmillLevel,
+];
 
 /** A real, safe platforming space: all residents and purchased furnishings are
  * drawn here, while the clear floor makes exploring comfortable on a phone.
@@ -1110,6 +1158,7 @@ export const groveLevel: Level = {
 export const challengeLevels: Level[] = [
   {
     id: 11,
+    contentId: "challenge.sunlit-meadow",
     name: "Petal-Hop Sprint",
     subtitle: "Wake the flowers, ride the mushroom, and follow the golden arc.",
     kind: "challenge",
@@ -1173,6 +1222,7 @@ export const challengeLevels: Level[] = [
   },
   {
     id: 12,
+    contentId: "challenge.firefly-hollow",
     name: "Lantern-Leaf Relay",
     subtitle: "Cross the stream on drifting leaves and light the far bank.",
     kind: "challenge",
@@ -1235,6 +1285,7 @@ export const challengeLevels: Level[] = [
   },
   {
     id: 13,
+    contentId: "challenge.cloudtop-crossing",
     name: "Cloudbreak Dash",
     subtitle: "Keep moving as the cloud bridge melts behind your footsteps.",
     kind: "challenge",

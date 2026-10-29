@@ -1,9 +1,9 @@
 # Mosslight
 
 An original side-scrolling platformer for iPhone, iPad, and the browser.
-Guide Pip through Sunlit Meadow, Firefly Hollow, and Cloudtop Crossing:
+Guide Pip through Sunlit Meadow, Firefly Hollow, Cloudtop Crossing, and Windmill Garden:
 collect golden coins, grow with diamonds, power up with stars, rescue hidden
-fireflies, and bring light back to the forest. Three extended trails include
+fireflies, and bring light back to the forest. Four extended trails include
 multiple checkpoints, optional routes, light-activated plants, and three-phase
 guardian encounters. Return rescued fireflies to a playable home grove and
 decorate it with earned coins. All art, music, and sound are generated locally.
@@ -29,7 +29,7 @@ Movement uses quick acceleration and braking, midair steering, a small grace
 period after leaving a ledge, and buffered jumps just before landing. Controls
 can be resized, repositioned, and swapped for either hand in the game menu.
 The camera looks in the direction Pip is traveling. The cartoon artwork is
-drawn locally at the screen's pixel density, with three distinct palettes,
+drawn locally at the screen's pixel density, with distinct garden and beehive palettes,
 animated characters, and collectible/landing effects.
 
 ## Explore the longer trails
@@ -38,6 +38,7 @@ animated characters, and collectible/landing effects.
 - **Firefly Hollow** adds moving leaf platforms and climbing routes.
 - **Cloudtop Crossing** features cloud bridges that warn before crumbling and
   return after a short delay.
+- **Windmill Garden** opens after beating the Meadow guardian. Learn powered feather flight, change wind/water/light mechanisms, follow three firefly branches, and discover a separate beehive level.
 - Walking beetles, hopping grasshoppers, and charging beetles each have distinct
   movement. Charging beetles signal before rushing. Every bug can be squashed
   by landing on it; star power also squashes bugs on contact.
@@ -61,7 +62,7 @@ Visit the safe, playable home grove from the menu. Rescued fireflies become
 residents, and earned coins buy optional outfits and decorations. Coins count
 toward both the run's extra-life counter and a persistent cosmetic wallet;
 purchases never change movement or combat strength. Rescue all three fireflies
-in a world to unlock its separate challenge room and earn time medals.
+in each of the original three worlds to unlock its separate challenge room and earn time medals.
 
 Choose **Classic** for the three-life rules, **Relaxed** for unlimited checkpoint
 retries, or **Timed** for a separately recorded three-life run. The mode applies
@@ -70,6 +71,12 @@ challenge medals and historical trail records are separate as well.
 
 See [the living garden guide](docs/LIVING_GARDEN.md) for the content and release
 acceptance criteria, including the physical-device playtest.
+
+The [Windmill Garden guide](docs/WINDMILL_GARDEN.md) explains flight, garden machinery,
+the secret beehive, the six-hit Mill Keeper, and Petal Post. Finding a feather
+unlocks the flight minigame; discovering the beehive unlocks journal replay.
+Both activities award visual rewards. The [design package](docs/windmill-garden/README.md)
+records their controls, geometry and implementation contracts.
 
 Music, sound effects, and haptics have separate settings. Each world has an
 original looping score, with separate grove and guardian themes and a musical
@@ -80,6 +87,7 @@ iOS plugin when supported.
 
 - In Classic and Timed modes, start each trail small with **3 lives**. Falling into a gap always costs one
   life, including while big or using star power.
+- **Wind Feathers let Pip fly.** Jump, release, then hold Jump again to rise. Release to glide and land to refill. Shrinking retains the feather; losing a life drops it, with free replacements at flight checkpoints.
 - **Diamonds make Pip big.** A bug hit then shrinks Pip without taking a life.
   A hit while small costs a life. A brief grace period after shrinking or
   respawning prevents one collision from counting as several hits.
@@ -144,7 +152,9 @@ be performed through Xcode Cloud and TestFlight.
 
 - `src/game/engine.ts` — fixed-step simulation, collision, and game rules.
 - `src/game/bosses.ts` — telegraphed guardian attacks and recovery phases.
-- `src/game/levels.ts` — three authored worlds, secret routes, grove, and challenges.
+- `src/game/levels.ts` — authored worlds, secret routes, grove, and challenges.
+- `src/game/expansion-levels.ts` — Windmill Garden, Lantern Beehive, and Petal Post.
+- `src/game/session.ts` — resource continuity across world/secret transitions.
 - `src/game/renderer.ts` — crisp cartoon canvas, camera, and animated effects.
 - `src/main.ts` — menus, HUD, progress, and game loop.
 - `src/controls.ts` — touch capture/dragging, keyboard, and gamepad input.

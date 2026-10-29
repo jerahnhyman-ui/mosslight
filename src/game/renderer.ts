@@ -6,7 +6,7 @@ import {
 } from "./engine";
 import type { Rect } from "./levels";
 
-type Theme = "meadow" | "dusk" | "alpine";
+type Theme = "meadow" | "dusk" | "alpine" | "windmill" | "hive";
 type Palette = {
   sky: string;
   horizon: string;
@@ -37,6 +37,40 @@ type Particle = {
 const WIDTH = 960;
 const HEIGHT = 540;
 const palettes: Record<Theme, Palette> = {
+  windmill: {
+    sky: "#81d9e7",
+    horizon: "#f6efb8",
+    sun: "#fff1a0",
+    far: "#b8dfb2",
+    middle: "#8bce98",
+    near: "#67b67d",
+    leaf: "#328e5e",
+    leafLight: "#88cf78",
+    leafShade: "#28724e",
+    trunk: "#a36e47",
+    grass: "#7ac45b",
+    grassLight: "#daf08a",
+    soil: "#d7a36b",
+    soilShade: "#a96e47",
+    rock: "#f0c88a",
+  },
+  hive: {
+    sky: "#e9b65f",
+    horizon: "#ffe5a1",
+    sun: "#fff3b1",
+    far: "#dfad67",
+    middle: "#c8955f",
+    near: "#b77f50",
+    leaf: "#9a7845",
+    leafLight: "#d5ac59",
+    leafShade: "#805b3c",
+    trunk: "#9b6441",
+    grass: "#d5ab55",
+    grassLight: "#ffdf83",
+    soil: "#d49a5a",
+    soilShade: "#a36a43",
+    rock: "#f3cd80",
+  },
   meadow: {
     sky: "#73d9e9",
     horizon: "#e7f8c9",
@@ -221,13 +255,17 @@ export class Renderer {
       (wantedLead - this.cameraLead) * (1 - Math.exp(-3.5 * dt));
     const target = titleMode
       ? 0
-      : Math.max(
-          0,
-          Math.min(
-            game.level.width - WIDTH,
-            game.player.x - WIDTH * 0.5 + this.cameraLead,
-          ),
-        );
+      : game.boss?.kind === "millkeeper" &&
+          game.boss.state !== "dormant" &&
+          game.boss.state !== "defeated"
+        ? Math.max(0, game.level.width - WIDTH)
+        : Math.max(
+            0,
+            Math.min(
+              game.level.width - WIDTH,
+              game.player.x - WIDTH * 0.5 + this.cameraLead,
+            ),
+          );
     if (
       newGame ||
       respawned ||
@@ -257,7 +295,13 @@ export class Renderer {
 
     // The trees sit on actual ground sections; no scenery suggests a floor over a pit.
     for (const platform of game.platforms) {
-      if (platform.kind !== "ground") continue;
+      if (game.level.theme === "hive") continue;
+      if (
+        platform.kind !== "ground" ||
+        platform.id?.startsWith("trellis.") ||
+        platform.id?.startsWith("gate.")
+      )
+        continue;
       for (let i = 0; i < Math.floor(platform.w / 330); i++) {
         const x = platform.x + 205 + i * 330;
         if (x > camera - 160 && x < camera + WIDTH + 160) {
@@ -270,6 +314,7 @@ export class Renderer {
       this.homeGrove(game, time);
       this.sectionLandmarks(game, time, p);
       this.treasuryRooms(game, time);
+      this.expansionScenery(game, time);
     }
     if (titleMode) this.tree(titleX + 45, 430, p, 19, time, 1.2);
     for (const platform of game.platforms) {
@@ -299,54 +344,71 @@ export class Renderer {
           );
       });
       if (game.level.kind !== "grove" && this.visible(game.level.goal.x, 90)) {
-        this.portal(game.level.goal.x, game.level.goal.y, p, time);
-        this.sealedGoal(game);
+        if (game.level.kind === "secret")
+          this.hiveBell(
+            game.level.goal.x,
+            game.level.goal.y,
+            game.secretCompleted,
+            time,
+          );
+        else {
+          this.portal(game.level.goal.x, game.level.goal.y, p, time);
+          this.sealedGoal(game);
+        }
       }
       this.secretClues(game, time);
+      this.expansionObjects(game, time);
       if (game.boss && game.boss.state !== "defeated") {
-        const gateX = game.boss.maxX + game.boss.w + 26;
-        if (this.visible(gateX, 40)) {
-          this.rounded(
-            gateX - 5,
-            0,
-            10,
-            game.boss.groundY,
-            4,
-            "rgba(211,238,153,.22)",
-          );
-          this.line(
-            [
-              [gateX, 0],
-              [gateX, game.boss.groundY],
-            ],
-            "rgba(190,226,138,.65)",
-            2,
-          );
-          for (let i = 0; i < 8; i++)
-            this.ellipse(
-              gateX,
-              (i * 57 + time * 14) % game.boss.groundY,
-              3,
+        const gates =
+          game.boss.kind === "millkeeper"
+            ? game.boss.state === "dormant"
+              ? []
+              : [game.boss.minX, game.boss.maxX]
+            : [game.boss.maxX + game.boss.w + 26];
+        for (const gateX of gates) {
+          if (this.visible(gateX, 40)) {
+            this.rounded(
+              gateX - 5,
+              0,
+              10,
+              game.boss.groundY,
               4,
-              "#e9f8b4",
+              "rgba(211,238,153,.22)",
             );
-          this.line(
-            [
-              [gateX, game.boss.groundY],
-              [gateX - 6, game.boss.groundY - 37],
-              [gateX, game.boss.groundY - 79],
-            ],
-            "#62996a",
-            8,
-          );
-          for (let i = 0; i < 4; i++)
-            this.leaf(
-              gateX - 3,
-              game.boss.groundY - 12 - i * 17,
-              16,
-              i % 2 ? 0.9 : -0.9,
-              i % 2 ? "#9ac57c" : "#7eb377",
+            this.line(
+              [
+                [gateX, 0],
+                [gateX, game.boss.groundY],
+              ],
+              "rgba(190,226,138,.65)",
+              2,
             );
+            for (let i = 0; i < 8; i++)
+              this.ellipse(
+                gateX,
+                (i * 57 + time * 14) % game.boss.groundY,
+                3,
+                4,
+                "#e9f8b4",
+              );
+            this.line(
+              [
+                [gateX, game.boss.groundY],
+                [gateX - 6, game.boss.groundY - 37],
+                [gateX, game.boss.groundY - 79],
+              ],
+              "#62996a",
+              8,
+            );
+            for (let i = 0; i < 4; i++)
+              this.leaf(
+                gateX - 3,
+                game.boss.groundY - 12 - i * 17,
+                16,
+                i % 2 ? 0.9 : -0.9,
+                i % 2 ? "#9ac57c" : "#7eb377",
+              );
+          }
         }
       }
       game.coins.forEach((coin, i) => {
@@ -425,6 +487,13 @@ export class Renderer {
             game.boss.state !== "defeated" &&
             Math.abs(game.boss.x - player.x) < 220
           ),
+        game.hasWindFeather
+          ? game.liftActive
+            ? "lift"
+            : game.glideArmed && !player.grounded
+              ? "glide"
+              : "ready"
+          : "none",
       );
       c.restore();
       if (game.starPowerRemaining > 0)
@@ -741,7 +810,7 @@ export class Renderer {
       this.ellipse(cx - rx * 0.24, cy - 21, rx * 0.56, 18, p.leafLight);
     }
     c.globalAlpha = 0.65;
-    for (let i = 0; i < 9; i++)
+    for (let i = 0; i < 12; i++)
       this.leaf(
         -60 + hash(seed + i) * 130,
         18 + hash(i + 4) * 55,
@@ -1135,10 +1204,10 @@ export class Renderer {
   private homeGrove(game: Game, time: number) {
     if (game.level.kind !== "grove") return;
     const c = this.ctx;
-    const total = Math.max(0, Math.min(9, game.rescuedTotal));
+    const total = Math.max(0, Math.min(12, game.rescuedTotal));
     const span = Math.min(1500, game.level.width - 430);
-    for (let i = 0; i < 9; i++) {
-      const x = 270 + (i * span) / 9;
+    for (let i = 0; i < 12; i++) {
+      const x = 270 + (i * span) / 12;
       if (!this.visible(x, 90)) continue;
       const lit = i < total;
       const y = 430;
@@ -1168,6 +1237,36 @@ export class Renderer {
         this.firefly(x + Math.sin(time + i) * 18, y - 73 + bob, time + i, 0.85);
       }
       this.leaf(x + 4, y - 60, 11, 0.5, lit ? "#7ca760" : "#8b9f7a");
+    }
+    if (
+      game.groveDecorations.includes("pinwheel_garland") ||
+      game.groveDecorations.includes("cosmetic.pinwheel_garland")
+    ) {
+      const start = 220,
+        end = Math.min(game.level.width - 150, 1450);
+      this.line(
+        [
+          [start, 270],
+          [(start + end) / 2, 310],
+          [end, 270],
+        ],
+        "#a67d55",
+        3,
+      );
+      for (let i = 0; i < 9; i++) {
+        const x = start + ((end - start) * i) / 8;
+        if (!this.visible(x, 30)) continue;
+        const y = 270 + 40 * (1 - Math.abs(i - 4) / 4);
+        c.save();
+        c.translate(x, y);
+        c.rotate(time * 0.8 + i);
+        for (let j = 0; j < 4; j++) {
+          c.rotate(Math.PI / 2);
+          this.ellipse(0, -9, 5, 9, j % 2 ? "#f4ab99" : "#ffe18c");
+        }
+        this.ellipse(0, 0, 3, 3, "#ad8056");
+        c.restore();
+      }
     }
     if (game.groveDecorations.includes("lanterns")) {
       for (let i = 0; i < 5; i++) {
@@ -1242,7 +1341,368 @@ export class Renderer {
     if (this.visible(130, 120)) {
       this.rounded(47, 300, 166, 38, 10, "#fff3ce", "#86a67b");
       c.fillStyle = "#496e54";
-      c.fillText(`${total} / 9 lights home`, 130, 324);
+      c.fillText(`${total} / 12 lights home`, 130, 324);
+    }
+    c.restore();
+  }
+
+  private hiveBell(x: number, y: number, completed: boolean, time: number) {
+    const cx = x + 30;
+    this.line(
+      [
+        [cx, y - 120],
+        [cx, y - 98],
+      ],
+      "#967047",
+      4,
+    );
+    this.ellipse(
+      cx,
+      y - 72,
+      23,
+      28,
+      completed ? "#f5d98e" : "#ffdf76",
+      "#ae7b44",
+    );
+    this.rounded(cx - 26, y - 57, 52, 9, 4, "#c38c4e");
+    this.ellipse(cx, y - 46, 6, 6, "#9c6c41");
+    if (!completed)
+      this.ellipse(
+        cx,
+        y - 72,
+        37 + Math.sin(time * 3) * 3,
+        37,
+        "rgba(255,243,158,.2)",
+      );
+  }
+
+  private expansionScenery(game: Game, time: number) {
+    if (game.level.theme !== "windmill" && game.level.theme !== "hive") return;
+    const c = this.ctx;
+    if (game.level.theme === "hive") {
+      // Honeycomb is background only; collision remains visible in the foreground.
+      c.save();
+      c.globalAlpha = 0.22;
+      c.strokeStyle = "#fff0af";
+      c.lineWidth = 3;
+      for (
+        let x = Math.floor(this.cameraX / 80) * 80 - 80;
+        x < this.cameraX + WIDTH + 80;
+        x += 80
+      )
+        for (let y = 90; y < 430; y += 70) {
+          c.beginPath();
+          for (let i = 0; i < 6; i++) {
+            const a = (Math.PI / 3) * i;
+            const px = x + Math.cos(a) * 39;
+            const py = y + (Math.floor(x / 80) % 2) * 35 + Math.sin(a) * 39;
+            if (!i) c.moveTo(px, py);
+            else c.lineTo(px, py);
+          }
+          c.closePath();
+          c.stroke();
+        }
+      c.restore();
+    } else {
+      // Distant mill silhouettes move independently of the active mechanisms.
+      for (
+        let x = Math.floor(this.cameraX / 1000) * 1000 + 650;
+        x < this.cameraX + WIDTH + 400;
+        x += 1000
+      ) {
+        this.rounded(x - 32, 290, 64, 110, 15, "#dfc18a");
+        this.ellipse(x, 291, 34, 14, "#b8865e");
+        c.save();
+        c.translate(x, 270);
+        c.rotate(time * 0.25);
+        for (let i = 0; i < 4; i++) {
+          c.rotate(Math.PI / 2);
+          this.rounded(-7, -74, 14, 64, 7, "#fff0a9", "#bd9865");
+        }
+        this.ellipse(0, 0, 9, 9, "#c38c55");
+        c.restore();
+      }
+    }
+  }
+
+  private expansionObjects(game: Game, time: number) {
+    const c = this.ctx;
+    const state = game.puzzleState;
+    for (const fountain of game.level.featherFountains ?? []) {
+      if (!this.visible(fountain.x, 60)) continue;
+      const { x, y } = fountain;
+      this.ellipse(x, y - 3, 28, 7, "#8bbcb0", "#578b7d");
+      this.ellipse(x, y - 7, 24, 5, "#c9f3df");
+      this.line(
+        [
+          [x, y - 8],
+          [x, y - 39],
+        ],
+        "#8ccbbd",
+        5,
+      );
+      this.ellipse(x, y - 39, 19, 5, "#d8f6df", "#75ae9e");
+      c.save();
+      c.translate(x, y - 50 + Math.sin(time * 3) * 3);
+      c.rotate(-0.35);
+      this.leaf(0, 0, 20, 0, "#f3fff2");
+      this.line(
+        [
+          [0, 0],
+          [0, -24],
+        ],
+        "#70bdb0",
+        2,
+      );
+      c.restore();
+      this.ellipse(x, y - 66, 25, 25, "rgba(227,255,241,.22)");
+    }
+    for (const m of game.level.mechanisms ?? []) {
+      if (!this.visible(m.x, 110)) continue;
+      const x = m.x,
+        y = m.y;
+      this.ellipse(x, y, 27, 5, "rgba(75,78,45,.17)");
+      if (m.kind === "flower") {
+        const on = !!(m.flower && state.flowers[m.flower]);
+        this.line(
+          [
+            [x, y],
+            [x, y - 34],
+          ],
+          "#57945c",
+          5,
+        );
+        for (let i = 0; i < 5; i++) {
+          const a = (i * Math.PI * 2) / 5;
+          this.ellipse(
+            x + Math.cos(a) * 12,
+            y - 43 + Math.sin(a) * 12,
+            9,
+            9,
+            on ? "#ffdf72" : "#f1aabe",
+            "#c17c78",
+            1,
+          );
+        }
+        this.ellipse(x, y - 43, 9, 9, on ? "#fff2ac" : "#d79a58");
+        c.save();
+        c.font = "bold 12px sans-serif";
+        c.textAlign = "center";
+        c.fillStyle = "#76533d";
+        c.fillText(m.flower ?? "", x, y - 39);
+        c.restore();
+        continue;
+      }
+      this.rounded(x - 25, y - 24, 50, 24, 8, "#b37b4d", "#80583d");
+      this.rounded(x - 21, y - 29, 42, 12, 5, "#f5d188", "#9a7047");
+      const label =
+        m.kind === "wind"
+          ? state.wind
+          : m.kind === "brake"
+            ? state.brake
+            : m.kind === "water" || m.kind === "sluice"
+              ? state.water
+              : m.kind === "shutter" || m.kind === "receiver"
+                ? state.shutter
+                : "";
+      if (m.kind === "wind") {
+        this.line(
+          [
+            [x, y - 28],
+            [x, y - 72],
+          ],
+          "#80583d",
+          4,
+        );
+        c.save();
+        c.translate(x, y - 69);
+        c.rotate(
+          (state.brake === "RELEASED" ? time * 2 : 0) *
+            (state.wind === "EAST" ? 1 : -1),
+        );
+        for (let i = 0; i < 4; i++) {
+          c.rotate(Math.PI / 2);
+          this.rounded(-4, -26, 8, 21, 3, "#fff1ac", "#ad8054");
+        }
+        this.ellipse(0, 0, 5, 5, "#b77d4b");
+        c.restore();
+      } else if (m.kind === "water" || m.kind === "sluice") {
+        this.ellipse(x, y - 40, 20, 12, "#8fd8dd", "#528f9c");
+        this.line(
+          [
+            [x - 12, y - 40],
+            [x - 5, y - 43],
+            [x + 4, y - 40],
+            [x + 12, y - 43],
+          ],
+          "#efffff",
+          2,
+        );
+      } else if (m.kind === "shutter" || m.kind === "receiver") {
+        this.rounded(
+          x - 17,
+          y - 63,
+          34,
+          34,
+          6,
+          state.shutter === "HIVE" ? "#ffe399" : "#b7e8ed",
+          "#a57a51",
+        );
+        this.line(
+          [
+            [x - 12, y - 46],
+            [x + 12, y - 46],
+          ],
+          "#fff8d3",
+          4,
+        );
+      } else {
+        this.line(
+          [
+            [x, y - 26],
+            [x + (state.brake === "HELD" ? -15 : 15), y - 55],
+          ],
+          "#80583d",
+          5,
+        );
+        this.ellipse(
+          x + (state.brake === "HELD" ? -15 : 15),
+          y - 55,
+          7,
+          7,
+          "#edaf6b",
+          "#80583d",
+        );
+      }
+      c.save();
+      c.font = "bold 11px sans-serif";
+      c.textAlign = "center";
+      c.fillStyle = "#674a36";
+      c.fillText(label, x, y - 12);
+      c.restore();
+    }
+    const open: Record<string, boolean> = {
+      vane: state.vaneGateOpen,
+      sluice: state.sluiceGateOpen,
+      light: state.lightGateOpen,
+      workshop: state.workshopGateOpen,
+      hive: state.flowers.A && state.flowers.B && state.flowers.C,
+    };
+    for (const gate of game.level.gates ?? []) {
+      if (!this.visible(gate.x, gate.w + 30)) continue;
+      if (open[gate.condition]) {
+        this.rounded(gate.x, gate.y, gate.w, 8, 4, "#bb9663");
+      } else {
+        this.rounded(gate.x, gate.y, gate.w, gate.h, 5, "#ad8151", "#75553c");
+        for (let y = gate.y + 18; y < gate.y + gate.h; y += 38)
+          this.line(
+            [
+              [gate.x + 3, y],
+              [gate.x + gate.w - 3, y],
+            ],
+            "#e4be7b",
+            4,
+          );
+      }
+    }
+    for (const portal of game.level.portals ?? []) {
+      if (!this.visible(portal.x, 100)) continue;
+      const ready =
+        !portal.requires ||
+        (portal.requires === "discovery"
+          ? state.hiveDiscovered
+          : game.secretCompleted);
+      this.rounded(
+        portal.x,
+        portal.y - 67,
+        portal.w,
+        67,
+        24,
+        ready ? "#8b623d" : "#b58d5a",
+        "#775439",
+      );
+      this.rounded(
+        portal.x + 7,
+        portal.y - 58,
+        portal.w - 14,
+        58,
+        20,
+        ready ? "#ffdc7b" : "#c3a277",
+      );
+      this.ellipse(
+        portal.x + portal.w / 2,
+        portal.y - 35,
+        12,
+        16,
+        ready ? "#fff3b4" : "#987b58",
+      );
+      c.save();
+      c.font = "bold 12px sans-serif";
+      c.textAlign = "center";
+      c.fillStyle = "#684b38";
+      c.fillText(
+        portal.target === "return" ? "HOME" : "HIVE",
+        portal.x + portal.w / 2,
+        portal.y - 12,
+      );
+      c.restore();
+    }
+    if (
+      game.level.flightTarget &&
+      this.visible(game.level.flightTarget.x, 50)
+    ) {
+      const t = game.level.flightTarget;
+      this.flowerRing(t.x, t.y, t.radius, "#ffdf76", time);
+    }
+    for (const hoop of game.level.hoops ?? []) {
+      if (this.visible(hoop.x, 70))
+        this.flowerRing(
+          hoop.x,
+          hoop.y,
+          32,
+          game.minigame.hoops.has(hoop.id) ? "#c6e5a7" : "#ffcf82",
+          time,
+        );
+    }
+    for (const pad of game.level.landingPads ?? []) {
+      if (!this.visible(pad.x, pad.w + 20)) continue;
+      this.rounded(
+        pad.x,
+        pad.y - 7,
+        pad.w,
+        9,
+        5,
+        game.minigame.pads.has(pad.id) ? "#b8d99b" : "#ffdb82",
+        "#a77d53",
+      );
+      for (let x = pad.x + 15; x < pad.x + pad.w; x += 30)
+        this.ellipse(x, pad.y - 3, 4, 3, "#fff5ca");
+    }
+  }
+
+  private flowerRing(
+    x: number,
+    y: number,
+    radius: number,
+    color: string,
+    time: number,
+  ) {
+    const c = this.ctx;
+    c.save();
+    c.strokeStyle = color;
+    c.lineWidth = 7;
+    c.beginPath();
+    c.arc(x, y, radius, 0, Math.PI * 2);
+    c.stroke();
+    for (let i = 0; i < 8; i++) {
+      const a = (i * Math.PI) / 4 + Math.sin(time * 2) * 0.03;
+      this.ellipse(
+        x + Math.cos(a) * radius,
+        y + Math.sin(a) * radius,
+        5,
+        5,
+        i % 2 ? "#fff3bb" : "#f4a9b5",
+      );
     }
     c.restore();
   }
@@ -1251,6 +1711,10 @@ export class Renderer {
     const b = game.boss;
     if (!b || !this.visible(b.x + b.w / 2, b.w + 60)) return;
     const c = this.ctx;
+    if (b.kind === "millkeeper") {
+      this.millKeeper(game, time);
+      return;
+    }
     const defeated = b.state === "defeated";
     const warning = b.state === "warning";
     const recovering = b.state === "recover";
@@ -1490,13 +1954,137 @@ export class Renderer {
     c.restore();
   }
 
+  private millKeeper(game: Game, time: number) {
+    const b = game.boss!;
+    const c = this.ctx;
+    const x = b.x + b.w / 2,
+      y = b.y + b.h;
+    if (b.state === "defeated") {
+      this.ellipse(x, y - 8, 55, 12, "rgba(255,239,152,.5)");
+      for (let i = 0; i < 3; i++)
+        this.firefly(
+          x + Math.sin(time + i * 2) * 28,
+          y - 30 - i * 18,
+          time,
+          0.7,
+        );
+      return;
+    }
+    const warning =
+      b.millState === "lowWarning" ||
+      b.millState === "highWarning" ||
+      b.millState === "vaneWarning";
+    const open = b.millState === "vaneOpen";
+    const recovering =
+      b.millState === "recover" || b.millState === "transition";
+    if (warning) {
+      const high = b.millState === "highWarning";
+      const yy = high ? 250 : 414;
+      if (b.millState !== "vaneWarning") {
+        c.save();
+        c.setLineDash([12, 8]);
+        this.line(
+          [
+            [b.minX, yy],
+            [b.maxX + b.w, yy],
+          ],
+          "#e28a62",
+          4,
+        );
+        c.restore();
+      }
+      this.rounded(x - 18, b.y - 38, 36, 30, 10, "#fff2bb", "#bd7850");
+      c.save();
+      c.font = "bold 18px sans-serif";
+      c.textAlign = "center";
+      c.fillStyle = "#9a573c";
+      c.fillText(
+        high ? "↓" : b.millState === "lowWarning" ? "↑" : "!",
+        x,
+        b.y - 16,
+      );
+      c.restore();
+    }
+    this.ellipse(x, y, 56, 8, "rgba(77,65,43,.2)");
+    this.rounded(x - 44, y - 115, 88, 112, 27, "#c88c57", "#82583e");
+    this.rounded(x - 36, y - 104, 72, 92, 20, "#e7b87b", "#a66f48");
+    for (let i = 0; i < 4; i++)
+      this.line(
+        [
+          [x - 31 + i * 20, y - 93],
+          [x - 31 + i * 20, y - 20],
+        ],
+        "#d19a63",
+        2,
+      );
+    c.save();
+    c.translate(x, y - 78);
+    c.rotate(recovering ? 0.25 : time * (warning ? 2.5 : 0.8));
+    for (let i = 0; i < 4; i++) {
+      c.rotate(Math.PI / 2);
+      this.rounded(-9, -66, 18, 58, 7, "#ffe49a", "#a7784c");
+      this.line(
+        [
+          [0, -58],
+          [0, -15],
+        ],
+        "#e6bb77",
+        2,
+      );
+    }
+    this.ellipse(0, 0, 11, 11, "#a96e48", "#80553e");
+    c.restore();
+    this.ellipse(x - 14, y - 43, 5, 7, "#fff5d5");
+    this.ellipse(x + 14, y - 43, 5, 7, "#fff5d5");
+    this.ellipse(x - 13, y - 42, 2, 3, "#45564b");
+    this.ellipse(x + 15, y - 42, 2, 3, "#45564b");
+    this.line(
+      [
+        [x - 5, y - 28],
+        [x, y - 25],
+        [x + 5, y - 28],
+      ],
+      "#80553e",
+      2,
+    );
+    // The high target matches the actual vane hit region.
+    const vy = 185;
+    this.line(
+      [
+        [x, y - 112],
+        [x, vy + 12],
+      ],
+      "#8b6245",
+      4,
+    );
+    this.ellipse(
+      x,
+      vy,
+      open ? 28 : 20,
+      open ? 28 : 20,
+      open ? "rgba(255,245,147,.48)" : "rgba(255,245,147,.16)",
+    );
+    this.flowerRing(x, vy, 13, open ? "#ffe37b" : "#cdb987", time);
+  }
+
   private bossHazards(game: Game, time: number) {
     const c = this.ctx;
     for (const r of game.hazards) {
       if (!this.visible(r.x, r.w + 20)) continue;
       const cx = r.x + r.w / 2,
         cy = r.y + r.h / 2;
-      if (r.kind === "web") {
+      if (r.kind === "sweep") {
+        this.rounded(r.x, r.y, r.w, r.h, 16, "rgba(235,146,91,.72)", "#b8704d");
+        for (let y = r.y + 12; y < r.y + r.h; y += 23)
+          this.line(
+            [
+              [r.x + 8, y],
+              [r.x + r.w - 8, y],
+            ],
+            "#ffe4a3",
+            3,
+          );
+      } else if (r.kind === "web") {
         this.ellipse(cx, cy, r.w / 2, r.h / 2, "#f5dce9", "#ad79a7", 2);
         for (let i = 0; i < 3; i++) {
           const a = (i * Math.PI) / 3 + time * 2;
@@ -1563,6 +2151,7 @@ export class Renderer {
       const floor = game.platforms.find(
         (platform) =>
           platform.kind === "ground" &&
+          platform.y > 100 &&
           signX >= platform.x + 10 &&
           signX + 100 < platform.x + platform.w,
       );
@@ -1755,6 +2344,27 @@ export class Renderer {
   private platform(r: Game["platforms"][number], p: Palette, time: number) {
     const c = this.ctx;
     const { x, y, w, h } = r;
+    if (r.id?.startsWith("gate.")) return; // Gates are drawn from their live latch state.
+    if (r.id?.startsWith("trellis.")) {
+      this.rounded(x, y, w, h, 3, "#739b57");
+      this.line(
+        [
+          [x, y + h - 3],
+          [x + w, y + h - 3],
+        ],
+        "#c9dc82",
+        5,
+      );
+      for (
+        let xx = Math.max(x + 12, this.cameraX - 40);
+        xx < Math.min(x + w, this.cameraX + WIDTH + 40);
+        xx += 55
+      ) {
+        this.leaf(xx, y + h, 14, -0.8, "#a5ca6d");
+        this.leaf(xx + 15, y + h, 11, 0.8, "#d7e995");
+      }
+      return;
+    }
     if (r.kind === "flower" || r.kind === "curled") {
       this.wakingPlant(r, time);
       return;
@@ -2641,8 +3251,9 @@ export class Renderer {
     landing: number,
     size = 1,
     pose: "normal" | "hurt" | "won" | "lost" = "normal",
-    outfit: "leaf" | "berry" | "moon" = "leaf",
+    outfit: "leaf" | "berry" | "moon" | "cosmetic.bee_scarf" = "leaf",
     danger = false,
+    flight: "none" | "ready" | "lift" | "glide" = "none",
   ) {
     const c = this.ctx;
     const running = grounded && Math.abs(vx) > 15;
@@ -2659,11 +3270,13 @@ export class Renderer {
           ? "#c4d8ed"
           : "#8cce79";
     const scarf =
-      outfit === "berry"
-        ? "#e3b86a"
-        : outfit === "moon"
-          ? "#e6dba7"
-          : "#eb745d";
+      outfit === "cosmetic.bee_scarf"
+        ? "#f2c552"
+        : outfit === "berry"
+          ? "#e3b86a"
+          : outfit === "moon"
+            ? "#e6dba7"
+            : "#eb745d";
     const stride = running ? Math.sin(time * 19) : 0;
     const celebration = pose === "won";
     const hurt = pose === "hurt" || pose === "lost";
@@ -2690,6 +3303,39 @@ export class Renderer {
       this.ellipse(-17, -23, flutter, 7, "rgba(226,255,224,.72)", "#92c9a2", 1);
       this.ellipse(14, -23, flutter, 7, "rgba(226,255,224,.72)", "#92c9a2", 1);
     }
+    if (flight !== "none") {
+      // The feather is anchored to Pip's satchel; lift and glide spread it differently.
+      c.save();
+      c.translate(-15, -25 + bob);
+      c.rotate(
+        flight === "lift"
+          ? -0.8 + Math.sin(time * 18) * 0.15
+          : flight === "glide"
+            ? -1.35
+            : -0.35,
+      );
+      this.leaf(0, 0, flight === "glide" ? 24 : 19, 0, "#e9fff4");
+      this.line(
+        [
+          [0, 0],
+          [0, -23],
+        ],
+        "#6bbdb3",
+        2,
+      );
+      c.restore();
+      if (flight === "lift") {
+        for (let i = 0; i < 3; i++)
+          this.line(
+            [
+              [-21 - i * 4, -5 + i * 7],
+              [-25 - i * 4, 2 + i * 7],
+            ],
+            "rgba(225,255,246,.8)",
+            2,
+          );
+      }
+    }
     // A streaming scarf makes direction and speed easy to read.
     c.beginPath();
     c.moveTo(-9, -26 + bob);
@@ -2705,6 +3351,24 @@ export class Renderer {
     c.closePath();
     c.fillStyle = scarf;
     c.fill();
+    if (outfit === "cosmetic.bee_scarf") {
+      this.line(
+        [
+          [-16, -24],
+          [-18, -18],
+        ],
+        "#66513b",
+        3,
+      );
+      this.line(
+        [
+          [-23, -22],
+          [-25, -17],
+        ],
+        "#66513b",
+        3,
+      );
+    }
     // Satchel, arms, and boots remain behind the face and body.
     this.rounded(-18, -26 + bob, 9, 18, 4, "#bf874c", "#936b43");
     this.line(

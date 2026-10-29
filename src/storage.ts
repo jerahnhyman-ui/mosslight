@@ -1,6 +1,10 @@
 export type PlayMode = "classic" | "relaxed" | "timed";
-export type Outfit = "leaf" | "berry" | "moon";
-export type Decoration = "lanterns" | "flowers" | "fountain";
+export type Outfit = "leaf" | "berry" | "moon" | "cosmetic.bee_scarf";
+export type Decoration =
+  | "lanterns"
+  | "flowers"
+  | "fountain"
+  | "cosmetic.pinwheel_garland";
 export interface RunRecord {
   completed: boolean;
   bestTime: number | null;
@@ -15,6 +19,7 @@ export interface ShopItem {
   description: string;
   coins: number;
   fireflies: number;
+  reward?: boolean;
 }
 export const SHOP_ITEMS: ShopItem[] = [
   {
@@ -65,6 +70,24 @@ export const SHOP_ITEMS: ShopItem[] = [
     coins: 150,
     fireflies: 6,
   },
+  {
+    id: "cosmetic.bee_scarf",
+    kind: "outfit",
+    name: "Bee Scarf",
+    description: "A gift from the beehive.",
+    coins: 0,
+    fireflies: 0,
+    reward: true,
+  },
+  {
+    id: "cosmetic.pinwheel_garland",
+    kind: "decoration",
+    name: "Pinwheel Garland",
+    description: "A prize for Petal Post flights.",
+    coins: 0,
+    fireflies: 0,
+    reward: true,
+  },
 ];
 const emptyRecord = (): RunRecord => ({ completed: false, bestTime: null });
 const emptyGarden = (): Record<PlayMode, RunRecord> => ({
@@ -89,6 +112,22 @@ export interface TouchSettings {
   height: number;
   swapped: boolean;
 }
+export interface HoopResult {
+  score: number;
+  hoops: number;
+  centered: number;
+  landings: number;
+  elapsed: number;
+  finished: boolean;
+}
+export type HoopMedal = "none" | "bronze" | "silver" | "gold";
+export interface HoopRecord {
+  revision: 1;
+  best: HoopResult | null;
+  bestMedal: HoopMedal;
+  completed: boolean;
+  bestFinishTime: number | null;
+}
 export interface Save {
   sound: boolean;
   music: boolean;
@@ -102,6 +141,10 @@ export interface Save {
   outfit: Outfit;
   decorations: Decoration[];
   challenges: ChallengeRecord[];
+  unlocks: { windFeatherDiscovered: boolean };
+  secrets: { beehive: { discovered: boolean; completed: boolean } };
+  minigames: { flowerHoops: HoopRecord };
+  claimedRewards: string[];
 }
 export const DEFAULT_CONTROLS: TouchSettings = {
   size: 1,
@@ -109,7 +152,25 @@ export const DEFAULT_CONTROLS: TouchSettings = {
   height: 0,
   swapped: false,
 };
-export const SAVE_KEY = "mosslight-save-v2";
+export const SAVE_KEY = "mosslight-save-v3";
+export const WORLD_IDS = [
+  "world.sunlit-meadow",
+  "world.firefly-hollow",
+  "world.cloudtop-crossing",
+  "world.windmill-garden",
+] as const;
+export const CHALLENGE_IDS = [
+  "challenge.sunlit-meadow",
+  "challenge.firefly-hollow",
+  "challenge.cloudtop-crossing",
+] as const;
+const emptyHoops = (): HoopRecord => ({
+  revision: 1,
+  best: null,
+  bestMedal: "none",
+  completed: false,
+  bestFinishTime: null,
+});
 const blank = (): Save => ({
   sound: true,
   music: true,
@@ -125,7 +186,11 @@ const blank = (): Save => ({
     ...emptyRecord(),
     medal: "none",
   })),
-  progress: Array.from({ length: 3 }, () => ({
+  unlocks: { windFeatherDiscovered: false },
+  secrets: { beehive: { discovered: false, completed: false } },
+  minigames: { flowerHoops: emptyHoops() },
+  claimedRewards: [],
+  progress: Array.from({ length: 4 }, () => ({
     completed: false,
     stars: 0,
     coins: 0,
@@ -177,15 +242,65 @@ export function recordFireflies(
 export function readSave(): Save {
   const defaults = blank();
   try {
-    const current = localStorage.getItem(SAVE_KEY);
-    const raw = JSON.parse(
-      current || localStorage.getItem("mosslight-save-v1") || "null",
-    );
-    if (!raw || !Array.isArray(raw.progress)) return defaults;
-    const isCurrent = current !== null;
+    // A corrupt newer snapshot must not hide a usable older one.
+    let raw: any = null;
+    let version = 0;
+    for (const [key, candidateVersion] of [
+      [SAVE_KEY, 3],
+      ["mosslight-save-v2", 2],
+      ["mosslight-save-v1", 1],
+    ] as const) {
+      try {
+        const text = localStorage.getItem(key);
+        if (!text) continue;
+        const candidate = JSON.parse(text);
+        if (candidateVersion === 3) {
+          if (
+            !candidate ||
+            candidate.schemaVersion !== 3 ||
+            !candidate.worlds ||
+            typeof candidate.worlds !== "object" ||
+            Array.isArray(candidate.worlds)
+          )
+            continue;
+          const worlds = WORLD_IDS.map((id) => candidate.worlds[id]);
+          if (
+            !worlds.every(
+              (world) =>
+                world && typeof world === "object" && !Array.isArray(world),
+            )
+          )
+            continue;
+          raw = {
+            ...candidate,
+            progress: worlds.map((world, i) => ({
+              ...world,
+              fireflies: Array.isArray(world.rescuedFireflies)
+                ? world.rescuedFireflies.map((id: string) =>
+                    typeof id === "string" &&
+                    id.startsWith(`${WORLD_IDS[i]}.firefly.`)
+                      ? Number(id.slice(`${WORLD_IDS[i]}.firefly.`.length))
+                      : -1,
+                  )
+                : [],
+            })),
+            challenges: CHALLENGE_IDS.map((id) => candidate.challenges?.[id]),
+          };
+        } else {
+          if (!candidate || !Array.isArray(candidate.progress)) continue;
+          raw = candidate;
+        }
+        version = candidateVersion;
+        break;
+      } catch {
+        /* Try the previous generation. */
+      }
+    }
+    if (!raw) return defaults;
     defaults.sound = raw.sound !== false;
     // Respect a muted older installation when introducing music for the first time.
-    defaults.music = isCurrent ? raw.music !== false : defaults.sound;
+    defaults.music =
+      typeof raw.music === "boolean" ? raw.music : defaults.sound;
     defaults.haptics = raw.haptics !== false;
     defaults.playMode = ["classic", "relaxed", "timed"].includes(raw.playMode)
       ? raw.playMode
@@ -194,7 +309,7 @@ export function readSave(): Save {
     defaults.wallet = Math.min(integer(raw.wallet), defaults.lifetimeCoins);
     defaults.outfits = [
       "leaf",
-      ...(["berry", "moon"] as Outfit[]).filter(
+      ...(["berry", "moon", "cosmetic.bee_scarf"] as Outfit[]).filter(
         (id) => Array.isArray(raw.outfits) && raw.outfits.includes(id),
       ),
     ];
@@ -202,7 +317,12 @@ export function readSave(): Save {
       ? raw.outfit
       : "leaf";
     defaults.decorations = (
-      ["lanterns", "flowers", "fountain"] as Decoration[]
+      [
+        "lanterns",
+        "flowers",
+        "fountain",
+        "cosmetic.pinwheel_garland",
+      ] as Decoration[]
     ).filter(
       (id) => Array.isArray(raw.decorations) && raw.decorations.includes(id),
     );
@@ -220,7 +340,7 @@ export function readSave(): Save {
               : "none",
       };
     });
-    if (isCurrent && raw.controls && typeof raw.controls === "object") {
+    if (raw.controls && typeof raw.controls === "object") {
       defaults.controls = {
         size: [0.85, 1, 1.15].includes(raw.controls.size)
           ? raw.controls.size
@@ -229,6 +349,38 @@ export function readSave(): Save {
         height: distance(raw.controls.height),
         swapped: raw.controls.swapped === true,
       };
+    }
+    if (version === 3) {
+      defaults.unlocks.windFeatherDiscovered =
+        raw.unlocks?.windFeatherDiscovered === true;
+      defaults.secrets.beehive.completed =
+        raw.secrets?.["secret.beehive"]?.completed === true;
+      defaults.secrets.beehive.discovered =
+        raw.secrets?.["secret.beehive"]?.discovered === true ||
+        defaults.secrets.beehive.completed;
+      defaults.claimedRewards = [
+        "cosmetic.bee_scarf",
+        "cosmetic.pinwheel_garland",
+      ].filter(
+        (id) =>
+          Array.isArray(raw.claimedRewards) && raw.claimedRewards.includes(id),
+      );
+      const hoops = raw.minigames?.["minigame.flower_hoops"];
+      if (hoops?.revision === 1) {
+        const best = sanitizeHoopResult(hoops.best);
+        defaults.minigames.flowerHoops = {
+          revision: 1,
+          best,
+          bestMedal: ["none", "bronze", "silver", "gold"].includes(
+            hoops.bestMedal,
+          )
+            ? hoops.bestMedal
+            : "none",
+          completed: hoops.completed === true,
+          bestFinishTime:
+            hoops.completed === true ? validTime(hoops.bestFinishTime) : null,
+        };
+      }
     }
     defaults.progress = defaults.progress.map((fallback, i) => {
       const p = raw.progress[i];
@@ -240,9 +392,9 @@ export function readSave(): Save {
           : 0,
         coins: Number.isFinite(p.coins) ? Math.floor(Math.max(0, p.coins)) : 0,
         bestTime: validTime(p.bestTime),
-        adventureCompleted: isCurrent && p.adventureCompleted === true,
-        adventureBestTime: isCurrent ? validTime(p.adventureBestTime) : null,
-        fireflies: isCurrent ? rescuedIndices(p.fireflies) : [],
+        adventureCompleted: p.adventureCompleted === true,
+        adventureBestTime: validTime(p.adventureBestTime),
+        fireflies: rescuedIndices(p.fireflies),
         garden: {
           classic: readRecord(p.garden?.classic),
           relaxed: readRecord(p.garden?.relaxed),
@@ -250,6 +402,7 @@ export function readSave(): Save {
         },
       };
     });
+    if (version < 3) writeSave(defaults);
   } catch {
     /* Storage can be disabled; the game still works. */
   }
@@ -257,9 +410,38 @@ export function readSave(): Save {
 }
 export function writeSave(save: Save) {
   try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify(save));
+    const { progress, challenges, secrets, minigames, ...common } = save;
+    const worlds = Object.fromEntries(
+      WORLD_IDS.map((id, i) => {
+        const { fireflies, ...world } = progress[i];
+        return [
+          id,
+          {
+            ...world,
+            rescuedFireflies: rescuedIndices(fireflies).map(
+              (index) => `${id}.firefly.${index}`,
+            ),
+          },
+        ];
+      }),
+    );
+    localStorage.setItem(
+      SAVE_KEY,
+      JSON.stringify({
+        ...common,
+        schemaVersion: 3,
+        worlds,
+        challenges: Object.fromEntries(
+          CHALLENGE_IDS.map((id, i) => [id, challenges[i]]),
+        ),
+        secrets: { "secret.beehive": secrets.beehive },
+        minigames: { "minigame.flower_hoops": minigames.flowerHoops },
+      }),
+    );
+    return true;
   } catch {
     /* Session-only progress. */
+    return false;
   }
 }
 
@@ -293,7 +475,7 @@ export function purchaseItem(
     if (item.kind === "outfit") save.outfit = item.id as Outfit;
     return "equipped";
   }
-  if (rescuedTotal(save) < item.fireflies) return "locked";
+  if (item.reward || rescuedTotal(save) < item.fireflies) return "locked";
   if (save.wallet < item.coins) return "unaffordable";
   save.wallet -= item.coins;
   if (item.kind === "outfit") {
@@ -316,7 +498,9 @@ export function recordGardenRun(
   return improved;
 }
 export function challengeUnlocked(save: Save, world: number) {
-  return save.progress[world]?.fireflies.length === 3;
+  return (
+    world >= 0 && world < 3 && save.progress[world]?.fireflies.length === 3
+  );
 }
 export function recordChallenge(
   save: Save,
@@ -338,5 +522,110 @@ export function recordChallenge(
   const best = record.bestTime!;
   record.medal =
     best <= target ? "gold" : best <= target * 1.5 ? "silver" : "bronze";
+  return improved;
+}
+
+/** Windmill Garden opens only after the current Meadow guardian, not a legacy trail. */
+export function worldUnlocked(save: Save, index: number): boolean {
+  return (
+    index >= 0 &&
+    index < 4 &&
+    (index !== 3 ||
+      Object.values(save.progress[0].garden).some((record) => record.completed))
+  );
+}
+export function discoverFeather(save: Save): boolean {
+  if (save.unlocks.windFeatherDiscovered) return false;
+  save.unlocks.windFeatherDiscovered = true;
+  return true;
+}
+export function discoverBeehive(save: Save): boolean {
+  if (save.secrets.beehive.discovered) return false;
+  save.secrets.beehive.discovered = true;
+  return true;
+}
+export function completeBeehive(save: Save): boolean {
+  const first = !save.secrets.beehive.completed;
+  save.secrets.beehive.discovered = true;
+  save.secrets.beehive.completed = true;
+  if (!save.outfits.includes("cosmetic.bee_scarf"))
+    save.outfits.push("cosmetic.bee_scarf");
+  if (!save.claimedRewards.includes("cosmetic.bee_scarf"))
+    save.claimedRewards.push("cosmetic.bee_scarf");
+  return first;
+}
+function sanitizeHoopResult(value: any): HoopResult | null {
+  if (
+    !value ||
+    typeof value !== "object" ||
+    !Number.isInteger(value.score) ||
+    value.score < 0 ||
+    value.score > 2600 ||
+    !Number.isInteger(value.hoops) ||
+    value.hoops < 0 ||
+    value.hoops > 16 ||
+    !Number.isInteger(value.centered) ||
+    value.centered < 0 ||
+    value.centered > value.hoops ||
+    !Number.isInteger(value.landings) ||
+    value.landings < 0 ||
+    value.landings > 8 ||
+    typeof value.elapsed !== "number" ||
+    !Number.isFinite(value.elapsed) ||
+    value.elapsed < 0 ||
+    value.elapsed > 60 ||
+    typeof value.finished !== "boolean"
+  )
+    return null;
+  return {
+    score: value.score,
+    hoops: value.hoops,
+    centered: value.centered,
+    landings: value.landings,
+    elapsed: value.elapsed,
+    finished: value.finished,
+  };
+}
+export function hoopMedal(result: HoopResult): HoopMedal {
+  if (
+    result.score >= 2300 &&
+    result.hoops === 16 &&
+    result.finished &&
+    result.elapsed <= 45
+  )
+    return "gold";
+  if (result.score >= 1750 && result.finished) return "silver";
+  return result.score >= 800 ? "bronze" : "none";
+}
+export function recordHoops(save: Save, input: HoopResult): boolean {
+  const result = sanitizeHoopResult(input);
+  if (!result || !save.unlocks.windFeatherDiscovered) return false;
+  const record = save.minigames.flowerHoops;
+  const best = record.best;
+  const improved =
+    !best ||
+    result.score > best.score ||
+    (result.score === best.score &&
+      ((result.finished && !best.finished) ||
+        (result.finished === best.finished && result.elapsed < best.elapsed)));
+  if (improved) record.best = result;
+  const medal = hoopMedal(result);
+  const ranks: HoopMedal[] = ["none", "bronze", "silver", "gold"];
+  if (ranks.indexOf(medal) > ranks.indexOf(record.bestMedal))
+    record.bestMedal = medal;
+  if (result.finished) {
+    record.completed = true;
+    if (
+      validTime(result.elapsed) !== null &&
+      (record.bestFinishTime === null || result.elapsed < record.bestFinishTime)
+    )
+      record.bestFinishTime = result.elapsed;
+  }
+  if (medal !== "none") {
+    if (!save.decorations.includes("cosmetic.pinwheel_garland"))
+      save.decorations.push("cosmetic.pinwheel_garland");
+    if (!save.claimedRewards.includes("cosmetic.pinwheel_garland"))
+      save.claimedRewards.push("cosmetic.pinwheel_garland");
+  }
   return improved;
 }

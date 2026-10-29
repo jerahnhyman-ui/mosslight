@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_CONTROLS,
+  worldUnlocked,
+  discoverFeather,
+  discoverBeehive,
+  completeBeehive,
+  recordHoops,
   RunCoinLedger,
   SHOP_ITEMS,
   challengeUnlocked,
@@ -83,7 +88,7 @@ describe("adventure progress", () => {
 
   it("bounds malformed settings and never trusts secret counts as rescued IDs", () => {
     items.set(
-      SAVE_KEY,
+      "mosslight-save-v2",
       JSON.stringify({
         controls: { size: 4, inset: -9, height: 500, swapped: "true" },
         progress: [
@@ -100,7 +105,7 @@ describe("adventure progress", () => {
     });
     expect(save.progress[0].fireflies).toEqual([0, 2]);
     expect(save.progress[0].adventureBestTime).toBeNull();
-    expect(save.progress).toHaveLength(3);
+    expect(save.progress).toHaveLength(4);
   });
 
   it("continues with session-only progress when storage is unavailable", () => {
@@ -114,7 +119,7 @@ describe("adventure progress", () => {
     });
     const save = readSave();
     recordFireflies(save.progress[0], [1]);
-    expect(() => writeSave(save)).not.toThrow();
+    expect(writeSave(save)).toBe(false);
     expect(save.progress[0].fireflies).toEqual([1]);
   });
 });
@@ -122,7 +127,7 @@ describe("adventure progress", () => {
 describe("living garden progression", () => {
   it("migrates build 15 saves without relabeling past trail records as boss victories", () => {
     items.set(
-      SAVE_KEY,
+      "mosslight-save-v2",
       JSON.stringify({
         sound: false,
         music: true,
@@ -213,9 +218,9 @@ describe("living garden progression", () => {
     const later = readSave();
     expect(later.decorations).toEqual(["lanterns", "flowers", "fountain"]);
     expect(
-      SHOP_ITEMS.filter((item) => item.kind === "decoration").every((item) =>
-        ownsItem(later, item),
-      ),
+      SHOP_ITEMS.filter(
+        (item) => item.kind === "decoration" && !item.reward,
+      ).every((item) => ownsItem(later, item)),
     ).toBe(true);
   });
 
@@ -265,7 +270,7 @@ describe("living garden progression", () => {
 
   it("sanitizes malformed currency, ownership and completion data", () => {
     items.set(
-      SAVE_KEY,
+      "mosslight-save-v2",
       JSON.stringify({
         wallet: 900,
         lifetimeCoins: 51.8,
@@ -297,5 +302,133 @@ describe("living garden progression", () => {
     });
     expect(save.progress[0].garden.relaxed.bestTime).toBeNull();
     expect(save.challenges[0].medal).toBe("bronze");
+  });
+});
+
+describe("windmill save migration and rewards", () => {
+  it("migrates v2 records into stable keyed v3 without granting expansion rewards", () => {
+    items.set(
+      "mosslight-save-v2",
+      JSON.stringify({
+        sound: false,
+        music: true,
+        controls: { size: 1.15, inset: 8, height: 6, swapped: true },
+        wallet: 20,
+        lifetimeCoins: 100,
+        outfits: ["berry"],
+        outfit: "berry",
+        decorations: ["flowers"],
+        challenges: [{ completed: true, bestTime: 18, medal: "gold" }],
+        progress: [
+          {
+            completed: true,
+            stars: 3,
+            coins: 91,
+            bestTime: 20,
+            adventureCompleted: true,
+            adventureBestTime: 60,
+            fireflies: [0, 2],
+            garden: { relaxed: { completed: true, bestTime: 100 } },
+          },
+        ],
+      }),
+    );
+    const save = readSave();
+    expect(items.has(SAVE_KEY)).toBe(true);
+    expect(worldUnlocked(save, 3)).toBe(true);
+    expect(save.unlocks.windFeatherDiscovered).toBe(false);
+    expect(save.secrets.beehive.completed).toBe(false);
+    expect(save.claimedRewards).toEqual([]);
+    writeSave(save);
+    const snapshot = JSON.parse(items.get(SAVE_KEY)!);
+    expect(snapshot.schemaVersion).toBe(3);
+    expect(snapshot.progress).toBeUndefined();
+    expect(snapshot.worlds["world.sunlit-meadow"].rescuedFireflies).toEqual([
+      "world.sunlit-meadow.firefly.0",
+      "world.sunlit-meadow.firefly.2",
+    ]);
+    expect(snapshot.challenges["challenge.sunlit-meadow"].medal).toBe("gold");
+    expect(readSave()).toEqual(save);
+    expect(items.has("mosslight-save-v2")).toBe(true);
+  });
+  it("falls back to valid older saves after malformed v3 and does not unlock from legacy completion", () => {
+    items.set(SAVE_KEY, JSON.stringify({ schemaVersion: 3, worlds: {} }));
+    items.set(
+      "mosslight-save-v2",
+      JSON.stringify({
+        progress: [
+          { completed: true, adventureCompleted: true, fireflies: [1] },
+        ],
+      }),
+    );
+    const save = readSave();
+    expect(save.progress[0].fireflies).toEqual([1]);
+    expect(worldUnlocked(save, 3)).toBe(false);
+    writeSave(save);
+    expect(readSave()).toEqual(save);
+  });
+  it("persists discoveries, twelve rescues, and idempotent bee and hoop rewards", () => {
+    const save = readSave();
+    for (const world of save.progress) recordFireflies(world, [0, 1, 2]);
+    expect(rescuedTotal(save)).toBe(12);
+    expect(challengeUnlocked(save, 3)).toBe(false);
+    expect(purchaseItem(save, "cosmetic.bee_scarf")).toBe("locked");
+    expect(purchaseItem(save, "cosmetic.pinwheel_garland")).toBe("locked");
+    expect(discoverBeehive(save)).toBe(true);
+    expect(discoverBeehive(save)).toBe(false);
+    expect(completeBeehive(save)).toBe(true);
+    expect(completeBeehive(save)).toBe(false);
+    const timeout = {
+      score: 800,
+      hoops: 8,
+      centered: 0,
+      landings: 0,
+      elapsed: 60,
+      finished: false,
+    };
+    expect(recordHoops(save, timeout)).toBe(false);
+    expect(discoverFeather(save)).toBe(true);
+    expect(recordHoops(save, timeout)).toBe(true);
+    expect(recordHoops(save, timeout)).toBe(false);
+    expect(save.minigames.flowerHoops.completed).toBe(false);
+    expect(save.minigames.flowerHoops.bestMedal).toBe("bronze");
+    expect(save.outfits.filter((x) => x === "cosmetic.bee_scarf")).toHaveLength(
+      1,
+    );
+    expect(
+      save.decorations.filter((x) => x === "cosmetic.pinwheel_garland"),
+    ).toHaveLength(1);
+    expect(save.wallet).toBe(0);
+    writeSave(save);
+    expect(readSave()).toEqual(save);
+  });
+  it("keeps a coherent best attempt and separately tracks medals and fastest finish", () => {
+    const save = readSave();
+    discoverFeather(save);
+    const best = {
+      score: 2400,
+      hoops: 16,
+      centered: 12,
+      landings: 4,
+      elapsed: 44,
+      finished: true,
+    };
+    expect(recordHoops(save, best)).toBe(true);
+    expect(
+      recordHoops(save, {
+        score: 2000,
+        hoops: 14,
+        centered: 4,
+        landings: 3,
+        elapsed: 35,
+        finished: true,
+      }),
+    ).toBe(false);
+    expect(save.minigames.flowerHoops.best).toEqual(best);
+    expect(save.minigames.flowerHoops.bestFinishTime).toBe(35);
+    expect(save.minigames.flowerHoops.bestMedal).toBe("gold");
+    expect(recordHoops(save, { ...best, score: 2601 })).toBe(false);
+    writeSave(save);
+    expect(readSave()).toEqual(save);
   });
 });

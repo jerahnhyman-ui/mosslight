@@ -2885,3 +2885,274 @@ select:focus-visible {
     right: auto;
   }
 }
+
+/* Windmill Garden: four worlds, a small flight meter, and the discovery journal. */
+.game-app[data-theme="windmill"] {
+  background: linear-gradient(#94dce8, #fff1bf 65%, #70a760);
+}
+.game-app[data-theme="hive"] {
+  background: linear-gradient(#bf813f, #ffe6a5 65%, #8b6940);
+}
+#forest-map {
+  height: auto;
+  min-height: 0;
+  padding: 20px 14px 32px;
+}
+#menu-worlds {
+  position: relative;
+  inset: auto;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px 16px;
+}
+#forest-map .menu-world,
+#forest-map .menu-world:nth-child(2),
+#forest-map .menu-world:nth-child(3) {
+  position: relative;
+  top: auto;
+  left: auto;
+  width: 100%;
+}
+#forest-map .menu-world:disabled {
+  opacity: 0.7;
+}
+#forest-map .map-trails {
+  display: none;
+}
+.world-tab:nth-child(4) .tab-number {
+  background: #f6dc9c;
+  color: #8b682e;
+}
+.world-tab:disabled {
+  opacity: 0.65;
+}
+.journal-list {
+  display: grid;
+  gap: 8px;
+  margin: 18px 0;
+}
+.journal-list h3 {
+  font-size: 13px;
+  margin: 0 0 2px;
+}
+#feather-meter {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #397f83;
+  border-left: 1px solid #759f7e55;
+  padding-left: 7px;
+}
+.feather-segments {
+  font-size: 12px;
+  letter-spacing: -1px;
+}
+#feather-label {
+  font-size: 9px;
+}
+.flight-activity-hud {
+  position: absolute;
+  z-index: 4;
+  top: calc(142px + var(--safe-top));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 9px 16px;
+  border: 1px solid #c1aa75;
+  border-radius: 15px;
+  background: #fffae5ed;
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+#activity-clock {
+  color: #97602b;
+  min-width: 24px;
+}
+.portal-prompt {
+  position: absolute;
+  z-index: 5;
+  top: calc(149px + var(--safe-top));
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100% - 48px);
+  background: #fff5ccf5;
+  border: 1px solid #d5b774;
+  border-radius: 12px;
+  padding: 8px 12px;
+  color: #70542a;
+  font-size: 12px;
+  font-weight: 700;
+  pointer-events: none;
+  text-align: center;
+}
+#save-status {
+  position: absolute;
+  z-index: 8;
+  top: calc(64px + var(--safe-top));
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 80%;
+  padding: 7px 12px;
+  margin: 0;
+  border-radius: 10px;
+  background: #fff4d3;
+  color: #795125;
+  font-size: 11px;
+  text-align: center;
+}
+.shop-preview[data-cosmetic="cosmetic.bee_scarf"] {
+  background: linear-gradient(135deg, #f7e699, #f3bd54);
+  color: #6a6034;
+}
+.shop-preview[data-cosmetic="cosmetic.pinwheel_garland"] {
+  background: #e2efd3;
+  color: #c27657;
+}
+.game-app[data-run-kind="minigame"] .power-state {
+  margin-inline: auto;
+}
+.game-app[data-run-kind="minigame"] .section-status {
+  display: none;
+}
+@media (max-width: 960px) {
+  .world-tab {
+    gap: 6px;
+    padding-inline: 8px;
+  }
+  .world-tab strong {
+    font-size: 11px;
+  }
+  .world-tab small {
+    font-size: 6px;
+  }
+  .world-tab .tab-stars {
+    display: none;
+  }
+}
+@media (max-height: 600px) and (min-aspect-ratio: 1/1) {
+  #feather-label {
+    display: none;
+  }
+  .flight-activity-hud,
+  .portal-prompt {
+    top: calc(101px + var(--safe-top));
+    font-size: 10px;
+    padding: 6px 10px;
+    gap: 10px;
+  }
+  .petal-results h2 {
+    margin: 4px 0;
+  }
+  .petal-results .challenge-medal {
+    font-size: 30px;
+  }
+}
+@media (max-width: 600px) {
+  #menu-worlds {
+    gap: 18px 10px;
+  }
+  #forest-map {
+    padding-inline: 6px;
+  }
+  #forest-map .menu-world-info strong {
+    font-size: 12px;
+  }
+  #forest-map .world-best {
+    font-size: 9px;
+  }
+  .world-tab .tab-number {
+    display: none;
+  }
+  .world-tab strong {
+    font-size: 9px;
+  }
+}
+@media (max-aspect-ratio: 1/1) {
+  .flight-activity-hud,
+  .portal-prompt {
+    top: calc(215px + var(--safe-top));
+  }
+  #feather-label {
+    display: none;
+  }
+  .grove-actions {
+    flex-wrap: wrap;
+  }
+}
+/* Keep the vane and high hoops clear of informational overlays. */
+.boss-hud {
+  left: calc(20px + var(--safe-left));
+  transform: none;
+  width: min(210px, calc(36vw - 24px));
+  padding: 8px 10px;
+}
+.boss-hud > div {
+  flex-wrap: wrap;
+  gap: 2px 8px;
+}
+#boss-name {
+  font-size: 11px;
+}
+#boss-health {
+  font-size: 12px;
+}
+.flight-activity-hud {
+  top: calc(85px + var(--safe-top));
+  right: calc(28px + var(--safe-right));
+  left: auto;
+  transform: none;
+  min-height: 43px;
+  gap: 10px;
+}
+.game-app[data-run-kind="minigame"] .power-state {
+  margin-left: 0;
+  margin-right: auto;
+}
+@media (max-height: 600px) and (min-aspect-ratio: 1/1) {
+  .boss-hud {
+    top: calc(108px + var(--safe-top));
+    padding: 6px 8px;
+  }
+  #boss-name {
+    font-size: 9px;
+  }
+  .flight-activity-hud {
+    top: calc(53px + var(--safe-top));
+    right: calc(20px + var(--safe-right));
+    min-height: 34px;
+    font-size: 10px;
+    gap: 8px;
+  }
+}
+@media (max-aspect-ratio: 1/1) {
+  .boss-hud {
+    top: calc(212px + var(--safe-top));
+    width: 150px;
+    left: calc(16px + var(--safe-left));
+  }
+  .flight-activity-hud {
+    top: calc(142px + var(--safe-top));
+    right: calc(16px + var(--safe-right));
+    min-height: 34px;
+    font-size: 10px;
+    padding: 6px 10px;
+  }
+}
+
+.boss-hud {
+  top: max(calc(147px + var(--safe-top)), var(--section-bottom, 0px));
+}
+@media (max-height: 600px) and (min-aspect-ratio: 1/1) {
+  .boss-hud {
+    top: max(calc(108px + var(--safe-top)), var(--section-bottom, 0px));
+  }
+}
+@media (max-aspect-ratio: 1/1) {
+  .boss-hud {
+    top: max(calc(212px + var(--safe-top)), var(--section-bottom, 0px));
+  }
+}
