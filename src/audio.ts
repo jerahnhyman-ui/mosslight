@@ -2,6 +2,8 @@ import { Capacitor } from "@capacitor/core";
 import { Haptics, ImpactStyle, NotificationType } from "@capacitor/haptics";
 
 type Theme = "meadow" | "dusk" | "alpine";
+type MusicScene = "trail" | "boss" | "grove";
+type ScoreName = Theme | "star" | "boss" | "grove";
 type Score = {
   bpm: number;
   melody: (number | null)[];
@@ -12,7 +14,7 @@ type Voice = { oscillator: OscillatorNode; gain: GainNode };
 
 // Original eight-bar themes. All sound is synthesized locally, so the score
 // works offline and adds no downloaded media or background playback session.
-const scores: Record<Theme | "star", Score> = {
+const scores: Record<ScoreName, Score> = {
   meadow: {
     bpm: 104,
     voice: "triangle",
@@ -101,6 +103,54 @@ const scores: Record<Theme | "star", Score> = {
       [48, 52, 55],
     ],
   },
+  boss: {
+    bpm: 126,
+    voice: "triangle",
+    melody: [
+      [62, null, 69, 65, 62, null, 69, 72],
+      [70, null, 65, 62, 65, null, 70, 74],
+      [67, null, 74, 70, 67, null, 74, 77],
+      [69, null, 73, 76, 74, 73, 69, null],
+      [74, null, 77, 81, 77, null, 74, 72],
+      [70, null, 74, 77, 74, null, 70, 65],
+      [67, 70, 74, null, 77, null, 74, 70],
+      [69, null, 73, 76, 73, null, 69, null],
+    ].flat(),
+    chords: [
+      [38, 41, 45],
+      [34, 38, 41],
+      [43, 46, 50],
+      [45, 49, 52],
+      [38, 41, 45],
+      [34, 38, 41],
+      [43, 46, 50],
+      [45, 49, 52],
+    ],
+  },
+  grove: {
+    bpm: 72,
+    voice: "sine",
+    melody: [
+      [72, null, null, 76, 79, null, null, null],
+      [76, null, 74, null, 72, null, null, null],
+      [69, null, null, 72, 76, null, 74, null],
+      [72, null, null, null, 67, null, null, null],
+      [76, null, null, 79, 84, null, null, null],
+      [81, null, 79, null, 76, null, null, null],
+      [74, null, null, 77, 79, null, 74, null],
+      [76, null, 72, null, 72, null, null, null],
+    ].flat(),
+    chords: [
+      [48, 52, 55],
+      [43, 47, 50],
+      [45, 48, 52],
+      [48, 52, 55],
+      [41, 45, 48],
+      [48, 52, 55],
+      [43, 47, 50],
+      [48, 52, 55],
+    ],
+  },
 };
 
 const effects: Record<string, number[]> = {
@@ -120,6 +170,16 @@ const effects: Record<string, number[]> = {
   break: [160, 110, 80],
   charge: [120, 155, 190],
   crumble: [150, 115],
+  awaken: [392, 523, 784, 1047],
+  "boss-start": [147, 220, 294],
+  "boss-warning": [247, 247, 330],
+  "boss-hit": [110, 196, 392],
+  "boss-defeat": [294, 392, 494, 587, 784],
+  "enemy-break": [150, 105, 75],
+  "hopper-bounce": [220, 440],
+  purchase: [659, 784, 1047],
+  unlock: [523, 659, 784, 1047, 1319],
+  equip: [523, 659],
   win: [523, 659, 784, 1047],
   lose: [300, 240, 160],
 };
@@ -133,12 +193,18 @@ export class AudioPlayer {
   private musicTimer?: ReturnType<typeof setInterval>;
   private musicVoices = new Set<Voice>();
   private effectVoices = new Set<Voice>();
-  private requested = { theme: "meadow" as Theme, active: false, star: false };
-  private playingScore?: Theme | "star";
+  private requested = {
+    theme: "meadow" as Theme,
+    active: false,
+    star: false,
+    scene: "trail" as MusicScene,
+  };
+  private playingScore?: ScoreName;
   private step = 0;
   private nextNoteAt = 0;
   private lastHaptic = -Infinity;
   private lastCoinAt = -Infinity;
+  private lastEffectAt = new Map<string, number>();
   private interrupted = false;
 
   get enabled() {
@@ -172,6 +238,7 @@ export class AudioPlayer {
         this.stopVoices(this.effectVoices);
         this.context = new AudioContext();
         this.lastCoinAt = -Infinity;
+        this.lastEffectAt.clear();
       }
       // Safari can report an "interrupted" state after a call or route change.
       // A genuine gesture may resume it just like a suspended context.
@@ -191,8 +258,13 @@ export class AudioPlayer {
   }
 
   /** Safe to call each frame: a score has only one scheduler at a time. */
-  setMusic(theme: Theme, active: boolean, starPower = false) {
-    this.requested = { theme, active, star: starPower };
+  setMusic(
+    theme: Theme,
+    active: boolean,
+    starPower = false,
+    scene: MusicScene = "trail",
+  ) {
+    this.requested = { theme, active, star: starPower, scene };
     this.syncMusic();
   }
 
@@ -221,24 +293,59 @@ export class AudioPlayer {
       if (this.context.currentTime - this.lastCoinAt < 0.045) return;
       this.lastCoinAt = this.context.currentTime;
     }
-    const low = event === "break" || event === "crumble" || event === "hurt";
-    const gentle =
-      event === "coin" || event === "charge" || event === "crumble";
+    // Several plants can wake on one step. Keep their shared flourish gentle;
+    // the warning and impact cues remain audible over the music.
+    const cooldown =
+      event === "awaken" || event === "hopper-bounce"
+        ? 0.12
+        : event === "enemy-break"
+          ? 0.075
+          : event === "boss-warning"
+            ? 0.18
+            : 0;
+    if (cooldown) {
+      const last = this.lastEffectAt.get(event) ?? -Infinity;
+      if (this.context.currentTime - last < cooldown) return;
+      this.lastEffectAt.set(event, this.context.currentTime);
+    }
+    const low = [
+      "break",
+      "crumble",
+      "hurt",
+      "enemy-break",
+      "boss-hit",
+    ].includes(event);
+    const gentle = [
+      "coin",
+      "charge",
+      "crumble",
+      "awaken",
+      "hopper-bounce",
+      "equip",
+    ].includes(event);
+    const bell = ["firefly", "awaken", "purchase", "unlock", "equip"].includes(
+      event,
+    );
+    const flourish = ["firefly", "win", "boss-defeat", "unlock"].includes(
+      event,
+    );
     for (const [index, frequency] of notes.entries()) {
       this.note(
         frequency,
         this.context.currentTime + index * 0.07,
-        event === "firefly" || event === "win" ? 0.24 : 0.14,
+        flourish ? 0.24 : 0.14,
         gentle ? 0.045 : 0.065,
-        low ? "triangle" : event === "firefly" ? "sine" : "triangle",
+        low ? "triangle" : bell ? "sine" : "triangle",
         this.effectVoices,
-        event === "bounce" || event === "jump" ? frequency * 1.12 : undefined,
+        ["bounce", "jump", "hopper-bounce"].includes(event)
+          ? frequency * 1.12
+          : undefined,
       );
     }
   }
 
   private syncMusic() {
-    const { theme, active, star } = this.requested;
+    const { theme, active, star, scene } = this.requested;
     if (
       !active ||
       !this.musicOn ||
@@ -248,7 +355,7 @@ export class AudioPlayer {
       this.stopMusic();
       return;
     }
-    const selected = star ? "star" : theme;
+    const selected = star ? "star" : scene === "trail" ? theme : scene;
     if (this.playingScore === selected && this.musicTimer !== undefined) return;
     this.stopMusic();
     this.playingScore = selected;
@@ -369,8 +476,16 @@ export class AudioPlayer {
   private haptic(event: string) {
     if (!this.hapticsOn || this.interrupted || !Capacitor.isNativePlatform())
       return;
-    const light = ["stomp", "bounce", "grow", "break"];
-    const success = ["checkpoint", "firefly", "extra-life", "win"];
+    const light = ["stomp", "bounce", "grow", "break", "awaken", "boss-hit"];
+    const success = [
+      "checkpoint",
+      "firefly",
+      "extra-life",
+      "win",
+      "boss-defeat",
+      "purchase",
+      "unlock",
+    ];
     const damage = ["shrink", "hurt", "life-lost", "lose"];
     if (
       !light.includes(event) &&

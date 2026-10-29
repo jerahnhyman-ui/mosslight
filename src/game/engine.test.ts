@@ -437,8 +437,8 @@ describe("Mosslight simulation", () => {
     expect(game.collectedCoins).toBe(0);
   });
 
-  it("wins at the exit and freezes the completed run", () => {
-    const game = new Game();
+  it("wins at an unguarded exit and freezes the completed run", () => {
+    const game = new Game(0, { level: { ...levels[0], boss: undefined } });
     game.player.x = game.level.goal.x;
     game.update(1 / 60, idle);
     expect(game.state).toBe("won");
@@ -805,14 +805,45 @@ describe("Mosslight simulation", () => {
   });
 
   it.each(levels)(
-    "$name has jumpable ground gaps and exactly three separate firefly secrets",
+    "$name has jumpable gaps or reachable bridge routes and three firefly secrets",
     (level) => {
       expect(level.fireflies).toHaveLength(3);
       const ground = level.platforms.filter((p) => p.kind === "ground");
       for (let i = 1; i < ground.length; i++) {
+        const left = ground[i - 1]!;
+        const right = ground[i]!;
+        if (right.x - left.x - left.w <= 180) continue;
+        // Wider crossings need an actual ascending approach and bridge. A route
+        // graph checks conservative jump height/span; full input routes below
+        // additionally exercise the timing of the crumbling surface.
+        const supports = level.platforms.filter(
+          (p) =>
+            p.kind !== "brick" &&
+            p.kind !== "moving" &&
+            p.x >= left.x &&
+            p.x <= right.x &&
+            p.y <= 430,
+        );
+        const reached = new Set<Platform>([left]);
+        let changed = true;
+        while (changed) {
+          changed = false;
+          for (const from of reached) {
+            for (const to of supports) {
+              if (reached.has(to) || to.x < from.x) continue;
+              const gap = Math.max(0, to.x - from.x - from.w);
+              const rise = from.y - to.y;
+              if (rise <= 135 && gap <= (rise > 80 ? 100 : 180)) {
+                reached.add(to);
+                changed = true;
+              }
+            }
+          }
+        }
         expect(
-          ground[i]!.x - ground[i - 1]!.x - ground[i - 1]!.w,
-        ).toBeLessThanOrEqual(180);
+          reached.has(right),
+          `Unbridged gap at ${left.x + left.w}..${right.x}`,
+        ).toBe(true);
       }
       expect(
         ground.some(

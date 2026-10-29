@@ -116,6 +116,7 @@ with a previously uploaded version/build-number pair.
 ```sh
 npm test
 npm run build
+npm run test:browser
 npx cap sync ios
 node scripts/check-testflight.mjs
 ```
@@ -123,6 +124,13 @@ node scripts/check-testflight.mjs
 These checks verify repository assets and settings only. A passing result does
 not prove Apple account access, code signing, an iOS compilation, or a successful
 TestFlight upload. Native compilation and device testing require Xcode/macOS.
+
+For living-garden updates, follow the [release acceptance and physical-device
+playtest](LIVING_GARDEN.md#release-acceptance). Check all three guardian fights,
+save migration, the home grove and cosmetic purchases, mode-specific records,
+and unlocked challenge rooms. Existing firefly rescues must survive an update.
+Record a physical-device playtest separately from the automated and archive
+results; neither substitutes for touch feel on an actual phone.
 
 ## Common build failures
 

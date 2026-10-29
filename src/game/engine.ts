@@ -6,6 +6,16 @@ import {
   type Rect,
 } from "./levels";
 
+import {
+  createBoss,
+  stepBoss,
+  warnBoss,
+  type BossState,
+  type BossHazard,
+} from "./bosses";
+export type { BossState, BossHazard } from "./bosses";
+export type RunMode = "classic" | "relaxed" | "timed";
+
 export type GameInput = {
   left: boolean;
   right: boolean;
@@ -27,6 +37,7 @@ export type PlatformState = Platform & {
   previousX: number;
   previousY: number;
   broken: boolean;
+  awakened: boolean;
   crumbleRemaining: number;
   respawnRemaining: number;
 };
@@ -66,7 +77,7 @@ const overlaps = (a: Rect, b: Rect) =>
   a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 const overlapsX = (a: Rect, b: Rect) => a.x < b.x + b.w && a.x + a.w > b.x;
 const active = (tile: PlatformState) =>
-  !tile.broken && tile.crumbleRemaining !== 0;
+  tile.awakened && !tile.broken && tile.crumbleRemaining !== 0;
 const solid = (tile: PlatformState) =>
   tile.kind === "ground" || tile.kind === "brick";
 const approach = (value: number, target: number, amount: number) =>
@@ -77,6 +88,12 @@ const approach = (value: number, target: number, amount: number) =>
 /** A renderer-independent, fixed-step simulation. No wall clock or randomness. */
 export class Game {
   readonly level: Level;
+  readonly mode: RunMode;
+  boss: BossState | null = null;
+  hazards: BossHazard[] = [];
+  outfit: "leaf" | "berry" | "moon" = "leaf";
+  groveDecorations: string[] = [];
+  rescuedTotal = 0;
   player!: Player;
   platforms!: PlatformState[];
   coins!: Collectible[];
@@ -106,9 +123,19 @@ export class Game {
     return this.activeCheckpointIndex >= 0;
   }
 
-  constructor(levelIndex = 0) {
+  constructor(levelIndex = 0, options: { mode?: RunMode; level?: Level } = {}) {
+    this.mode = options.mode ?? "classic";
     this.level =
-      levels[Math.max(0, Math.min(levels.length - 1, Math.floor(levelIndex)))]!;
+      options.level ??
+      levels[
+        Math.max(
+          0,
+          Math.min(
+            levels.length - 1,
+            Math.floor(Number.isFinite(levelIndex) ? levelIndex : 0),
+          ),
+        )
+      ]!;
     this.restart();
   }
 
@@ -125,6 +152,8 @@ export class Game {
     this.activeCheckpointIndex = -1;
     this.events = [];
     this.accumulator = 0;
+    this.boss = this.level.boss ? createBoss(this.level.boss) : null;
+    this.hazards = [];
     this.platforms = this.level.platforms.map((tile) => {
       const offset = tile.motion
         ? Math.sin(tile.motion.phase ?? 0) * tile.motion.range
@@ -140,6 +169,7 @@ export class Game {
         previousX: x,
         previousY: y,
         broken: false,
+        awakened: tile.kind !== "flower" && tile.kind !== "curled",
         crumbleRemaining: -1,
         respawnRemaining: 0,
       };
@@ -220,6 +250,7 @@ export class Game {
     }
     p.invulnerable = Math.max(0, p.invulnerable - STEP);
     this.hurtLock = Math.max(0, this.hurtLock - STEP);
+    this.wakePlants();
     this.movePlatforms();
     this.coyote = p.grounded ? COYOTE_TIME : Math.max(0, this.coyote - STEP);
     this.jumpBuffer = Math.max(0, this.jumpBuffer - STEP);
@@ -242,6 +273,8 @@ export class Game {
     p.x += p.vx * STEP;
     this.resolveHorizontal(p.vx);
     p.x = Math.max(0, Math.min(this.level.width - p.w, p.x));
+    if (this.boss && this.boss.state !== "defeated")
+      p.x = Math.min(p.x, this.boss.maxX + this.boss.w + 26 - p.w);
     const oldBottom = p.y + p.h;
     const oldTop = p.y;
     p.y += p.vy * STEP;
@@ -356,21 +389,12 @@ export class Game {
         p.grounded = false;
         this.coyote = 0;
         this.jumpCanShorten = false;
-      } else if (p.invulnerable <= 0) {
-        if (p.form === "small") return this.loseLife();
-        this.resize("small");
-        p.invulnerable = 1.5;
-        this.events.push("shrink");
-        p.vx = p.x + p.w / 2 < enemy.x + enemy.w / 2 ? -300 : 300;
-        p.vy = -290;
-        p.grounded = false;
-        this.coyote = 0;
-        this.jumpBuffer = 0;
-        this.jumpCanShorten = false;
-        this.hurtLock = 0.22;
-      }
+      } else if (this.hurt(enemy)) return true;
     }
+    if (this.updateBoss(oldBottom)) return true;
     if (
+      this.level.kind !== "grove" &&
+      (!this.boss || this.boss.state === "defeated") &&
       overlaps(p, {
         x: this.level.goal.x,
         y: this.level.goal.y - 95,
@@ -382,6 +406,115 @@ export class Game {
       p.vx = 0;
       this.events.push("win");
     }
+  }
+
+  private wakePlants() {
+    const p = this.player;
+    for (const tile of this.platforms) {
+      if (tile.awakened) continue;
+      const nearestX = Math.max(
+        tile.x,
+        Math.min(tile.x + tile.w, p.x + p.w / 2),
+      );
+      const nearestY = Math.max(
+        tile.y,
+        Math.min(tile.y + tile.h, p.y + p.h / 2),
+      );
+      if (
+        Math.hypot(nearestX - p.x - p.w / 2, nearestY - p.y - p.h / 2) <=
+        (tile.wakeRadius ?? 150)
+      ) {
+        tile.awakened = true;
+        this.events.push("awaken");
+      }
+    }
+  }
+
+  /** Returns true only when a life was lost and the frame must stop. */
+  private hurt(source: Rect) {
+    const p = this.player;
+    if (
+      p.invulnerable > 0 ||
+      this.starPowerRemaining > 0 ||
+      this.level.kind === "grove"
+    )
+      return false;
+    if (p.form === "small") return this.loseLife();
+    this.resize("small");
+    p.invulnerable = 1.5;
+    this.events.push("shrink");
+    p.vx = p.x + p.w / 2 < source.x + source.w / 2 ? -300 : 300;
+    p.vy = -290;
+    p.grounded = false;
+    this.coyote = 0;
+    this.jumpBuffer = 0;
+    this.jumpCanShorten = false;
+    this.hurtLock = 0.22;
+    return false;
+  }
+
+  private updateBoss(oldBottom: number) {
+    const boss = this.boss;
+    if (!boss) return false;
+    const p = this.player;
+    const previousY = boss.y;
+    stepBoss(boss, STEP, p, this.hazards, this.events);
+    for (const hazard of this.hazards) {
+      hazard.remaining = Math.max(0, hazard.remaining - STEP);
+      hazard.x += hazard.vx * STEP;
+      hazard.y += hazard.vy * STEP;
+      if (
+        hazard.remaining <= 0 ||
+        hazard.x < boss.minX - 30 ||
+        hazard.x > boss.maxX + boss.w + 30
+      ) {
+        hazard.remaining = 0;
+        continue;
+      }
+      if (overlaps(p, hazard)) {
+        hazard.remaining = 0;
+        if (this.hurt(hazard)) return true;
+      }
+    }
+    this.hazards = this.hazards.filter((hazard) => hazard.remaining > 0);
+    if (
+      boss.state === "dormant" ||
+      boss.state === "defeated" ||
+      !overlaps(p, boss)
+    )
+      return false;
+    const stomp = p.vy > 0 && oldBottom <= previousY + 12;
+    const powered = this.starPowerRemaining > 0;
+    if ((stomp && boss.state === "recover") || powered) {
+      if (boss.invulnerable <= 0) {
+        boss.health--;
+        boss.invulnerable = 1.35;
+        this.hazards = [];
+        this.events.push("boss-hit");
+        if (boss.health <= 0) {
+          boss.health = 0;
+          boss.state = "defeated";
+          boss.stateTime = 0;
+          this.events.push("boss-defeat");
+        } else {
+          boss.phase = boss.maxHealth - boss.health + 1;
+          warnBoss(boss, p, this.events);
+        }
+      }
+      if (stomp || !powered) this.bounceOffBoss(boss);
+    } else if (stomp) {
+      // Armored phases safely bounce Pip away; the folded/panting recovery is the opening.
+      this.bounceOffBoss(boss);
+    } else if (this.hurt(boss)) return true;
+    return false;
+  }
+
+  private bounceOffBoss(boss: BossState) {
+    this.player.y = boss.y - this.player.h;
+    this.player.vy = -490;
+    this.player.grounded = false;
+    this.coyote = 0;
+    this.jumpCanShorten = false;
   }
 
   private movePlatforms() {
@@ -468,9 +601,24 @@ export class Game {
       }
       enemy.vx = enemy.facing * (enemy.grounded ? 35 : 85);
       if (!enemy.grounded) {
+        const oldBottom = enemy.y + enemy.h;
         enemy.vy += (enemy.vy < 0 ? GRAVITY : FALL_GRAVITY) * STEP;
         enemy.y += enemy.vy * STEP;
-        if (enemy.y >= enemy.baseY) {
+        const mushroom = this.platforms.find(
+          (tile) =>
+            tile.kind === "mushroom" &&
+            active(tile) &&
+            overlapsX(enemy, tile) &&
+            enemy.vy > 0 &&
+            oldBottom <= tile.y + 1 &&
+            enemy.y + enemy.h >= tile.y,
+        );
+        if (mushroom) {
+          enemy.y = mushroom.y - enemy.h;
+          enemy.vy = -580;
+          if (Math.abs(enemy.x - this.player.x) < 500)
+            this.events.push("hopper-bounce");
+        } else if (enemy.y >= enemy.baseY) {
           enemy.y = enemy.baseY;
           enemy.vy = 0;
           enemy.grounded = true;
@@ -506,6 +654,27 @@ export class Game {
       enemy.vx = speed ? enemy.facing * speed : 0;
     }
     enemy.x += enemy.vx * STEP;
+    if (enemy.kind === "charger") {
+      for (const tile of this.platforms) {
+        if (!active(tile) || !solid(tile) || !overlaps(enemy, tile)) continue;
+        if (
+          enemy.state === "charge" &&
+          tile.kind === "brick" &&
+          tile.enemyBreakable
+        ) {
+          tile.broken = true;
+          if (Math.abs(enemy.x - this.player.x) < 500)
+            this.events.push("enemy-break");
+          this.awardCoins(tile.rewardCoins ?? 0);
+        } else {
+          enemy.x = enemy.vx >= 0 ? tile.x - enemy.w : tile.x + tile.w;
+          enemy.facing *= -1;
+          enemy.vx = 0;
+          enemy.state = "recover";
+          enemy.stateTime = 0.65;
+        }
+      }
+    }
     if (enemy.x <= enemy.minX || enemy.x >= enemy.maxX) {
       enemy.x = Math.max(enemy.minX, Math.min(enemy.maxX, enemy.x));
       if (
@@ -590,10 +759,18 @@ export class Game {
   }
 
   private loseLife() {
-    this.lives--;
+    if (this.level.kind === "grove") {
+      this.spawn();
+      this.events.push("grove-return");
+      return true;
+    }
+    if (this.mode !== "relaxed") this.lives--;
     this.deaths++;
     this.starPowerRemaining = 0;
     this.events.push("life-lost");
+    this.hazards = [];
+    if (this.boss && this.boss.state !== "defeated" && this.level.boss)
+      this.boss = createBoss(this.level.boss);
     for (const diamond of this.diamonds) diamond.collected = false;
     // Clouds must be available on retry. Broken coin caches stay broken so rewards
     // cannot be farmed, just as ordinary collected coins stay collected after death.

@@ -1,6 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_CONTROLS,
+  RunCoinLedger,
+  SHOP_ITEMS,
+  challengeUnlocked,
+  ownsItem,
+  purchaseItem,
+  recordGardenRun,
+  recordChallenge,
+  rescuedTotal,
   readSave,
   recordFireflies,
   SAVE_KEY,
@@ -35,6 +43,11 @@ describe("adventure progress", () => {
       adventureCompleted: false,
       adventureBestTime: null,
       fireflies: [],
+      garden: {
+        classic: { completed: false, bestTime: null },
+        relaxed: { completed: false, bestTime: null },
+        timed: { completed: false, bestTime: null },
+      },
     });
     expect(save.music).toBe(false);
     expect(save.sound).toBe(false);
@@ -103,5 +116,186 @@ describe("adventure progress", () => {
     recordFireflies(save.progress[0], [1]);
     expect(() => writeSave(save)).not.toThrow();
     expect(save.progress[0].fireflies).toEqual([1]);
+  });
+});
+
+describe("living garden progression", () => {
+  it("migrates build 15 saves without relabeling past trail records as boss victories", () => {
+    items.set(
+      SAVE_KEY,
+      JSON.stringify({
+        sound: false,
+        music: true,
+        controls: { size: 1.15, inset: 10, height: 20, swapped: true },
+        progress: [
+          {
+            completed: true,
+            bestTime: 20,
+            adventureCompleted: true,
+            adventureBestTime: 72,
+            fireflies: [0, 2],
+            coins: 180,
+          },
+        ],
+      }),
+    );
+    const save = readSave();
+    expect(save.progress[0].adventureCompleted).toBe(true);
+    expect(save.progress[0].adventureBestTime).toBe(72);
+    expect(save.progress[0].fireflies).toEqual([0, 2]);
+    expect(
+      Object.values(save.progress[0].garden).every(
+        (record) => !record.completed && record.bestTime === null,
+      ),
+    ).toBe(true);
+    expect(save.wallet).toBe(0);
+    expect(save.lifetimeCoins).toBe(0);
+    expect(save.outfit).toBe("leaf");
+    expect(save.challenges.every((record) => !record.completed)).toBe(true);
+    writeSave(save);
+    expect(readSave()).toEqual(save);
+  });
+
+  it("credits each collected coin exactly once during frames and checkpoint retries", () => {
+    const save = readSave();
+    const ledger = new RunCoinLedger();
+    expect(ledger.collect(save, 3)).toBe(3);
+    expect(ledger.collect(save, 3)).toBe(0);
+    expect(ledger.collect(save, 2)).toBe(0);
+    expect(ledger.collect(save, 0)).toBe(0);
+    expect(ledger.collect(save, 5)).toBe(2);
+    expect(ledger.collect(save, NaN)).toBe(0);
+    expect(ledger.collect(save, Infinity)).toBe(0);
+    expect(save.wallet).toBe(5);
+    expect(save.lifetimeCoins).toBe(5);
+    writeSave(save);
+    const reloaded = readSave();
+    expect(reloaded.wallet).toBe(5);
+    // A separate replay can earn new coins, independently of a prior run.
+    new RunCoinLedger().collect(reloaded, 2);
+    expect(reloaded.wallet).toBe(7);
+  });
+
+  it("requires rescues and earned coins, charges once and equips only owned outfits", () => {
+    const save = readSave();
+    new RunCoinLedger().collect(save, 120);
+    expect(purchaseItem(save, "berry")).toBe("locked");
+    expect(save.wallet).toBe(120);
+    recordFireflies(save.progress[0], [0, 1, 2]);
+    expect(purchaseItem(save, "berry")).toBe("purchased");
+    expect(save.wallet).toBe(20);
+    expect(save.lifetimeCoins).toBe(120);
+    expect(save.outfit).toBe("berry");
+    expect(purchaseItem(save, "berry")).toBe("equipped");
+    expect(save.wallet).toBe(20);
+    expect(save.outfits).toEqual(["leaf", "berry"]);
+    expect(purchaseItem(save, "lanterns")).toBe("unaffordable");
+    expect(purchaseItem(save, "leaf")).toBe("equipped");
+    expect(save.outfit).toBe("leaf");
+    expect(purchaseItem(save, "other")).toBe("invalid");
+    writeSave(save);
+    expect(readSave()).toEqual(save);
+  });
+
+  it("keeps decorations permanent and lifetime earnings intact after purchases", () => {
+    const save = readSave();
+    new RunCoinLedger().collect(save, 400);
+    recordFireflies(save.progress[0], [0, 1, 2]);
+    recordFireflies(save.progress[1], [0, 1, 2]);
+    expect(rescuedTotal(save)).toBe(6);
+    for (const id of ["lanterns", "flowers", "fountain"])
+      expect(purchaseItem(save, id)).toBe("purchased");
+    expect(save.wallet).toBe(75);
+    expect(save.lifetimeCoins).toBe(400);
+    expect(purchaseItem(save, "fountain")).toBe("equipped");
+    expect(save.wallet).toBe(75);
+    writeSave(save);
+    const later = readSave();
+    expect(later.decorations).toEqual(["lanterns", "flowers", "fountain"]);
+    expect(
+      SHOP_ITEMS.filter((item) => item.kind === "decoration").every((item) =>
+        ownsItem(later, item),
+      ),
+    ).toBe(true);
+  });
+
+  it("records each adventure mode independently and leaves historical times intact", () => {
+    const save = readSave();
+    save.progress[0].adventureBestTime = 45;
+    save.progress[0].adventureCompleted = true;
+    expect(recordGardenRun(save, 0, "relaxed", 101)).toBe(true);
+    expect(recordGardenRun(save, 0, "classic", 130)).toBe(true);
+    expect(recordGardenRun(save, 0, "timed", 90)).toBe(true);
+    expect(recordGardenRun(save, 0, "classic", 140)).toBe(false);
+    expect(recordGardenRun(save, 0, "classic", 110)).toBe(true);
+    expect(recordGardenRun(save, 0, "timed", NaN)).toBe(false);
+    expect(save.progress[0].garden).toEqual({
+      classic: { completed: true, bestTime: 110 },
+      relaxed: { completed: true, bestTime: 101 },
+      timed: { completed: true, bestTime: 90 },
+    });
+    expect(save.progress[0].adventureBestTime).toBe(45);
+    expect(save.progress[1].garden.classic.completed).toBe(false);
+    writeSave(save);
+    expect(readSave()).toEqual(save);
+  });
+
+  it("unlocks the correct challenge and improves medals without erasing better runs", () => {
+    const save = readSave();
+    expect(challengeUnlocked(save, 0)).toBe(false);
+    expect(recordChallenge(save, 0, 12, 20)).toBe(false);
+    recordFireflies(save.progress[0], [0, 1]);
+    expect(challengeUnlocked(save, 0)).toBe(false);
+    recordFireflies(save.progress[0], [2]);
+    expect(challengeUnlocked(save, 0)).toBe(true);
+    expect(challengeUnlocked(save, 1)).toBe(false);
+    expect(recordChallenge(save, 0, 40, 20)).toBe(true);
+    expect(save.challenges[0].medal).toBe("bronze");
+    expect(recordChallenge(save, 0, 28, 20)).toBe(true);
+    expect(save.challenges[0].medal).toBe("silver");
+    expect(recordChallenge(save, 0, 18, 20)).toBe(true);
+    expect(save.challenges[0].medal).toBe("gold");
+    expect(recordChallenge(save, 0, 50, 20)).toBe(false);
+    expect(save.challenges[0].bestTime).toBe(18);
+    expect(save.challenges[0].medal).toBe("gold");
+    expect(save.progress[0].garden.timed.completed).toBe(false);
+    writeSave(save);
+    expect(readSave()).toEqual(save);
+  });
+
+  it("sanitizes malformed currency, ownership and completion data", () => {
+    items.set(
+      SAVE_KEY,
+      JSON.stringify({
+        wallet: 900,
+        lifetimeCoins: 51.8,
+        playMode: "invincible",
+        outfit: "moon",
+        outfits: ["berry", "berry", "unknown"],
+        decorations: ["flowers", "flowers", "hacked"],
+        challenges: [{ completed: true, bestTime: -2, medal: "platinum" }],
+        progress: [
+          {
+            garden: {
+              classic: { completed: false, bestTime: 1 },
+              relaxed: { completed: true, bestTime: -3 },
+            },
+          },
+        ],
+      }),
+    );
+    const save = readSave();
+    expect(save.wallet).toBe(51);
+    expect(save.lifetimeCoins).toBe(51);
+    expect(save.playMode).toBe("classic");
+    expect(save.outfits).toEqual(["leaf", "berry"]);
+    expect(save.outfit).toBe("leaf");
+    expect(save.decorations).toEqual(["flowers"]);
+    expect(save.progress[0].garden.classic).toEqual({
+      completed: false,
+      bestTime: null,
+    });
+    expect(save.progress[0].garden.relaxed.bestTime).toBeNull();
+    expect(save.challenges[0].medal).toBe("bronze");
   });
 });

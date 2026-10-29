@@ -2490,9 +2490,12 @@ select:focus-visible {
 .game-app[data-toast-position="above"] .checkpoint-toast {
   left: calc(16px + var(--safe-left));
   right: calc(16px + var(--safe-right));
-  bottom: calc(
-    var(--control-bottom) + var(--safe-bottom) + var(--control-height) +
-      max(calc(var(--dpad-button-height) + 12px), var(--jump-total)) + 18px
+  bottom: var(
+    --toast-control-clearance,
+    calc(
+      var(--control-bottom) + var(--safe-bottom) + var(--control-height) +
+        max(calc(var(--dpad-button-height) + 12px), var(--jump-total)) + 40px
+    )
   );
   width: max-content;
   max-width: min(
@@ -2510,4 +2513,375 @@ select:focus-visible {
 }
 .control-caption {
   white-space: nowrap;
+}
+
+/* Living garden: progression lives in the map; play stays clear and thumb-friendly. */
+.adventure-choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 22px;
+  padding-top: 20px;
+  border-top: 1px solid #d5dec8;
+}
+.mode-choice label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 7px;
+}
+.mode-choice small {
+  display: block;
+  font-size: 10px;
+  line-height: 1.5;
+  margin-top: 7px;
+  color: #58745e;
+}
+.grove-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  text-align: left;
+  padding: 18px 14px;
+  border-radius: 17px;
+  background: #dcedbd;
+  border: 1px solid #b2cb91;
+  min-height: 70px;
+}
+.grove-entry strong,
+.grove-entry small {
+  display: block;
+}
+.grove-entry strong {
+  font-size: 13px;
+}
+.grove-entry small {
+  font-size: 10px;
+  margin-top: 6px;
+  color: #517446;
+}
+.challenge-list {
+  margin-top: 20px;
+}
+.challenge-list h3 {
+  font-size: 12px;
+  margin: 0 0 8px;
+}
+.challenge-entry {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: #f0efd8;
+  border: 1px solid #dedfc7;
+  border-radius: 12px;
+  text-align: left;
+  min-height: 55px;
+  padding: 10px 14px;
+  margin-top: 7px;
+}
+.challenge-entry strong,
+.challenge-entry small {
+  display: block;
+}
+.challenge-entry strong {
+  font-size: 12px;
+}
+.challenge-entry small {
+  font-size: 10px;
+  margin-top: 4px;
+  line-height: 1.4;
+}
+.challenge-entry:disabled {
+  opacity: 0.68;
+}
+#grove-dialog {
+  width: min(730px, calc(100% - 32px - var(--safe-left) - var(--safe-right)));
+}
+.grove-wallet {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 16px;
+  margin: 18px 0;
+  border-radius: 13px;
+  background: #f2e8b4;
+}
+.grove-wallet strong {
+  font-size: 17px;
+}
+.grove-wallet span {
+  font-size: 10px;
+  color: #736c32;
+}
+.shop-items {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.shop-item {
+  border: 1px solid #d2ddc1;
+  border-radius: 17px;
+  padding: 15px;
+  display: grid;
+  grid-template-columns: 54px 1fr;
+  gap: 12px;
+  background: #f7f6e6;
+}
+.shop-item small {
+  font-size: 7px;
+  letter-spacing: 1.2px;
+  font-weight: 700;
+  color: #748565;
+}
+.shop-item h3 {
+  font-size: 14px;
+  margin: 4px 0 7px;
+}
+.shop-item p {
+  font-size: 11px;
+  line-height: 1.5;
+  margin: 0 0 10px;
+  color: #65785e;
+}
+.shop-item button {
+  background: #2b7755;
+  color: #fff9dc;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  min-height: 44px;
+  padding: 9px 13px;
+  width: 100%;
+}
+.shop-item button:disabled {
+  opacity: 1;
+  background: #e1e5d0;
+  color: #627459;
+}
+.shop-preview {
+  width: 54px;
+  height: 66px;
+  border-radius: 17px;
+  background: #e1edc9;
+  display: grid;
+  place-items: center;
+  color: #397b50;
+  font-size: 39px;
+}
+.shop-preview .icon {
+  width: 37px;
+  height: 41px;
+  fill: #acd477;
+  stroke-width: 1.7;
+}
+.shop-preview[data-cosmetic="berry"] {
+  background: #f4d5d9;
+  color: #a94d6a;
+}
+.shop-preview[data-cosmetic="berry"] .icon {
+  fill: #e998af;
+}
+.shop-preview[data-cosmetic="moon"] {
+  background: #dee5f7;
+  color: #6773a7;
+}
+.shop-preview[data-cosmetic="moon"] .icon {
+  fill: #b8c9eb;
+}
+.shop-preview[data-cosmetic="lanterns"] {
+  color: #9b7b29;
+  background: #f4e9af;
+}
+.shop-preview[data-cosmetic="lanterns"] .icon {
+  fill: #ffdc72;
+}
+.shop-preview[data-cosmetic="flowers"] {
+  color: #d67881;
+  background: #f5ded5;
+}
+.shop-preview[data-cosmetic="fountain"] {
+  color: #368c9f;
+  background: #d0e9e4;
+}
+.shop-shortfall {
+  display: block;
+  font-size: 9px;
+  color: #758267;
+  margin-top: 5px;
+  text-align: center;
+}
+#shop-status {
+  min-height: 18px;
+  font-size: 12px;
+  color: #41714e;
+}
+#grove-done {
+  min-height: 44px;
+  padding: 12px 20px;
+  font-size: 14px;
+}
+.grove-actions {
+  position: absolute;
+  z-index: 6;
+  top: calc(150px + var(--safe-top));
+  left: calc(24px + var(--safe-left));
+  display: flex;
+  gap: 8px;
+}
+.grove-actions button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: #fff9d7ed;
+  box-shadow: 0 3px 0 #46795830;
+  border: 1px solid #b0c98c;
+  border-radius: 12px;
+  min-height: 44px;
+  padding: 9px 13px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.grove-actions .icon {
+  width: 17px;
+  height: 17px;
+}
+.game-app[data-run-kind="grove"] .coin-meter,
+.game-app[data-run-kind="grove"] .vitals,
+.game-app[data-run-kind="grove"] .power-state,
+.game-app[data-run-kind="grove"] .trail-track,
+.game-app[data-run-kind="grove"] #checkpoint-count {
+  display: none;
+}
+.boss-hud {
+  position: absolute;
+  z-index: 4;
+  top: calc(147px + var(--safe-top));
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(370px, calc(100% - 48px - var(--safe-left) - var(--safe-right)));
+  background: #fff9deee;
+  border: 2px solid #b58e65;
+  border-radius: 15px;
+  padding: 10px 14px;
+  pointer-events: none;
+  box-shadow: 0 4px 0 #5e58331a;
+}
+.boss-hud > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 9px;
+  align-items: center;
+}
+#boss-name {
+  font-size: 12px;
+}
+#boss-health {
+  color: #ce775d;
+  font-size: 17px;
+  letter-spacing: 4px;
+  white-space: nowrap;
+}
+#boss-instruction {
+  margin: 4px 0 0;
+  font-size: 10px;
+  line-height: 1.4;
+}
+.boss-hud[data-state="warning"] {
+  border-color: #d46b4f;
+  background: #fff0d5;
+}
+.boss-hud[data-state="recover"] {
+  border-color: #52a477;
+  background: #e9f8d7;
+}
+.challenge-medal {
+  font-size: 54px;
+  color: #cead4d;
+  text-shadow: 0 3px 0 #fff0aa;
+}
+.challenge-medal[data-medal="bronze"] {
+  color: #b88059;
+}
+.challenge-medal[data-medal="silver"] {
+  color: #9caebd;
+}
+.section-status {
+  justify-content: flex-start;
+}
+#checkpoint-count {
+  margin-left: auto;
+}
+@media (max-height: 600px) and (min-aspect-ratio: 1/1) {
+  .boss-hud {
+    top: calc(128px + var(--safe-top));
+    width: 310px;
+    padding: 6px 11px;
+    border-radius: 11px;
+  }
+  #boss-name {
+    font-size: 10px;
+  }
+  #boss-health {
+    font-size: 14px;
+  }
+  #boss-instruction {
+    font-size: 9px;
+    margin-top: 2px;
+  }
+  .grove-actions {
+    top: calc(94px + var(--safe-top));
+    left: calc(20px + var(--safe-left));
+  }
+  .grove-actions button {
+    font-size: 10px;
+  }
+  .game-app[data-run-kind="grove"] .section-status {
+    display: none;
+  }
+}
+@media (max-height: 350px) and (min-aspect-ratio: 1/1) {
+  .boss-hud {
+    top: calc(105px + var(--safe-top));
+    padding: 4px 10px;
+  }
+}
+@media (max-width: 600px) {
+  .adventure-choices,
+  .shop-items {
+    grid-template-columns: 1fr;
+  }
+  .grove-wallet {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .shop-item {
+    grid-template-columns: 54px 1fr;
+  }
+}
+@media (max-aspect-ratio: 1/1) {
+  #checkpoint-count {
+    margin-left: 0;
+  }
+  .boss-hud {
+    top: calc(212px + var(--safe-top));
+  }
+  .grove-actions {
+    top: calc(205px + var(--safe-top));
+    left: calc(16px + var(--safe-left));
+    right: calc(16px + var(--safe-right));
+  }
+  .grove-actions button {
+    flex: 1;
+    justify-content: center;
+    padding: 9px 8px;
+  }
+  .section-status {
+    width: auto;
+    right: auto;
+  }
 }
