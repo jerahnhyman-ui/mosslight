@@ -1,7 +1,7 @@
 # Mosslight
 
 An original side-scrolling platformer for iPhone, iPad, and the browser.
-Guide Pip through Sunlit Meadow, Firefly Hollow, Cloudtop Crossing, and Windmill Garden:
+Guide Pip or Poppy through Sunlit Meadow, Firefly Hollow, Cloudtop Crossing, and Windmill Garden:
 collect golden coins, grow with diamonds, power up with stars, rescue hidden
 fireflies, and bring light back to the forest. Four extended trails include
 multiple checkpoints, optional routes, light-activated plants, and three-phase
@@ -27,7 +27,9 @@ left stick/D-pad and A also work; Start pauses and resumes.
 Movement uses quick acceleration and braking, midair steering, a small grace
 period after leaving a ledge, and buffered jumps just before landing. Controls
 can be resized, repositioned, and swapped for either hand in the game menu.
-The camera looks in the direction Pip is traveling. The cartoon artwork is
+Choose **Play as** in the game menu to switch between Pip and Poppy. They share
+the same moves and abilities, and the choice is saved on the device. The camera
+looks in the direction the selected friend is traveling. The cartoon artwork is
 drawn locally at the screen's pixel density, with distinct garden and beehive palettes,
 animated characters, and collectible/landing effects.
 
@@ -38,6 +40,10 @@ animated characters, and collectible/landing effects.
 - **Cloudtop Crossing** features cloud bridges that warn before crumbling and
   return after a short delay.
 - **Windmill Garden** opens after beating the Meadow guardian. Put feather flight to work, change wind/water/light mechanisms, follow three firefly branches, and discover a separate beehive level.
+- **Hidden sky gardens** sit above Sunlit Meadow, Firefly Hollow, and Cloudtop
+  Crossing. Look for drifting petals, earn a Wind Feather, and land on the
+  cloud ledges to recharge. Stand still at a glowing SKY portal, then press
+  Jump when prompted. Each garden has its own switch puzzle and a return portal.
 - Walking beetles, hopping grasshoppers, and charging beetles each have distinct
   movement. Charging beetles signal before rushing. Every bug can be squashed
   by landing on it; star power also squashes bugs on contact.
@@ -59,7 +65,8 @@ animated characters, and collectible/landing effects.
 ## Home grove, rewards, and modes
 
 Visit the safe, playable home grove from the menu. Rescued fireflies become
-residents, and earned coins buy optional outfits and decorations. Coins count
+residents; a frog, cloud bird, and moth can also be found in optional areas
+and welcomed home. Earned coins buy optional outfits and decorations. Coins count
 toward both the run's extra-life counter and a persistent cosmetic wallet;
 purchases never change movement or combat strength. Rescue all three fireflies
 in each of the original three worlds to unlock its separate challenge room and earn time medals.
@@ -68,8 +75,26 @@ The Home Grove also leads to two optional places. Enter Moonpool Grotto from
 the grove floor and hold Jump to swim upward; release it to sink. Its valves
 and bubble currents open a route through the water. Above the grove, a Wind
 Feather can reach a hidden stairway of clouds. Land on each cloud to recharge
-and discover Cloudbloom Sanctuary and its sky-flower puzzle. Stand still at a
+and discover Cloudbloom Sanctuary and its sky-flower puzzle. Moonpool's current
+selector and receiver open an optional underwater cove; Cloudbloom's wind
+switch moves a cloud bridge toward an optional perch. Stand still at a
 portal and press Jump when prompted; each area has a way back to the grove.
+
+The **Discovery journal** in the game menu gives hints for undiscovered places.
+Discovering a place saves it to the journal; once found, select it there to
+visit again. The journal also records when a secret has been explored. Rescued
+creatures remain in the grove across visits and reloads.
+
+The game menu's **Garden games** offers two optional activities:
+
+- **Garden Match:** turn over cards to find six matching pairs.
+- **Seed Stack:** move and rotate falling pieces to complete rows; clear eight
+  rows to grow the garden. Use the on-screen controls or the arrow keys, ↑ or X
+  to rotate, and Space to drop.
+
+Opening a garden game pauses an active adventure. Close it to return to the
+paused game, then resume when ready. The best completed matching game and the
+best Seed Stack score and row count are saved on the device.
 
 Choose **Classic** for the three-life rules, **Relaxed** for unlimited checkpoint
 retries, or **Timed** for a separately recorded three-life run. The mode applies
@@ -94,7 +119,7 @@ iOS plugin when supported.
 
 - In Classic and Timed modes, start each trail small with **3 lives**. Falling into a gap always costs one
   life, including while big or using star power.
-- **Earn power-ups by bumping marked blocks from below.** Small and Big Pip can
+- **Earn power-ups by bumping marked blocks from below.** Either friend, small or big, can
   both hit these blocks. Feather and star blocks grant their powers when hit;
   diamond blocks release a diamond to collect.
 - **Wind Feathers let Pip fly in every world.** Bump a feather-marked block on the opening path; the Home Grove has one for practice too. Jump, release, then hold Jump again to rise. Release to glide and land to refill. The camera follows high flights. Shrinking retains the feather; losing a life drops it and makes feather blocks available again. Challenge rooms keep their original jumping rules.
@@ -114,7 +139,8 @@ iOS plugin when supported.
   Zero lives ends a Classic or Timed run. Relaxed mode keeps checkpoint retries
   available. Restarting or choosing another trail starts fresh.
 
-Fireflies, completion records, best times, and settings are saved on the device.
+Fireflies, discovered and explored secrets, rescued creatures, character choice,
+completion records, best times, and settings are saved on the device.
 Records from the earlier short trails are retained separately so their times
 do not compete with the extended adventures.
 The game has no accounts, ads, analytics, remote assets, or backend requirement.
@@ -166,6 +192,8 @@ be performed through Xcode Cloud and TestFlight.
 - `src/game/levels.ts` — authored worlds, secret routes, grove, and challenges.
 - `src/game/expansion-levels.ts` — Windmill Garden, Lantern Beehive, and Petal Post.
 - `src/game/moonpool-level.ts` and `src/game/cloud-garden.ts` — the optional grotto and cloud sanctuary.
+- `src/game/sky-secrets.ts` and `src/game/creatures.ts` — hidden sky gardens and rescued residents.
+- `src/minigames.ts` and `src/minigames/core.ts` — Garden Match and Seed Stack.
 - `src/game/session.ts` — resource continuity across world/secret transitions.
 - `src/game/renderer.ts` — crisp cartoon canvas, camera, and animated effects.
 - `src/main.ts` — menus, HUD, progress, and game loop.

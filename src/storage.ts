@@ -128,6 +128,31 @@ export interface HoopRecord {
   completed: boolean;
   bestFinishTime: number | null;
 }
+
+/** Stable content IDs are independent of world indices and survive updates. */
+export const EXPLORATION_SECRET_IDS = [
+  "secret.moonpool",
+  "secret.cloud-garden",
+  "secret.sky-meadow",
+  "secret.sky-hollow",
+  "secret.sky-cloudtop",
+] as const;
+export type ExplorationSecretId = (typeof EXPLORATION_SECRET_IDS)[number];
+export type SecretRecord = { discovered: boolean; completed: boolean };
+export const CREATURE_IDS = ["frog", "cloudbird", "moth"] as const;
+export type CreatureId = (typeof CREATURE_IDS)[number];
+export type CharacterId = "pip" | "poppy";
+export type GardenActivityResult =
+  | { kind: "matching"; moves: number }
+  | { kind: "falling"; score: number; lines: number };
+const emptyExploration = (): Record<ExplorationSecretId, SecretRecord> =>
+  Object.fromEntries(
+    EXPLORATION_SECRET_IDS.map((id) => [
+      id,
+      { discovered: false, completed: false },
+    ]),
+  ) as Record<ExplorationSecretId, SecretRecord>;
+
 export interface Save {
   sound: boolean;
   music: boolean;
@@ -139,11 +164,20 @@ export interface Save {
   lifetimeCoins: number;
   outfits: Outfit[];
   outfit: Outfit;
+  selectedCharacter: CharacterId;
   decorations: Decoration[];
   challenges: ChallengeRecord[];
   unlocks: { windFeatherDiscovered: boolean };
-  secrets: { beehive: { discovered: boolean; completed: boolean } };
-  minigames: { flowerHoops: HoopRecord };
+  secrets: {
+    beehive: SecretRecord;
+    exploration: Record<ExplorationSecretId, SecretRecord>;
+  };
+  rescuedCreatures: CreatureId[];
+  minigames: {
+    flowerHoops: HoopRecord;
+    gardenMatch: { bestMoves: number | null };
+    seedStack: { bestScore: number | null; bestLines: number | null };
+  };
   claimedRewards: string[];
 }
 export const DEFAULT_CONTROLS: TouchSettings = {
@@ -181,14 +215,23 @@ const blank = (): Save => ({
   lifetimeCoins: 0,
   outfits: ["leaf"],
   outfit: "leaf",
+  selectedCharacter: "pip",
   decorations: [],
   challenges: Array.from({ length: 3 }, () => ({
     ...emptyRecord(),
     medal: "none",
   })),
   unlocks: { windFeatherDiscovered: false },
-  secrets: { beehive: { discovered: false, completed: false } },
-  minigames: { flowerHoops: emptyHoops() },
+  secrets: {
+    beehive: { discovered: false, completed: false },
+    exploration: emptyExploration(),
+  },
+  rescuedCreatures: [],
+  minigames: {
+    flowerHoops: emptyHoops(),
+    gardenMatch: { bestMoves: null },
+    seedStack: { bestScore: null, bestLines: null },
+  },
   claimedRewards: [],
   progress: Array.from({ length: 4 }, () => ({
     completed: false,
@@ -316,6 +359,8 @@ export function readSave(): Save {
     defaults.outfit = defaults.outfits.includes(raw.outfit)
       ? raw.outfit
       : "leaf";
+    defaults.selectedCharacter =
+      raw.selectedCharacter === "poppy" ? "poppy" : "pip";
     defaults.decorations = (
       [
         "lanterns",
@@ -358,6 +403,18 @@ export function readSave(): Save {
       defaults.secrets.beehive.discovered =
         raw.secrets?.["secret.beehive"]?.discovered === true ||
         defaults.secrets.beehive.completed;
+      for (const id of EXPLORATION_SECRET_IDS) {
+        const completed = raw.secrets?.[id]?.completed === true;
+        defaults.secrets.exploration[id] = {
+          discovered: raw.secrets?.[id]?.discovered === true || completed,
+          completed,
+        };
+      }
+      defaults.rescuedCreatures = CREATURE_IDS.filter(
+        (id) =>
+          Array.isArray(raw.rescuedCreatures) &&
+          raw.rescuedCreatures.includes(id),
+      );
       defaults.claimedRewards = [
         "cosmetic.bee_scarf",
         "cosmetic.pinwheel_garland",
@@ -381,6 +438,14 @@ export function readSave(): Save {
             hoops.completed === true ? validTime(hoops.bestFinishTime) : null,
         };
       }
+      const match = raw.minigames?.["minigame.garden_match"];
+      if (Number.isSafeInteger(match?.bestMoves) && match.bestMoves >= 6)
+        defaults.minigames.gardenMatch.bestMoves = match.bestMoves;
+      const stack = raw.minigames?.["minigame.seed_stack"];
+      if (Number.isSafeInteger(stack?.bestScore) && stack.bestScore >= 0)
+        defaults.minigames.seedStack.bestScore = stack.bestScore;
+      if (Number.isSafeInteger(stack?.bestLines) && stack.bestLines >= 0)
+        defaults.minigames.seedStack.bestLines = stack.bestLines;
     }
     defaults.progress = defaults.progress.map((fallback, i) => {
       const p = raw.progress[i];
@@ -434,8 +499,17 @@ export function writeSave(save: Save) {
         challenges: Object.fromEntries(
           CHALLENGE_IDS.map((id, i) => [id, challenges[i]]),
         ),
-        secrets: { "secret.beehive": secrets.beehive },
-        minigames: { "minigame.flower_hoops": minigames.flowerHoops },
+        secrets: {
+          "secret.beehive": secrets.beehive,
+          ...Object.fromEntries(
+            EXPLORATION_SECRET_IDS.map((id) => [id, secrets.exploration[id]]),
+          ),
+        },
+        minigames: {
+          "minigame.flower_hoops": minigames.flowerHoops,
+          "minigame.garden_match": minigames.gardenMatch,
+          "minigame.seed_stack": minigames.seedStack,
+        },
       }),
     );
     return true;
@@ -544,6 +618,69 @@ export function discoverBeehive(save: Save): boolean {
   save.secrets.beehive.discovered = true;
   return true;
 }
+
+/** Returns true only when the journal changes; completing implies discovery. */
+export function discoverSecret(save: Save, id: ExplorationSecretId): boolean {
+  const record = save.secrets.exploration[id];
+  if (record.discovered) return false;
+  record.discovered = true;
+  return true;
+}
+
+export function completeSecret(save: Save, id: ExplorationSecretId): boolean {
+  const record = save.secrets.exploration[id];
+  const first = !record.completed;
+  record.discovered = true;
+  record.completed = true;
+  return first;
+}
+
+/** A rescued creature is a permanent, idempotent Home Grove resident. */
+export function rescueCreature(save: Save, id: CreatureId): boolean {
+  if (save.rescuedCreatures.includes(id)) return false;
+  save.rescuedCreatures.push(id);
+  save.rescuedCreatures.sort(
+    (a, b) => CREATURE_IDS.indexOf(a) - CREATURE_IDS.indexOf(b),
+  );
+  return true;
+}
+
+/** Character choice is cosmetic; both friends share the same movement rules. */
+export function selectCharacter(save: Save, id: CharacterId): boolean {
+  if (save.selectedCharacter === id) return false;
+  save.selectedCharacter = id;
+  return true;
+}
+
+/** Record separate replay goals: fewer turns for matching, higher score and rows for stacking. */
+export function recordGardenActivity(
+  save: Save,
+  result: GardenActivityResult,
+): boolean {
+  if (result.kind === "matching") {
+    if (!Number.isSafeInteger(result.moves) || result.moves < 6) return false;
+    const old = save.minigames.gardenMatch.bestMoves;
+    if (old !== null && old <= result.moves) return false;
+    save.minigames.gardenMatch.bestMoves = result.moves;
+    return true;
+  }
+  if (
+    !Number.isSafeInteger(result.score) ||
+    result.score < 0 ||
+    !Number.isSafeInteger(result.lines) ||
+    result.lines < 0
+  )
+    return false;
+  const record = save.minigames.seedStack;
+  const scoreBetter =
+    record.bestScore === null || result.score > record.bestScore;
+  const linesBetter =
+    record.bestLines === null || result.lines > record.bestLines;
+  if (scoreBetter) record.bestScore = result.score;
+  if (linesBetter) record.bestLines = result.lines;
+  return scoreBetter || linesBetter;
+}
+
 export function completeBeehive(save: Save): boolean {
   const first = !save.secrets.beehive.completed;
   save.secrets.beehive.discovered = true;

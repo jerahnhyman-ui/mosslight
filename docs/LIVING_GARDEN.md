@@ -1,6 +1,6 @@
 # The living garden
 
-Mosslight follows Pip, a small creature waking an enormous garden with light.
+Mosslight follows Pip and Poppy, two playable friends waking an enormous garden with light. Both use the same movement and abilities.
 The game uses movement, jumping, exploration, and readable enemy behavior; new
 interactions do not require another touch button.
 
@@ -22,7 +22,11 @@ interactions do not require another touch button.
 
 ## A home for the light
 
-The home grove is a safe, playable space. Rescued fireflies become its residents.
+The home grove is a safe, playable space. Rescued fireflies become its residents,
+alongside a frog, cloud bird, and moth discovered in optional areas. The
+Discovery journal saves secret places and their completion, and allows a return
+visit after discovery. Garden Match and Seed Stack are optional menu activities
+with their own saved best results.
 Cosmetic outfits and decorations provide lasting rewards for exploration.
 Collected coins contribute to a persistent wallet even when Pip already has
 three lives. Purchases affect appearance, not movement or combat strength.

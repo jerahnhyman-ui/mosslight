@@ -5,6 +5,7 @@ import {
   type Game,
 } from "./engine";
 import type { Rect } from "./levels";
+import { CREATURES } from "./creatures";
 
 type Theme =
   | "meadow"
@@ -457,6 +458,7 @@ export class Renderer {
       this.sectionLandmarks(game, time, p);
       this.treasuryRooms(game, time);
       this.expansionScenery(game, time);
+      this.skyWayfinding(game, time);
     }
     if (titleMode) this.tree(titleX + 45, titleGround, p, 19, time, 1.2);
     for (const platform of game.platforms) {
@@ -474,6 +476,7 @@ export class Renderer {
       this.platform(platform, p, time);
     }
     if (!titleMode) {
+      this.rewardGuide(game);
       game.level.checkpoints.forEach((checkpoint, index) => {
         if (this.visible(checkpoint.x, 60))
           this.checkpoint(
@@ -570,6 +573,7 @@ export class Renderer {
         if (!firefly.collected && this.visible(firefly.x, 40))
           this.rescueFirefly(firefly.x, firefly.y, time, index);
       });
+      this.secretCreatures(game, time);
       for (const enemy of game.enemies) {
         if ((enemy.alive || enemy.squashed > 0) && this.visible(enemy.x, 40))
           this.bug(enemy, time, enemy.alive ? 0 : enemy.squashed);
@@ -637,12 +641,28 @@ export class Renderer {
               ? "glide"
               : "ready"
           : "none",
+        game.character,
       );
       c.restore();
       if (game.starPowerRemaining > 0)
         this.starAura(center, feet, size, game.starPowerRemaining, time, true);
     } else {
-      this.hero(titleX, titleGround + 1, 0, 0, 1, true, time, 0, 2.9);
+      this.hero(
+        titleX,
+        titleGround + 1,
+        0,
+        0,
+        1,
+        true,
+        time,
+        0,
+        2.9,
+        "normal",
+        game.outfit,
+        false,
+        "none",
+        game.character,
+      );
       this.firefly(
         titleX + 96 + Math.sin(time * 0.8) * 18,
         titleGround - 163 + Math.cos(time) * 11,
@@ -953,11 +973,17 @@ export class Renderer {
           this.ellipse(x, zone.y + 5, 23, 2, "rgba(231,255,248,.45)");
         }
       } else if (game.puzzleState.water === "HIGH") {
-        // The rising bubbles mark the actual current's bounds.
+        // The selector reverses which current rises, so bubbles show the
+        // same direction as the force Pip experiences.
+        const rises =
+          game.level.contentId !== "secret.moonpool" ||
+          (zone.x < 1200
+            ? game.puzzleState.shutter === "HIVE"
+            : game.puzzleState.shutter === "BRIDGE");
         for (let i = 0; i < Math.max(5, Math.floor(zone.w / 15)); i++) {
           const x = zone.x + 6 + hash(i + zone.x) * Math.max(1, zone.w - 12);
           const phase = (time * 38 + hash(i + 57) * zone.h) % zone.h;
-          const y = zone.y + zone.h - phase;
+          const y = rises ? zone.y + zone.h - phase : zone.y + phase;
           this.ellipse(
             x + Math.sin(time * 2 + i) * 4,
             y,
@@ -1446,6 +1472,132 @@ export class Renderer {
     }
   }
 
+  /** A non-interactive sign teaches the block gesture before the first reward. */
+  private rewardGuide(game: Game) {
+    if (
+      game.level.contentId !== "world.sunlit-meadow" ||
+      !this.visible(235, 120)
+    )
+      return;
+    const c = this.ctx;
+    this.line(
+      [
+        [235, 430],
+        [235, 362],
+      ],
+      "#8d7550",
+      5,
+    );
+    this.rounded(177, 326, 116, 40, 9, "#fff4cb", "#9b895e");
+    this.rounded(183, 333, 24, 24, 5, "#c0e8cd", "#719e84");
+    c.save();
+    c.fillStyle = "#426d55";
+    c.textAlign = "center";
+    c.textBaseline = "middle";
+    c.font = "bold 18px sans-serif";
+    c.fillText("↑", 195, 345);
+    c.font = "bold 11px 'DM Sans', sans-serif";
+    c.fillText("BUMP", 247, 339);
+    c.fillText("BLOCKS", 247, 353);
+    c.restore();
+  }
+
+  /** Petals make a high optional route visible without marking a solid path. */
+  private skyWayfinding(game: Game, time: number) {
+    for (const tile of game.platforms) {
+      if (!tile.id?.startsWith("cloud.sky-") || !tile.id.endsWith(".first"))
+        continue;
+      const x = tile.x + tile.w / 2;
+      if (!this.visible(x, 180)) continue;
+      for (let i = 0; i < 7; i++) {
+        const y = tile.y + 48 + i * 34;
+        const sway = Math.sin(time * 1.4 + i * 1.3) * 9;
+        this.ellipse(x + sway + (i % 2 ? 14 : -14), y, 3, 5, "#fff3bb");
+      }
+    }
+  }
+
+  private creature(
+    kind: "frog" | "bird" | "moth",
+    x: number,
+    y: number,
+    time: number,
+  ) {
+    const c = this.ctx;
+    c.save();
+    c.translate(
+      x,
+      y + Math.sin(time * 2 + x * 0.01) * (kind === "frog" ? 1 : 3),
+    );
+    this.ellipse(0, 0, 27, 25, "rgba(255,246,190,.18)");
+    if (kind === "frog") {
+      this.ellipse(-11, 10, 8, 4, "#78bd80", "#477e64");
+      this.ellipse(11, 10, 8, 4, "#78bd80", "#477e64");
+      this.ellipse(0, 2, 17, 12, "#9bd99a", "#477e64");
+      this.ellipse(-10, -8, 6, 6, "#b9e9ad", "#477e64");
+      this.ellipse(10, -8, 6, 6, "#b9e9ad", "#477e64");
+      this.ellipse(-10, -8, 2, 2, "#31554c");
+      this.ellipse(10, -8, 2, 2, "#31554c");
+      this.line(
+        [
+          [-4, 5],
+          [0, 7],
+          [4, 5],
+        ],
+        "#477e64",
+        1.5,
+      );
+    } else if (kind === "bird") {
+      this.ellipse(-13, -1, 10, 7, "#a8d7ed", "#6095b1");
+      this.ellipse(0, 0, 16, 12, "#c6ebf5", "#6095b1");
+      this.ellipse(5, -3, 2, 2, "#416a69");
+      this.line(
+        [
+          [15, 0],
+          [20, 2],
+          [15, 4],
+        ],
+        "#e9ab66",
+        3,
+      );
+      this.ellipse(-5, 4, 8, 5, "#8bc9e3");
+    } else {
+      this.ellipse(-12, -3, 10, 14, "#e7b8d7", "#a477a1");
+      this.ellipse(12, -3, 10, 14, "#e7b8d7", "#a477a1");
+      this.ellipse(0, 1, 7, 13, "#fff0bb", "#a477a1");
+      this.ellipse(-3, -2, 1.7, 2, "#624e67");
+      this.ellipse(3, -2, 1.7, 2, "#624e67");
+      this.line(
+        [
+          [-3, -10],
+          [-8, -16],
+        ],
+        "#a477a1",
+        2,
+      );
+      this.line(
+        [
+          [3, -10],
+          [8, -16],
+        ],
+        "#a477a1",
+        2,
+      );
+    }
+    c.restore();
+  }
+
+  private secretCreatures(game: Game, time: number) {
+    for (const creature of CREATURES) {
+      if (
+        creature.contentId === game.level.contentId &&
+        !game.rescuedCreatures.includes(creature.id) &&
+        this.visible(creature.x, 45)
+      )
+        this.creature(creature.kind, creature.x, creature.y, time);
+    }
+  }
+
   private homeGrove(game: Game, time: number) {
     if (game.level.kind !== "grove") return;
     const c = this.ctx;
@@ -1589,6 +1741,12 @@ export class Renderer {
       c.fillText(`${total} / 12 lights home`, 130, 324);
     }
     c.restore();
+    const creatureHomes = [500, 880, 1420];
+    CREATURES.forEach((creature, index) => {
+      const x = creatureHomes[index];
+      if (game.rescuedCreatures.includes(creature.id) && this.visible(x, 45))
+        this.creature(creature.kind, x, 410, time);
+    });
   }
 
   private hiveBell(x: number, y: number, completed: boolean, time: number) {
@@ -1749,15 +1907,27 @@ export class Renderer {
             ? state.sluiceGateOpen
               ? "OPEN"
               : "LOCKED"
-            : m.kind === "wind"
-              ? state.wind
-              : m.kind === "brake"
-                ? state.brake
-                : m.kind === "water" || m.kind === "sluice"
-                  ? state.water
-                  : m.kind === "shutter" || m.kind === "receiver"
-                    ? state.shutter
-                    : "";
+            : m.id === "moonpool.current-selector"
+              ? state.shutter === "HIVE"
+                ? "LEFT UP"
+                : "RIGHT UP"
+              : m.id === "moonpool.receiver"
+                ? state.lightGateOpen
+                  ? "OPEN"
+                  : "LOCKED"
+                : m.id === "cloud.wind-switch"
+                  ? state.wind === "WEST"
+                    ? "← BRIDGE"
+                    : "BRIDGE →"
+                  : m.kind === "wind"
+                    ? state.wind
+                    : m.kind === "brake"
+                      ? state.brake
+                      : m.kind === "water" || m.kind === "sluice"
+                        ? state.water
+                        : m.kind === "shutter" || m.kind === "receiver"
+                          ? state.shutter
+                          : "";
       if (m.kind === "wind") {
         this.line(
           [
@@ -1878,6 +2048,16 @@ export class Renderer {
     }
     for (const portal of game.level.portals ?? []) {
       if (!this.visible(portal.x, 100)) continue;
+      const isSky = portal.target.startsWith("sky-");
+      if (isSky) {
+        this.ellipse(
+          portal.x + portal.w / 2,
+          portal.y - 36,
+          portal.w * 0.8,
+          48,
+          "rgba(255,247,190,.20)",
+        );
+      }
       const ready =
         !portal.requires ||
         (portal.requires === "discovery"
@@ -1914,11 +2094,13 @@ export class Renderer {
       c.fillText(
         portal.target === "return"
           ? "BACK"
-          : portal.target === "cloud"
-            ? "CLOUD"
-            : portal.target === "moonpool"
-              ? "MOONPOOL"
-              : "HIVE",
+          : isSky
+            ? "SKY"
+            : portal.target === "cloud"
+              ? "CLOUD"
+              : portal.target === "moonpool"
+                ? "MOONPOOL"
+                : "HIVE",
         portal.x + portal.w / 2,
         portal.y - 12,
       );
@@ -3878,7 +4060,25 @@ export class Renderer {
     outfit: "leaf" | "berry" | "moon" | "cosmetic.bee_scarf" = "leaf",
     danger = false,
     flight: "none" | "ready" | "lift" | "glide" = "none",
+    character: "pip" | "poppy" = "pip",
   ) {
+    if (character === "poppy") {
+      this.poppyHero(
+        x,
+        y,
+        vx,
+        vy,
+        facing,
+        grounded,
+        time,
+        landing,
+        size,
+        pose,
+        outfit,
+        flight,
+      );
+      return;
+    }
     const c = this.ctx;
     const running = grounded && Math.abs(vx) > 15;
     const outfitColor =
@@ -4148,6 +4348,158 @@ export class Renderer {
       this.ellipse(-8, -3, 5, 3, "#386a53");
       this.ellipse(8, -5, 5, 3, "#386a53");
     }
+    c.restore();
+  }
+
+  /** Poppy uses Pip's exact collision box and movement, with her own ladybug art. */
+  private poppyHero(
+    x: number,
+    y: number,
+    vx: number,
+    vy: number,
+    facing: number,
+    grounded: boolean,
+    time: number,
+    landing: number,
+    size: number,
+    pose: "normal" | "hurt" | "won" | "lost",
+    outfit: "leaf" | "berry" | "moon" | "cosmetic.bee_scarf",
+    flight: "none" | "ready" | "lift" | "glide",
+  ) {
+    const c = this.ctx;
+    const running = grounded && Math.abs(vx) > 15;
+    const stride = running ? Math.sin(time * 19) : 0;
+    const bob = grounded
+      ? running
+        ? Math.abs(stride) * 1.2
+        : Math.sin(time * 2.5) * 0.6
+      : 0;
+    const hurt = pose === "hurt" || pose === "lost";
+    const scarf =
+      outfit === "cosmetic.bee_scarf"
+        ? "#f2c552"
+        : outfit === "moon"
+          ? "#b8d0f1"
+          : outfit === "berry"
+            ? "#efb8d3"
+            : "#ffcf80";
+    c.save();
+    c.translate(x, y);
+    c.scale(size, size);
+    if (grounded) this.ellipse(0, -0.5, 17, 3, "rgba(28,80,50,.2)");
+    c.scale(facing < 0 ? -1 : 1, 1);
+    c.rotate(hurt ? -0.06 : running ? Math.min(0.075, Math.abs(vx) / 4000) : 0);
+    if (pose === "won") c.translate(0, -Math.abs(Math.sin(time * 5)) * 3);
+    const squash =
+      landing > 0 ? Math.sin((landing / 0.14) * Math.PI) * 0.09 : 0;
+    const rise = !grounded && vy < -180 ? Math.min(0.07, -vy / 10000) : 0;
+    c.scale(1 + squash - rise, 1 - squash + rise);
+    if (flight !== "none") {
+      c.save();
+      c.translate(-15, -25 + bob);
+      c.rotate(
+        flight === "lift"
+          ? -0.8 + Math.sin(time * 18) * 0.15
+          : flight === "glide"
+            ? -1.35
+            : -0.35,
+      );
+      this.leaf(0, 0, flight === "glide" ? 24 : 19, 0, "#e9fff4");
+      this.line(
+        [
+          [0, 0],
+          [0, -23],
+        ],
+        "#6bbdb3",
+        2,
+      );
+      c.restore();
+    }
+    if (!grounded) {
+      const flutter = 5 + Math.abs(Math.sin(time * 24)) * 5;
+      this.ellipse(-15, -24, flutter, 7, "rgba(255,241,225,.75)", "#e9b9aa", 1);
+      this.ellipse(14, -24, flutter, 7, "rgba(255,241,225,.75)", "#e9b9aa", 1);
+    }
+    // Her red, spotted shell and rounded antennae keep her recognizable at phone scale.
+    this.line(
+      [
+        [-8, -7],
+        [-10 - stride * 4, -2],
+      ],
+      "#513d3b",
+      5,
+    );
+    this.line(
+      [
+        [7, -7],
+        [9 + stride * 4, -2],
+      ],
+      "#513d3b",
+      5,
+    );
+    this.ellipse(-1, -17 + bob, 15, 14, "#e76a65", "#8f4143", 2);
+    this.line(
+      [
+        [0, -30 + bob],
+        [0, -7 + bob],
+      ],
+      "#9c4749",
+      1.5,
+    );
+    this.ellipse(-8, -22 + bob, 3.1, 3.1, "#5d4144");
+    this.ellipse(7, -24 + bob, 3, 3, "#5d4144");
+    this.ellipse(-6, -12 + bob, 2.7, 2.7, "#5d4144");
+    this.ellipse(8, -12 + bob, 2.7, 2.7, "#5d4144");
+    this.line(
+      [
+        [-12, -20 + bob],
+        [-17, (pose === "won" ? -35 : -13 + stride * 3) + bob],
+      ],
+      "#a75550",
+      5,
+    );
+    this.line(
+      [
+        [11, -20 + bob],
+        [16, (pose === "won" ? -35 : -13 - stride * 3) + bob],
+      ],
+      "#a75550",
+      5,
+    );
+    this.ellipse(0, -34 + bob, 15, 13, "#c95e5b", "#8f4143", 2);
+    this.ellipse(2, -32 + bob, 12, 10, "#fff0d4");
+    this.ellipse(-3, -33 + bob, 2.6, hurt ? 1 : 3.6, "#53433e");
+    this.ellipse(7, -33 + bob, 2.6, hurt ? 1 : 3.6, "#53433e");
+    this.ellipse(-6, -27 + bob, 2.3, 1.4, "#f4a5a0");
+    this.ellipse(11, -27 + bob, 2.3, 1.4, "#f4a5a0");
+    this.line(
+      [
+        [0, -26 + bob],
+        [3, -24 + bob],
+        [6, -26 + bob],
+      ],
+      "#8f6d5b",
+      1.3,
+    );
+    this.line(
+      [
+        [-8, -45 + bob],
+        [-12, -53 + bob],
+      ],
+      "#684545",
+      2,
+    );
+    this.line(
+      [
+        [7, -45 + bob],
+        [11, -53 + bob],
+      ],
+      "#684545",
+      2,
+    );
+    this.ellipse(-12, -53 + bob, 2.5, 2.5, "#684545");
+    this.ellipse(11, -53 + bob, 2.5, 2.5, "#684545");
+    this.rounded(-11, -23 + bob, 23, 5, 2.5, scarf);
     c.restore();
   }
 

@@ -15,11 +15,17 @@ import {
   challengeLevels,
   beehiveLevel,
   flowerHoopsLevel,
+  type Level,
 } from "./game/levels";
-import { AdventureSession } from "./game/session";
+import { AdventureSession, type SecretTarget } from "./game/session";
+import { moonpoolLevel } from "./game/moonpool-level";
+import { cloudGardenLevel } from "./game/cloud-garden";
+import { skySecretLevels } from "./game/sky-secrets";
 import { Renderer } from "./game/renderer";
 import { Controls } from "./controls";
 import { AudioPlayer } from "./audio";
+import { openMiniGame } from "./minigames";
+import { CREATURES } from "./game/creatures";
 import {
   DEFAULT_CONTROLS,
   SHOP_ITEMS,
@@ -39,6 +45,13 @@ import {
   discoverBeehive,
   completeBeehive,
   recordHoops,
+  EXPLORATION_SECRET_IDS,
+  discoverSecret,
+  completeSecret,
+  rescueCreature,
+  selectCharacter,
+  recordGardenActivity,
+  type ExplorationSecretId,
   type Save,
 } from "./storage";
 
@@ -78,6 +91,7 @@ type RunKind = "world" | "grove" | "challenge" | "secret" | "minigame";
 let runKind: RunKind = "world";
 let coinLedger = new RunCoinLedger();
 let session: AdventureSession | null = null;
+let replaySecretLevel: Level | null = null;
 const seenTutorials = new Set<string>();
 const modeName = (value: PlayMode) =>
   ({ classic: "Classic", relaxed: "Relaxed", timed: "Timed" })[value];
@@ -85,6 +99,8 @@ function dressGame(next: Game) {
   next.outfit = save.outfit;
   next.groveDecorations = [...save.decorations];
   next.rescuedTotal = rescuedTotal(save);
+  next.rescuedCreatures = [...save.rescuedCreatures];
+  next.character = save.selectedCharacter;
 }
 function createGame(index: number) {
   const next = new Game(index, {
@@ -99,7 +115,7 @@ function createGame(index: number) {
       : runKind === "challenge"
         ? { level: challengeLevels[index] }
         : runKind === "secret"
-          ? { level: beehiveLevel }
+          ? { level: replaySecretLevel ?? beehiveLevel }
           : runKind === "minigame"
             ? { level: flowerHoopsLevel }
             : {}),
@@ -167,6 +183,65 @@ const dialog = $<HTMLDialogElement>("#help-dialog");
 const menuDialog = $<HTMLDialogElement>("#menu-dialog");
 const settingsDialog = $<HTMLDialogElement>("#settings-dialog");
 const groveDialog = $<HTMLDialogElement>("#grove-dialog");
+let activityOpen = false;
+const characterChoice = document.createElement("div");
+characterChoice.className = "mode-choice";
+characterChoice.innerHTML = `<label for="character-choice">Play as</label><select id="character-choice"><option value="pip">Pip</option><option value="poppy">Poppy</option></select><small>Both friends have the same moves and abilities.</small>`;
+$(".adventure-choices").prepend(characterChoice);
+const characterSelect = $<HTMLSelectElement>("#character-choice");
+characterSelect.value = save.selectedCharacter;
+characterSelect.addEventListener("change", () => {
+  const choice = characterSelect.value === "poppy" ? "poppy" : "pip";
+  if (selectCharacter(save, choice)) {
+    dressGame(game);
+    writeSave(save);
+  }
+});
+const activities = document.createElement("section");
+activities.className = "journal-list";
+activities.innerHTML = `<h3>Garden games</h3>
+  <button type="button" class="challenge-entry" data-activity="matching"><span><strong>Garden Match</strong><small id="matching-record"></small></span><span>✿</span></button>
+  <button type="button" class="challenge-entry" data-activity="falling"><span><strong>Seed Stack</strong><small id="falling-record"></small></span><span>▦</span></button>`;
+$("#journal-list").before(activities);
+function updateActivityRecords() {
+  const match = save.minigames.gardenMatch.bestMoves;
+  const score = save.minigames.seedStack.bestScore;
+  $("#matching-record").textContent =
+    match === null ? "Find the matching pairs" : `Best: ${match} turns`;
+  $("#falling-record").textContent =
+    score === null
+      ? "Fit the falling pieces and clear rows"
+      : `Best score: ${score}`;
+}
+updateActivityRecords();
+activities.addEventListener("click", (event) => {
+  const button = (event.target as HTMLElement).closest<HTMLButtonElement>(
+    "[data-activity]",
+  );
+  if (!button || activityOpen) return;
+  const kind = button.dataset.activity;
+  if (kind !== "matching" && kind !== "falling") return;
+  pause();
+  controls.reset();
+  menuDialog.close();
+  activityOpen = true;
+  openMiniGame(
+    kind,
+    () => {
+      activityOpen = false;
+      controls.reset();
+      if (mode === "paused")
+        overlay.querySelector<HTMLButtonElement>("button")?.focus();
+      else canvas.focus({ preventScroll: true });
+    },
+    (result) => {
+      if (recordGardenActivity(save, result)) {
+        writeSave(save);
+        updateActivityRecords();
+      }
+    },
+  );
+});
 const controls = new Controls(
   $(".touch-dpad"),
   $(".touch-jump"),
@@ -175,14 +250,16 @@ const controls = new Controls(
     !dialog.open &&
     !menuDialog.open &&
     !settingsDialog.open &&
-    !groveDialog.open,
+    !groveDialog.open &&
+    !activityOpen,
   () => audio.unlock(),
   () => {
     if (
       dialog.open ||
       menuDialog.open ||
       settingsDialog.open ||
-      groveDialog.open
+      groveDialog.open ||
+      activityOpen
     )
       return;
     if (mode === "playing") pause();
@@ -330,14 +407,57 @@ function updateAdventureChoices() {
 function updateJournal() {
   const hive = save.secrets.beehive;
   const hoops = save.minigames.flowerHoops;
+  const places: Record<ExplorationSecretId, { level: Level; hint: string }> = {
+    "secret.moonpool": {
+      level: moonpoolLevel,
+      hint: "Look for a pool in the Home Grove.",
+    },
+    "secret.cloud-garden": {
+      level: cloudGardenLevel,
+      hint: "Follow the clouds above the Home Grove.",
+    },
+    "secret.sky-meadow": {
+      level: skySecretLevels["sky-meadow"],
+      hint: "Watch for petals high above Sunlit Meadow.",
+    },
+    "secret.sky-hollow": {
+      level: skySecretLevels["sky-hollow"],
+      hint: "Look above the branches in Firefly Hollow.",
+    },
+    "secret.sky-cloudtop": {
+      level: skySecretLevels["sky-cloudtop"],
+      hint: "Follow the high clouds in Cloudtop Crossing.",
+    },
+  };
   $("#journal-list").innerHTML =
-    `<h3>Pip’s discovery journal</h3><button class="challenge-entry" id="journal-hive" ${hive.discovered ? "" : "disabled"}><span><strong>Lantern Beehive</strong><small>${hive.discovered ? (hive.completed ? "Bee Scarf earned · replay the secret" : "Secret discovered · explore three honeycomb rooms") : "Follow the pollen clue in Windmill Garden"}</small></span><span>⌂</span></button><button class="challenge-entry" id="journal-hoops" ${save.unlocks.windFeatherDiscovered ? "" : "disabled"}><span><strong>Petal Post</strong><small>${save.unlocks.windFeatherDiscovered ? (hoops.best ? `${hoops.bestMedal === "none" ? "Practice" : hoops.bestMedal + " medal"} · best ${hoops.best.score} points` : "A little flight. Sixteen flower hoops.") : "Bump a feather block near a trail entrance"}</small></span><span>✿</span></button>`;
+    `<h3>Discovery journal</h3><button class="challenge-entry" id="journal-hive" ${hive.discovered ? "" : "disabled"}><span><strong>Lantern Beehive</strong><small>${hive.discovered ? (hive.completed ? "Bee Scarf earned · replay the secret" : "Secret discovered · explore three honeycomb rooms") : "Follow the pollen clue in Windmill Garden"}</small></span><span>⌂</span></button>` +
+    EXPLORATION_SECRET_IDS.map((id) => {
+      const record = save.secrets.exploration[id];
+      const place = places[id];
+      return `<button type="button" class="challenge-entry" data-secret="${id}" ${record.discovered ? "" : "disabled"}><span><strong>${record.discovered ? place.level.name : "Undiscovered place"}</strong><small>${record.discovered ? (record.completed ? "Explored · visit again" : "Discovered · visit again") : place.hint}</small></span><span>☁</span></button>`;
+    }).join("") +
+    `<button class="challenge-entry" id="journal-hoops" ${save.unlocks.windFeatherDiscovered ? "" : "disabled"}><span><strong>Petal Post</strong><small>${save.unlocks.windFeatherDiscovered ? (hoops.best ? `${hoops.bestMedal === "none" ? "Practice" : hoops.bestMedal + " medal"} · best ${hoops.best.score} points` : "A little flight. Sixteen flower hoops.") : "Bump a feather block near a trail entrance"}</small></span><span>✿</span></button>`;
   $("#journal-hive").addEventListener("click", replayBeehive);
   $("#journal-hoops").addEventListener("click", playPetalPost);
+  document
+    .querySelectorAll<HTMLButtonElement>("[data-secret]")
+    .forEach((button) => {
+      button.addEventListener("click", () => {
+        const id = button.dataset.secret as ExplorationSecretId;
+        if (!save.secrets.exploration[id]?.discovered) return;
+        replaySecretLevel = places[id].level;
+        session = null;
+        runKind = "secret";
+        menuDialog.close();
+        groveDialog.close();
+        start();
+      });
+    });
   $("#grove-petal-button").hidden = !save.unlocks.windFeatherDiscovered;
 }
 function replayBeehive() {
   if (!save.secrets.beehive.discovered) return;
+  replaySecretLevel = null;
   session = null;
   runKind = "secret";
   menuDialog.close();
@@ -799,7 +919,9 @@ function updateHUD() {
           ? "Jump to enter Cloudbloom Sanctuary"
           : game.portalReady === "moonpool"
             ? "Jump to enter Moonpool Grotto"
-            : "Jump to return to the garden",
+            : game.portalReady.startsWith("sky-")
+              ? "Jump to explore the secret sky path"
+              : "Jump to return to the garden",
     );
   $(".power-state").hidden = runKind === "grove" && !game.hasWindFeather;
   $("#feather-meter").hidden = !game.hasWindFeather;
@@ -1012,7 +1134,8 @@ function frame(now: number) {
     !dialog.open &&
     !menuDialog.open &&
     !settingsDialog.open &&
-    !groveDialog.open
+    !groveDialog.open &&
+    !activityOpen
   ) {
     start();
     delta = 0;
@@ -1037,6 +1160,38 @@ function frame(now: number) {
       game.events.includes("secret-complete")
     )
       discoveryChanged = completeBeehive(save) || discoveryChanged;
+    if (
+      game.events.includes("secret-complete") &&
+      EXPLORATION_SECRET_IDS.includes(
+        game.level.contentId as ExplorationSecretId,
+      )
+    )
+      discoveryChanged =
+        completeSecret(save, game.level.contentId as ExplorationSecretId) ||
+        discoveryChanged;
+    let rescuedName: string | null = null;
+    for (const creature of CREATURES) {
+      if (
+        creature.contentId !== game.level.contentId ||
+        save.rescuedCreatures.includes(creature.id)
+      )
+        continue;
+      const centerX = game.player.x + game.player.w / 2;
+      const centerY = game.player.y + game.player.h / 2;
+      if (
+        Math.abs(centerX - creature.x) < 32 &&
+        Math.abs(centerY - creature.y) < 34 &&
+        rescueCreature(save, creature.id)
+      ) {
+        rescuedName =
+          creature.kind === "bird"
+            ? "Cloud bird"
+            : creature.kind === "frog"
+              ? "Frog"
+              : "Moth";
+        discoveryChanged = true;
+      }
+    }
     if (discoveryChanged) {
       writeSave(save);
       updateJournal();
@@ -1102,7 +1257,14 @@ function frame(now: number) {
       ],
       ["mechanism", "Follow the wind, water and light.", "leaf"],
     ];
-    const message = messages.find(([event]) => game.events.includes(event));
+    const message: [string, string, keyof typeof paths] | undefined =
+      rescuedName
+        ? [
+            "creature-rescue",
+            `${rescuedName} rescued! Find your new friend in the Home Grove.`,
+            "leaf",
+          ]
+        : messages.find(([event]) => game.events.includes(event));
     if (message) {
       $("#game-toast").innerHTML =
         `${icon(message[2])}<span>${message[1]}</span>`;
@@ -1132,15 +1294,34 @@ function frame(now: number) {
     }
     updateHUD();
     if (game.state !== "playing" || game.minigame.finished) finish();
-    else if (game.requestedPortal === "beehive" && session)
-      changeScene(session.enterBeehive(), "secret");
     else if (
-      (game.requestedPortal === "cloud" ||
-        game.requestedPortal === "moonpool") &&
-      session
-    )
-      changeScene(session.enter(game.requestedPortal), "secret");
-    else if (game.requestedPortal === "return") returnFromBeehive();
+      session &&
+      game.requestedPortal &&
+      (
+        [
+          "beehive",
+          "cloud",
+          "moonpool",
+          "sky-meadow",
+          "sky-hollow",
+          "sky-cloudtop",
+        ] as string[]
+      ).includes(game.requestedPortal)
+    ) {
+      const next = session.enter(game.requestedPortal as SecretTarget);
+      if (next !== game) {
+        if (
+          EXPLORATION_SECRET_IDS.includes(
+            next.level.contentId as ExplorationSecretId,
+          ) &&
+          discoverSecret(save, next.level.contentId as ExplorationSecretId)
+        ) {
+          writeSave(save);
+          updateJournal();
+        }
+        changeScene(next, "secret");
+      }
+    } else if (game.requestedPortal === "return") returnFromBeehive();
   }
   $(".checkpoint-toast").hidden = mode !== "playing" || now > toastUntil;
   audio.setMusic(

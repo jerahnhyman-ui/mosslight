@@ -16,6 +16,32 @@ export const moonpoolLevel: Level = {
     // shelves and bubble streams give the player a clear route around each.
     { id: "moonpool.rock.1", x: 1050, y: 350, w: 58, h: 140, kind: "ground" },
     { id: "moonpool.rock.2", x: 1850, y: 320, w: 58, h: 170, kind: "ground" },
+    // A small optional cove: the receiver opens the left-hand door while the
+    // original route continues underneath the enclosure.
+    {
+      id: "moonpool.rock.cove-roof",
+      x: 2260,
+      y: 160,
+      w: 272,
+      h: 20,
+      kind: "ground",
+    },
+    {
+      id: "moonpool.rock.cove-floor",
+      x: 2260,
+      y: 300,
+      w: 272,
+      h: 20,
+      kind: "ground",
+    },
+    {
+      id: "moonpool.rock.cove-wall",
+      x: 2510,
+      y: 180,
+      w: 22,
+      h: 120,
+      kind: "ground",
+    },
     { x: 440, y: 390, w: 180, h: 20, kind: "platform" },
     { x: 800, y: 315, w: 180, h: 20, kind: "platform" },
     { x: 1200, y: 370, w: 180, h: 20, kind: "platform" },
@@ -52,9 +78,19 @@ export const moonpoolLevel: Level = {
   ],
   mechanisms: [
     { id: "moonpool.valve", kind: "water", x: 530, y: 390 },
+    { id: "moonpool.current-selector", kind: "shutter", x: 1290, y: 370 },
+    { id: "moonpool.receiver", kind: "receiver", x: 1730, y: 280 },
     { id: "moonpool.sluice", kind: "sluice", x: 2160, y: 370 },
   ],
   gates: [
+    {
+      id: "moonpool.cove-door",
+      condition: "light",
+      x: 2260,
+      y: 180,
+      w: 22,
+      h: 120,
+    },
     {
       id: "moonpool.gate",
       condition: "sluice",
@@ -85,6 +121,14 @@ export const moonpoolLevel: Level = {
     { x: 390, text: "Land on the valve to start the bubbles." },
     { x: 760, text: "Bubble currents carry you upward." },
     { x: 950, text: "Swim above the rocks to find a way through." },
+    {
+      x: 1180,
+      text: "Land on the current selector to send the bubbles up on the other side.",
+    },
+    {
+      x: 1570,
+      text: "With the right bubbles rising, land on the receiver to open the hidden cove.",
+    },
     {
       x: 1920,
       text: "With bubbles flowing, land on the sluice latch to open the gate.",

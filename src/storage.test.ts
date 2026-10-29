@@ -5,6 +5,12 @@ import {
   discoverFeather,
   discoverBeehive,
   completeBeehive,
+  discoverSecret,
+  completeSecret,
+  rescueCreature,
+  selectCharacter,
+  recordGardenActivity,
+  EXPLORATION_SECRET_IDS,
   recordHoops,
   RunCoinLedger,
   SHOP_ITEMS,
@@ -31,6 +37,150 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("adventure progress", () => {
+  it("loads existing v3 saves without losing progress when new secrets are absent", () => {
+    const previous = readSave();
+    previous.wallet = 23;
+    previous.lifetimeCoins = 47;
+    previous.progress[0].fireflies = [0, 2];
+    previous.secrets.beehive = { discovered: true, completed: false };
+    writeSave(previous);
+    const oldSnapshot = JSON.parse(items.get(SAVE_KEY)!);
+    for (const id of EXPLORATION_SECRET_IDS) delete oldSnapshot.secrets[id];
+    delete oldSnapshot.rescuedCreatures;
+    delete oldSnapshot.selectedCharacter;
+    delete oldSnapshot.minigames["minigame.garden_match"];
+    delete oldSnapshot.minigames["minigame.seed_stack"];
+    items.set(SAVE_KEY, JSON.stringify(oldSnapshot));
+    const loaded = readSave();
+    expect(loaded.wallet).toBe(23);
+    expect(loaded.lifetimeCoins).toBe(47);
+    expect(loaded.progress[0].fireflies).toEqual([0, 2]);
+    expect(loaded.secrets.beehive).toEqual({
+      discovered: true,
+      completed: false,
+    });
+    expect(loaded.rescuedCreatures).toEqual([]);
+    expect(loaded.selectedCharacter).toBe("pip");
+    expect(loaded.minigames.gardenMatch.bestMoves).toBeNull();
+    expect(loaded.minigames.seedStack.bestScore).toBeNull();
+    for (const id of EXPLORATION_SECRET_IDS)
+      expect(loaded.secrets.exploration[id]).toEqual({
+        discovered: false,
+        completed: false,
+      });
+  });
+
+  it("persists and validates the selected character without changing progress", () => {
+    const save = readSave();
+    save.wallet = 14;
+    save.lifetimeCoins = 32;
+    save.progress[0].fireflies = [1];
+    expect(save.selectedCharacter).toBe("pip");
+    expect(selectCharacter(save, "poppy")).toBe(true);
+    expect(selectCharacter(save, "poppy")).toBe(false);
+    writeSave(save);
+    expect(readSave()).toEqual(save);
+    const snapshot = JSON.parse(items.get(SAVE_KEY)!);
+    snapshot.selectedCharacter = "unknown";
+    items.set(SAVE_KEY, JSON.stringify(snapshot));
+    const loaded = readSave();
+    expect(loaded.selectedCharacter).toBe("pip");
+    expect(loaded.wallet).toBe(14);
+    expect(loaded.progress[0].fireflies).toEqual([1]);
+  });
+
+  it("keeps the best activity records without altering the coin wallet", () => {
+    const save = readSave();
+    save.wallet = 12;
+    save.lifetimeCoins = 22;
+    expect(recordGardenActivity(save, { kind: "matching", moves: 5 })).toBe(
+      false,
+    );
+    expect(recordGardenActivity(save, { kind: "matching", moves: 16 })).toBe(
+      true,
+    );
+    expect(recordGardenActivity(save, { kind: "matching", moves: 20 })).toBe(
+      false,
+    );
+    expect(recordGardenActivity(save, { kind: "matching", moves: 9 })).toBe(
+      true,
+    );
+    expect(
+      recordGardenActivity(save, { kind: "falling", score: 450, lines: 3 }),
+    ).toBe(true);
+    expect(
+      recordGardenActivity(save, { kind: "falling", score: 300, lines: 5 }),
+    ).toBe(true);
+    expect(
+      recordGardenActivity(save, { kind: "falling", score: 400, lines: 2 }),
+    ).toBe(false);
+    expect(
+      recordGardenActivity(save, { kind: "falling", score: -1, lines: 5 }),
+    ).toBe(false);
+    expect(save.minigames.gardenMatch.bestMoves).toBe(9);
+    expect(save.minigames.seedStack).toEqual({ bestScore: 450, bestLines: 5 });
+    expect(save.wallet).toBe(12);
+    writeSave(save);
+    expect(readSave()).toEqual(save);
+  });
+
+  it("persists secret discovery, completion, and unique rescued creatures", () => {
+    const save = readSave();
+    expect(discoverSecret(save, "secret.moonpool")).toBe(true);
+    expect(discoverSecret(save, "secret.moonpool")).toBe(false);
+    expect(completeSecret(save, "secret.cloud-garden")).toBe(true);
+    expect(completeSecret(save, "secret.cloud-garden")).toBe(false);
+    expect(rescueCreature(save, "moth")).toBe(true);
+    expect(rescueCreature(save, "frog")).toBe(true);
+    expect(rescueCreature(save, "frog")).toBe(false);
+    writeSave(save);
+    expect(readSave()).toEqual(save);
+    const loaded = readSave();
+    expect(loaded.secrets.exploration["secret.moonpool"]).toEqual({
+      discovered: true,
+      completed: false,
+    });
+    expect(loaded.secrets.exploration["secret.cloud-garden"]).toEqual({
+      discovered: true,
+      completed: true,
+    });
+    expect(loaded.rescuedCreatures).toEqual(["frog", "moth"]);
+  });
+
+  it("normalizes malformed exploration records without inventing rescues", () => {
+    writeSave(readSave());
+    const snapshot = JSON.parse(items.get(SAVE_KEY)!);
+    snapshot.secrets["secret.sky-meadow"] = {
+      discovered: false,
+      completed: true,
+    };
+    snapshot.secrets["secret.moonpool"] = {
+      discovered: "true",
+      completed: "yes",
+    };
+    snapshot.rescuedCreatures = ["frog", "frog", "dragon", null];
+    snapshot.minigames["minigame.garden_match"] = { bestMoves: -7 };
+    snapshot.minigames["minigame.seed_stack"] = {
+      bestScore: "999",
+      bestLines: -1,
+    };
+    items.set(SAVE_KEY, JSON.stringify(snapshot));
+    const loaded = readSave();
+    expect(loaded.secrets.exploration["secret.sky-meadow"]).toEqual({
+      discovered: true,
+      completed: true,
+    });
+    expect(loaded.secrets.exploration["secret.moonpool"]).toEqual({
+      discovered: false,
+      completed: false,
+    });
+    expect(loaded.rescuedCreatures).toEqual(["frog"]);
+    expect(loaded.minigames.gardenMatch.bestMoves).toBeNull();
+    expect(loaded.minigames.seedStack).toEqual({
+      bestScore: null,
+      bestLines: null,
+    });
+  });
   it("preserves previous trail achievements without claiming new secrets or comparable times", () => {
     items.set(
       "mosslight-save-v1",

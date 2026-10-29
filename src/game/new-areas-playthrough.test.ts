@@ -49,7 +49,9 @@ describe("new secret area playthrough", () => {
     const g = new Game(0, { level: cloudGardenLevel });
     for (let n = 0; n < 10; n++) tick(g);
     earnFeather(g);
-    for (const flower of g.level.mechanisms!) {
+    for (const flower of g.level.mechanisms!.filter(
+      (m) => m.kind === "flower",
+    )) {
       approach(g, flower.x - 25);
       for (let n = 0; n < 300 && !g.player.grounded; n++) tick(g);
       for (let n = 0; n < 30; n++) tick(g);
@@ -78,10 +80,16 @@ describe("new secret area playthrough", () => {
     approach(grove, 830);
     enterPortal(grove, "moonpool");
     const g = session.enter("moonpool");
-    // Swim above both new rock walls without touching the puzzle switches.
-    for (let n = 0; n < 2500 && center(g) < 2490; n++)
+    // Swim above the rocks, then take the lower route under the optional
+    // closed cove without touching either of its puzzle switches.
+    for (let n = 0; n < 2500 && center(g) < 2190; n++)
       tick(g, { ...idle, jump: true, right: true });
-    expect(center(g)).toBeGreaterThanOrEqual(2490);
+    expect(center(g)).toBeGreaterThanOrEqual(2190);
+    for (let n = 0; n < 500 && g.player.y < 325; n++) tick(g);
+    expect(g.player.y).toBeGreaterThanOrEqual(325);
+    for (let n = 0; n < 1000 && center(g) < 2550; n++)
+      tick(g, { ...idle, right: true });
+    expect(center(g)).toBeGreaterThanOrEqual(2550);
     for (let n = 0; n < 500 && g.player.y + g.player.h > 185; n++)
       tick(g, { ...idle, jump: true });
     tick(g);

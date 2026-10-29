@@ -3,9 +3,10 @@ import { AdventureSession } from "./session";
 import { Game } from "./engine";
 import { windmillLevel, beehiveLevel } from "./expansion-levels";
 import { RunCoinLedger, readSave } from "../storage";
-import { groveLevel } from "./levels";
+import { groveLevel, levels } from "./levels";
 import { cloudGardenLevel } from "./cloud-garden";
 import { moonpoolLevel } from "./moonpool-level";
+import { skySecretLevels } from "./sky-secrets";
 
 // Fixture tests exercise the scene handoff directly; these are not full play routes.
 function setup() {
@@ -26,6 +27,52 @@ function pickup(game: Game, x: number, y: number) {
 }
 
 describe("AdventureSession scene handoffs", () => {
+  it.each([
+    [0, "sky-meadow"],
+    [1, "sky-hollow"],
+    [2, "sky-cloudtop"],
+  ] as const)(
+    "enters %s's hidden sky route and returns to its safe ledge",
+    (worldIndex, target) => {
+      const parent = new Game(worldIndex, { mode: "relaxed" });
+      const session = new AdventureSession(parent);
+      const portal = levels[worldIndex].portals!.find(
+        (p) => p.target === target,
+      )!;
+      expect(portal).toBeDefined();
+      parent.player.x = portal.x + portal.w / 2 - parent.player.w / 2;
+      parent.player.y = portal.y - parent.player.h;
+      parent.player.grounded = true;
+      const neutral = {
+        left: false,
+        right: false,
+        jump: false,
+        jumpPressed: false,
+      };
+      for (let i = 0; i < 50; i++) parent.update(1 / 120, neutral);
+      expect(parent.portalReady).toBe(target);
+      parent.update(1 / 120, { ...neutral, jump: true, jumpPressed: true });
+      expect(parent.requestedPortal).toBe(target);
+      parent.collectedCoins = 17;
+      const secret = session.enter(target);
+      expect(secret.level).toBe(skySecretLevels[target]);
+      expect(secret.collectedCoins).toBe(17);
+      secret.collectedCoins = 20;
+      expect(session.returnToWorld()).toBe(parent);
+      expect(parent.collectedCoins).toBe(20);
+      expect(parent.player.y + parent.player.h).toBe(portal.y);
+      expect(
+        parent.platforms.some(
+          (p) =>
+            !p.broken &&
+            p.y === portal.y &&
+            parent.player.x >= p.x &&
+            parent.player.x + parent.player.w <= p.x + p.w,
+        ),
+      ).toBe(true);
+      expect(session.enter(target)).toBe(secret);
+    },
+  );
   it.each([
     ["cloud", cloudGardenLevel],
     ["moonpool", moonpoolLevel],

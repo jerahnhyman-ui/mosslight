@@ -102,8 +102,11 @@ export class Game {
   finalBossStarted = false;
   hazards: BossHazard[] = [];
   outfit: "leaf" | "berry" | "moon" | "cosmetic.bee_scarf" = "leaf";
+  character: "pip" | "poppy" = "pip";
   groveDecorations: string[] = [];
   rescuedTotal = 0;
+  /** Stable resident IDs copied between a trail and its secret detour. */
+  rescuedCreatures: string[] = [];
   player!: Player;
   platforms!: PlatformState[];
   coins!: Collectible[];
@@ -330,8 +333,10 @@ export class Game {
   transferPlayerFrom(source: Game, anchor: { x: number; feetY: number }) {
     this.resize(source.player.form);
     this.outfit = source.outfit;
+    this.character = source.character;
     this.groveDecorations = [...source.groveDecorations];
     this.rescuedTotal = source.rescuedTotal;
+    this.rescuedCreatures = [...source.rescuedCreatures];
     Object.assign(this.player, {
       x: anchor.x,
       y: anchor.feetY - this.player.h,
@@ -487,9 +492,20 @@ export class Game {
       this.glideArmed = false;
       this.jumpCanShorten = false;
       const current =
-        this.level.contentId === "secret.moonpool" &&
-        this.puzzleState.water === "LOW"
-          ? 0
+        this.level.contentId === "secret.moonpool"
+          ? this.puzzleState.water === "LOW"
+            ? 0
+            : water.reduce((total, zone) => {
+                const flow = zone.currentY ?? 0;
+                if (!flow) return total;
+                // The selector sends the bubbles up on one side and down on
+                // the other, so its effect can be read and used immediately.
+                const reversed =
+                  this.puzzleState.shutter === "BRIDGE"
+                    ? zone.x < 1200
+                    : zone.x >= 1200;
+                return total + (reversed ? -flow : flow);
+              }, 0)
           : Math.min(0, ...water.map((zone) => zone.currentY ?? 0));
       const target = (input.jump && this.hurtLock === 0 ? -160 : 115) + current;
       p.vy = approach(p.vy, target, 440 * STEP);
@@ -1026,7 +1042,13 @@ export class Game {
         rider = tile;
       tile.previousX = tile.x;
       tile.previousY = tile.y;
-      if (tile.id === "windmill.lily") {
+      if (tile.id === "cloud.wind.bridge") {
+        tile.x = approach(
+          tile.x,
+          tile.baseX + (this.puzzleState.wind === "EAST" ? 240 : 0),
+          140 * STEP,
+        );
+      } else if (tile.id === "windmill.lily") {
         tile.y = approach(
           tile.y,
           this.puzzleState.water === "HIGH" ? 330 : 450,

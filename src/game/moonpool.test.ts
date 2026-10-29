@@ -60,7 +60,10 @@ describe("Moonpool Grotto", () => {
     tick(game, idle, 1);
     game.transferPlayerFrom(source, { x: 80, feetY: 490 });
 
-    const mechanisms = moonpoolLevel.mechanisms!;
+    // The optional current/cove puzzle is independent of the main exit.
+    const mechanisms = moonpoolLevel.mechanisms!.filter(
+      (mechanism) => mechanism.kind === "water" || mechanism.kind === "sluice",
+    );
     for (const mechanism of mechanisms) {
       let reached = false;
       let descending = false;

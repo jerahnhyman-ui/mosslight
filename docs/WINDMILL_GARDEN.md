@@ -16,6 +16,8 @@ The Mill Keeper is a six-hit sub-boss across three phases. Jump the low sweep; f
 
 Finding the first feather unlocks Petal Post in Home Grove and the journal. Start on the first launch pad, fly through sixteen hoops and settle on landing pads. Each hoop and landing scores once. A finish or sixty-second timeout ends the activity. Bronze begins at 800 points and awards the Pinwheel Garland once; Silver and Gold require a finish. Replays are free and never award spendable coins.
 
+The Discovery journal also saves Moonpool Grotto, Cloudbloom Sanctuary, and the three hidden sky gardens above the original trails. After discovering a place, select it in the journal to visit again; completion is recorded separately. A rescued frog, cloud bird, and moth move into the Home Grove. The menu's Garden Match and Seed Stack activities save their best results independently of Petal Post. Pip and Poppy can be selected from the game menu and use the same movement and powers.
+
 ## Persistence and integration
 
 - Saves migrate to `mosslight-save-v3`, with stable world/challenge/collectible keys. Older keys remain intact for recovery. Existing settings, wallet, cosmetics, rescues and all historical record categories are retained.
@@ -23,7 +25,7 @@ Finding the first feather unlocks Petal Post in Home Grove and the journal. Star
 - A shared adventure session retains the parent and secret scenes and transfers current run resources. Reentering the cached secret cannot duplicate coin claims. A single cumulative coin ledger credits the wallet throughout the detour.
 - First discovery, completion and cosmetic ownership are persisted together. If storage is unavailable, a persistent status explains that progress is currently session-only.
 - Journal replay and Petal Post use independent runs. They cannot replace parent-world records. Petal Post has one standard score record, separate from the original three challenge rooms.
-- The grove supports twelve rescued residents, the Bee Scarf outfit and the Pinwheel Garland decoration. Cosmetics do not change gameplay statistics.
+- The grove supports twelve rescued fireflies, three rescued creature residents, the Bee Scarf outfit and the Pinwheel Garland decoration. Cosmetics do not change gameplay statistics.
 
 ## Verification and release
 

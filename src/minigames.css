@@ -1,0 +1,246 @@
+dialog.garden-activity {
+  --activity-cell: clamp(9px, calc((100dvh - 150px) / 16), 25px);
+  width: min(720px, calc(100vw - 28px));
+  max-width: calc(100vw - 28px);
+  max-height: calc(100dvh - 18px);
+  box-sizing: border-box;
+  padding: 16px 20px;
+  border: 2px solid #fff9;
+  border-radius: 24px;
+  color: #294e41;
+  background: #fffbed;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.garden-activity::backdrop {
+  background: #153f39a8;
+  backdrop-filter: blur(5px);
+}
+.garden-activity-inner {
+  width: 100%;
+}
+.garden-activity-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.garden-activity-header h2 {
+  margin: 0;
+  font-size: clamp(20px, 3vw, 28px);
+  line-height: 1.1;
+}
+.garden-activity-eyebrow {
+  color: #678b6e;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  font-weight: 800;
+}
+.garden-activity button {
+  font: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.garden-activity-close {
+  flex: none;
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 14px;
+  font-size: 27px !important;
+  line-height: 1;
+  background: #e4edd6;
+  color: #315847;
+}
+.garden-match-layout,
+.garden-stack-layout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(12px, 4vw, 30px);
+}
+.garden-match-info,
+.garden-stack-side {
+  min-width: 145px;
+  max-width: 250px;
+}
+.garden-activity p {
+  margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 1.35;
+}
+.garden-activity-status {
+  font-weight: 800;
+  color: #356d53;
+}
+.garden-activity-restart,
+.garden-stack-actions button {
+  min-height: 42px;
+  padding: 7px 13px;
+  border: 0;
+  border-radius: 13px;
+  color: #fff;
+  background: #478e69;
+  font-weight: 800 !important;
+}
+.garden-match-cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(44px, 1fr));
+  gap: 7px;
+  width: min(330px, 58%);
+}
+.garden-match-card {
+  min-width: 44px;
+  height: clamp(45px, 15dvh, 78px);
+  border: 2px solid #90b998;
+  border-radius: 13px;
+  background: #c2dfb3;
+  color: #52976d;
+  font-size: clamp(20px, 4vh, 30px) !important;
+  box-shadow: 0 3px 0 #7cad86;
+}
+.garden-match-card.is-shown {
+  background: #fff;
+  box-shadow: 0 3px 0 #d3e8ce;
+}
+.garden-match-card.is-matched {
+  border-color: #aedbb3;
+  background: #e1f3d4;
+  opacity: 1;
+}
+.garden-stack-board {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(10, var(--activity-cell));
+  grid-template-rows: repeat(16, var(--activity-cell));
+  gap: 1px;
+  padding: 5px;
+  border-radius: 10px;
+  background: #386254;
+  border: 3px solid #6f9e78;
+}
+.garden-stack-cell {
+  display: block;
+  border-radius: 2px;
+  background: #c9ddc3;
+}
+.garden-stack-cell:not(:empty),
+.garden-stack-cell[class*="cell-"] {
+  box-shadow:
+    inset 1px 1px #ffffff80,
+    inset -1px -1px #225b4d55;
+}
+.garden-stack-cell.cell-leaf {
+  background: #66b693;
+}
+.garden-stack-cell.cell-sun {
+  background: #eec45f;
+}
+.garden-stack-cell.cell-branch {
+  background: #ad8bd0;
+}
+.garden-stack-cell.cell-flower {
+  background: #ef98a3;
+}
+.garden-stack-cell.cell-berry {
+  background: #df747d;
+}
+.garden-stack-cell.cell-seed {
+  background: #eaa867;
+}
+.garden-stack-cell.cell-moon {
+  background: #79b9d0;
+}
+.garden-stack-next {
+  color: #67886e;
+  font-weight: 700;
+}
+.garden-stack-controls {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(42px, 1fr));
+  gap: 5px;
+}
+.garden-stack-controls button {
+  min-width: 42px;
+  min-height: 42px;
+  padding: 4px;
+  border: 1px solid #a2c7a4;
+  border-radius: 12px;
+  background: #dfefcf;
+  color: #285640;
+  font-size: 19px !important;
+  font-weight: 800 !important;
+}
+.garden-stack-controls [data-action="drop"] {
+  grid-column: span 2;
+  font-size: 13px !important;
+}
+.garden-stack-actions {
+  display: flex;
+  gap: 5px;
+  margin-top: 7px;
+}
+.garden-stack-actions button {
+  flex: 1;
+  min-height: 38px;
+  padding: 4px;
+  font-size: 12px !important;
+}
+.garden-stack-actions button:disabled {
+  opacity: 0.55;
+}
+.garden-stack-side small {
+  display: block;
+  margin-top: 7px;
+  font-size: 10px;
+  line-height: 1.25;
+  color: #6a8a73;
+}
+.garden-activity button:focus-visible {
+  outline: 3px solid #e39352;
+  outline-offset: 2px;
+}
+@media (max-height: 420px) and (orientation: landscape) {
+  dialog.garden-activity {
+    padding: 8px 16px;
+    --activity-cell: clamp(9px, calc((100dvh - 105px) / 16), 21px);
+  }
+  .garden-activity-header {
+    margin-bottom: 3px;
+  }
+  .garden-activity-header h2 {
+    font-size: 21px;
+  }
+  .garden-activity-close {
+    width: 36px;
+    height: 36px;
+  }
+  .garden-match-card {
+    height: clamp(42px, 17dvh, 68px);
+  }
+  .garden-stack-side small {
+    display: none;
+  }
+}
+@media (orientation: portrait) and (max-width: 550px) {
+  dialog.garden-activity {
+    --activity-cell: clamp(9px, calc((100vw - 240px) / 10), 22px);
+  }
+  .garden-match-layout {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .garden-match-info {
+    max-width: none;
+  }
+  .garden-match-cards {
+    width: 100%;
+  }
+  .garden-stack-layout {
+    gap: 10px;
+  }
+  .garden-stack-side {
+    min-width: 130px;
+  }
+}

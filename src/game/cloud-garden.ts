@@ -45,6 +45,9 @@ export const cloudGardenLevel: Level = withRewardBlocks({
     },
     cloud("flower.c", 1460, 255, 170),
     cloud("path.4", 1730, 340, 170),
+    // The wind switch carries this bridge toward the optional high cove.
+    cloud("wind.bridge", 1680, 120, 180),
+    cloud("wind.cove", 2110, 35, 160),
   ],
   coins: [
     { x: 510, y: 218 },
@@ -56,6 +59,9 @@ export const cloudGardenLevel: Level = withRewardBlocks({
     { x: 1490, y: 218 },
     { x: 1530, y: 218 },
     { x: 1570, y: 218 },
+    { x: 2140, y: 4 },
+    { x: 2180, y: 4 },
+    { x: 2220, y: 4 },
   ],
   stars: [],
   diamonds: [],
@@ -79,6 +85,7 @@ export const cloudGardenLevel: Level = withRewardBlocks({
     { id: "cloud.flower.a", kind: "flower", flower: "A", x: 565, y: 255 },
     { id: "cloud.flower.b", kind: "flower", flower: "B", x: 1055, y: 255 },
     { id: "cloud.flower.c", kind: "flower", flower: "C", x: 1545, y: 255 },
+    { id: "cloud.wind-switch", kind: "wind", x: 1650, y: 430 },
   ],
   // Extend well above the flight ceiling and below the safety floor so the
   // sanctuary cannot be reached by going around the closed gate.
@@ -109,6 +116,10 @@ export const cloudGardenLevel: Level = withRewardBlocks({
     {
       x: 740,
       text: "Some clouds drift. Land and pause to recharge before flying on.",
+    },
+    {
+      x: 1610,
+      text: "Land on the wind flower to move a cloud bridge toward the high cove.",
     },
   ],
   goal: { x: 2250, y: 430 },

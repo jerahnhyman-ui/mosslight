@@ -2,6 +2,15 @@ import { Game } from "./engine";
 import { beehiveLevel } from "./levels";
 import { cloudGardenLevel } from "./cloud-garden";
 import { moonpoolLevel } from "./moonpool-level";
+import { skySecretLevels } from "./sky-secrets";
+
+export type SecretTarget =
+  | "beehive"
+  | "cloud"
+  | "moonpool"
+  | "sky-meadow"
+  | "sky-hollow"
+  | "sky-cloudtop";
 
 /** Keeps room state and one set of run resources across a world/secret detour. */
 export class AdventureSession {
@@ -23,7 +32,7 @@ export class AdventureSession {
     return this.enter("beehive");
   }
 
-  enter(target: "beehive" | "cloud" | "moonpool"): Game {
+  enter(target: SecretTarget): Game {
     if (this.inSecret || this.parent.state !== "playing") return this.active;
     const portal = this.parent.level.portals?.find((p) => p.target === target);
     if (
@@ -36,7 +45,9 @@ export class AdventureSession {
         ? beehiveLevel
         : target === "cloud"
           ? cloudGardenLevel
-          : moonpoolLevel;
+          : target === "moonpool"
+            ? moonpoolLevel
+            : skySecretLevels[target];
     this.returnPoint = {
       x:
         target === "beehive"
