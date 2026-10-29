@@ -1,11 +1,12 @@
 # Mosslight
 
-An original, Mario-inspired side-scrolling platformer for iPhone, iPad, and the
-browser. Guide Pip through Sunlit Meadow, Firefly Hollow, and Cloudtop Crossing:
+An original side-scrolling platformer for iPhone, iPad, and the browser.
+Guide Pip through Sunlit Meadow, Firefly Hollow, and Cloudtop Crossing:
 collect golden coins, grow with diamonds, power up with stars, rescue hidden
 fireflies, and bring light back to the forest. Three extended trails include
-multiple checkpoints, optional routes, and distinct terrain. All art, music,
-and sound are generated locally.
+multiple checkpoints, optional routes, light-activated plants, and three-phase
+guardian encounters. Return rescued fireflies to a playable home grove and
+decorate it with earned coins. All art, music, and sound are generated locally.
 
 ## Play and develop
 
@@ -47,14 +48,37 @@ animated characters, and collectible/landing effects.
   The world map lights up as fireflies are rescued and trails are completed.
 - Multiple checkpoints keep longer journeys forgiving. Returning to an earlier
   flag never moves the respawn point backward.
+- Pip's glow wakes flowers and curled leaves into platforms. Environmental
+  clues suggest optional routes around giant garden landmarks.
+- Charging beetles break marked barriers, and hoppers bounce on mushrooms.
+- Each world ends with a guardian: a stag beetle, spider, or storm moth.
+  Watch the warning, avoid the attack, and stomp during recovery. A checkpoint
+  and recovery diamond precede each arena.
+
+## Home grove, rewards, and modes
+
+Visit the safe, playable home grove from the menu. Rescued fireflies become
+residents, and earned coins buy optional outfits and decorations. Coins count
+toward both the run's extra-life counter and a persistent cosmetic wallet;
+purchases never change movement or combat strength. Rescue all three fireflies
+in a world to unlock its separate challenge room and earn time medals.
+
+Choose **Classic** for the three-life rules, **Relaxed** for unlimited checkpoint
+retries, or **Timed** for a separately recorded three-life run. The mode applies
+when starting a new run. Each mode has separate completion and time records;
+challenge medals and historical trail records are separate as well.
+
+See [the living garden guide](docs/LIVING_GARDEN.md) for the content and release
+acceptance criteria, including the physical-device playtest.
 
 Music, sound effects, and haptics have separate settings. Each world has an
-original looping score, with a musical change during star power. Music pauses
-with gameplay. Haptics use the native iOS plugin when supported.
+original looping score, with separate grove and guardian themes and a musical
+change during star power. Music pauses with gameplay. Haptics use the native
+iOS plugin when supported.
 
 ## Lives and power-ups
 
-- Start each trail small with **3 lives**. Falling into a gap always costs one
+- In Classic and Timed modes, start each trail small with **3 lives**. Falling into a gap always costs one
   life, including while big or using star power.
 - **Diamonds make Pip big.** A bug hit then shrinks Pip without taking a life.
   A hit while small costs a life. A brief grace period after shrinking or
@@ -68,7 +92,8 @@ with gameplay. Haptics use the native iOS plugin when supported.
   falling still costs a life.
 - Losing a life returns small Pip to the checkpoint, or the start if no checkpoint
   is active, and clears star power. Diamonds return so Pip can grow again.
-  Zero lives ends the run. Restarting or choosing another trail starts fresh.
+  Zero lives ends a Classic or Timed run. Relaxed mode keeps checkpoint retries
+  available. Restarting or choosing another trail starts fresh.
 
 Fireflies, completion records, best times, and settings are saved on the device.
 Records from the earlier short trails are retained separately so their times
@@ -118,7 +143,8 @@ be performed through Xcode Cloud and TestFlight.
 ## Structure
 
 - `src/game/engine.ts` — fixed-step simulation, collision, and game rules.
-- `src/game/levels.ts` — three extended authored trails and their secret routes.
+- `src/game/bosses.ts` — telegraphed guardian attacks and recovery phases.
+- `src/game/levels.ts` — three authored worlds, secret routes, grove, and challenges.
 - `src/game/renderer.ts` — crisp cartoon canvas, camera, and animated effects.
 - `src/main.ts` — menus, HUD, progress, and game loop.
 - `src/controls.ts` — touch capture/dragging, keyboard, and gamepad input.

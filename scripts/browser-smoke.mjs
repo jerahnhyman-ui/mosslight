@@ -19,7 +19,7 @@ let browser;
 const errors = [];
 const baseURL = "http://127.0.0.1:4173";
 // Authored Meadow finish marker; browser routes read only visible HUD progress.
-const MEADOW_GOAL_X = 11030;
+const MEADOW_GOAL_X = 12140;
 const captureErrors = (page) =>
   page.on("pageerror", (error) => errors.push(error.message));
 const screenshot = (page, name) =>
@@ -254,10 +254,10 @@ async function advanceUntil(
   }
   throw new Error(`Timed out waiting for ${description}`);
 }
-async function walkToMeadowX(page, targetX) {
+async function walkToX(page, targetX, goalX = MEADOW_GOAL_X) {
   // Read the visible trail-progress indicator, rather than exposing game state.
   for (let frame = 0; frame < 200; frame++) {
-    const x = (await trailProgress(page)) * MEADOW_GOAL_X;
+    const x = (await trailProgress(page)) * goalX;
     if (Math.abs(targetX - x) < 9) {
       await page.keyboard.up("ArrowLeft");
       await page.keyboard.up("ArrowRight");
@@ -271,16 +271,21 @@ async function walkToMeadowX(page, targetX) {
     await page.keyboard.down(direction);
     await page.clock.runFor(32);
   }
-  throw new Error(
-    `Could not reach meadow x=${targetX} using keyboard controls`,
-  );
+  throw new Error(`Could not reach x=${targetX} using keyboard controls`);
 }
-async function jumpToMeadowX(page, targetX) {
+const walkToMeadowX = (page, targetX) => walkToX(page, targetX);
+async function jumpToX(page, targetX, goalX = MEADOW_GOAL_X) {
   await page.keyboard.down("Space");
-  await walkToMeadowX(page, targetX);
+  await walkToX(page, targetX, goalX);
   await page.clock.runFor(450);
   await page.keyboard.up("Space");
   await page.clock.runFor(64);
+}
+const jumpToMeadowX = (page, targetX) => jumpToX(page, targetX);
+async function readStoredSave(page) {
+  return page.evaluate(() =>
+    JSON.parse(localStorage.getItem("mosslight-save-v2") || "null"),
+  );
 }
 async function checkStarPickupVisibility(page, label) {
   const overlaps = await page.evaluate(() => {
@@ -414,7 +419,7 @@ try {
     .getByRole("button", { name: "Pause game", exact: true })
     .click();
   await desktop
-    .getByRole("button", { name: "Restart trail", exact: true })
+    .getByRole("button", { name: "Restart adventure", exact: true })
     .click();
   await expect(desktop.locator("#lives")).toHaveAttribute(
     "aria-label",
@@ -489,6 +494,17 @@ try {
     path: "artifacts/rules-diamond-growth.png",
     fullPage: true,
   });
+  const earnedSave = await readStoredSave(rules);
+  expect(
+    earnedSave.wallet,
+    "collected trail coins enter the permanent wallet at full lives",
+  ).toBeGreaterThan(0);
+  expect(earnedSave.lifetimeCoins).toBe(earnedSave.wallet);
+  await rules.clock.runFor(500);
+  expect(
+    (await readStoredSave(rules)).wallet,
+    "idle frames cannot award the same coin again",
+  ).toBe(earnedSave.wallet);
   const growthNotes = [...audioNotes];
   expect(
     growthNotes,
@@ -691,7 +707,7 @@ try {
   await expect(secrets.locator("#section-name")).toContainText(
     "Mushroom Grove",
   );
-  await expect(secrets.locator("#checkpoint-count")).toContainText("1 / 4");
+  await expect(secrets.locator("#checkpoint-count")).toContainText("1 / 5");
   const notesBeforeBounce = secretNotes.length;
   await secrets.keyboard.down("Space");
   await walkToMeadowX(secrets, 3740);
@@ -1009,6 +1025,213 @@ try {
   await music.close();
   console.log(
     "PASS music: original score starts after gesture, continues in play, pauses/resumes, and mutes independently of effects",
+  );
+
+  const garden = await rulesPage(browser, []);
+  await garden.getByRole("button", { name: "Game menu", exact: true }).click();
+  for (const index of [0, 1, 2])
+    await expect(garden.locator(`[data-challenge="${index}"]`)).toBeDisabled();
+  await garden.locator("#visit-grove").click();
+  await expect(garden.locator(".game-app")).toHaveAttribute(
+    "data-run-kind",
+    "grove",
+  );
+  await expect(garden.locator("#world-label")).toHaveText("The Home Grove");
+  await garden.clock.runFor(64);
+  const groveProgress = await trailProgress(garden);
+  await garden.keyboard.down("ArrowRight");
+  await garden.clock.runFor(1500);
+  await garden.keyboard.up("ArrowRight");
+  expect(
+    await trailProgress(garden),
+    "the home grove is playable with ordinary controls",
+  ).toBeGreaterThan(groveProgress + 0.1);
+  await garden.locator("#grove-shop-button").click();
+  await expect(garden.locator("#grove-dialog")).toBeVisible();
+  await expect(garden.locator("#wallet-count")).toHaveText("0 coins");
+  await expect(garden.locator('[data-buy="berry"]')).toBeDisabled();
+  await expect(garden.locator('[data-buy="moon"]')).toBeDisabled();
+  await garden.locator("#grove-done").click();
+  await expect(garden.locator(".game-app")).toHaveAttribute(
+    "data-mode",
+    "playing",
+  );
+  // Restore an explicitly seeded earned-progress fixture to exercise unlocked
+  // rewards. Actual pickup persistence is covered by the real route above.
+  await garden.evaluate(() => {
+    const saved = JSON.parse(localStorage.getItem("mosslight-save-v2") || "{}");
+    saved.progress ??= [{}, {}, {}];
+    saved.progress[0].fireflies = [0, 1, 2];
+    saved.wallet = 500;
+    saved.lifetimeCoins = 500;
+    localStorage.setItem("mosslight-save-v2", JSON.stringify(saved));
+  });
+  await garden.reload();
+  await garden.getByRole("button", { name: "Game menu", exact: true }).click();
+  await expect(garden.locator('[data-challenge="0"]')).toBeEnabled();
+  await expect(garden.locator('[data-challenge="1"]')).toBeDisabled();
+  await garden.locator("#visit-grove").click();
+  await garden.clock.runFor(64);
+  await expect(garden.locator("#run-mode")).toContainText("3 neighbors home");
+  await garden.locator("#grove-shop-button").click();
+  await expect(garden.locator("#wallet-count")).toHaveText("500 coins");
+  for (const item of ["berry", "lanterns", "flowers"])
+    await garden.locator(`[data-buy="${item}"]`).click();
+  await expect(garden.locator("#wallet-count")).toHaveText("225 coins");
+  await expect(garden.locator('[data-buy="berry"]')).toHaveText("Wearing");
+  await expect(garden.locator('[data-buy="lanterns"]')).toBeDisabled();
+  await garden.locator('[data-buy="leaf"]').click();
+  await garden.locator('[data-buy="berry"]').click();
+  await expect(garden.locator("#wallet-count")).toHaveText("225 coins");
+  await expect(garden.locator('[data-buy="moon"]')).toBeDisabled();
+  const purchased = await readStoredSave(garden);
+  expect(purchased.outfit).toBe("berry");
+  expect(purchased.decorations).toEqual(["lanterns", "flowers"]);
+  expect(purchased.lifetimeCoins).toBe(500);
+  await garden.screenshot({
+    path: "artifacts/garden-shop-acceptance.png",
+    fullPage: true,
+  });
+  await garden.locator("#grove-done").click();
+  await garden.clock.runFor(64);
+  await checkLayout(garden, "landscape home grove");
+  await garden.screenshot({
+    path: "artifacts/garden-home-acceptance.png",
+    fullPage: true,
+  });
+  await garden.setViewportSize({ width: 390, height: 844 });
+  await garden.clock.runFor(64);
+  await checkLayout(garden, "portrait home grove");
+  await garden.locator("#grove-shop-button").click();
+  await garden.screenshot({
+    path: "artifacts/garden-shop-portrait-acceptance.png",
+    fullPage: true,
+  });
+  await garden.locator("#grove-done").click();
+  await garden.reload();
+  expect((await readStoredSave(garden)).wallet).toBe(225);
+  expect((await readStoredSave(garden)).outfit).toBe("berry");
+  await garden.getByRole("button", { name: "Game menu", exact: true }).click();
+  await garden.locator("#play-mode").selectOption("relaxed");
+  await garden.locator('[data-menu-world="0"]').click();
+  await garden.locator("#start-button").click();
+  await garden.clock.runFor(64);
+  await expect(garden.locator("#life-count")).toHaveText("∞");
+  await expect(garden.locator("#run-mode")).toHaveText("Relaxed");
+  await garden.reload();
+  await garden.getByRole("button", { name: "Game menu", exact: true }).click();
+  await expect(garden.locator("#play-mode")).toHaveValue("relaxed");
+  await garden.locator("#play-mode").selectOption("timed");
+  await garden.locator('[data-menu-world="0"]').click();
+  await garden.locator("#start-button").click();
+  await garden.clock.runFor(64);
+  await expect(garden.locator("#run-mode")).toHaveText("Time Trial");
+  await expect(garden.locator("#life-count")).toHaveText("3");
+  await garden.getByRole("button", { name: "Game menu", exact: true }).click();
+  await garden.locator('[data-challenge="0"]').click();
+  await garden.setViewportSize({ width: 844, height: 390 });
+  await garden.clock.runFor(64);
+  await expect(garden.locator(".game-app")).toHaveAttribute(
+    "data-run-kind",
+    "challenge",
+  );
+  await expect(garden.locator("#world-label")).toHaveText("Petal-Hop Sprint");
+  await expect(garden.locator("#run-mode")).toContainText("Gold 00:18");
+  // Complete an optional room with ordinary keyboard input. The long authored
+  // route tests separately exercise every raised platform and all three rooms.
+  await walkToX(garden, 620, 2180);
+  await garden.keyboard.down("Space");
+  await walkToX(garden, 735, 2180);
+  await garden.clock.runFor(380);
+  await walkToX(garden, 1070, 2180);
+  await garden.keyboard.up("Space");
+  await garden.clock.runFor(500);
+  await walkToX(garden, 1200, 2180);
+  await jumpToX(garden, 1450, 2180);
+  await garden.clock.runFor(400);
+  await walkToX(garden, 1810, 2180);
+  await garden.clock.runFor(500);
+  await garden.keyboard.down("ArrowRight");
+  await advanceUntil(
+    garden,
+    async () =>
+      (await garden.locator(".game-app").getAttribute("data-mode")) === "won",
+    "challenge finish",
+    4000,
+  );
+  await garden.keyboard.up("ArrowRight");
+  await expect(garden.locator(".challenge-medal")).toBeVisible();
+  const challengeSave = await readStoredSave(garden);
+  expect(challengeSave.challenges[0].completed).toBe(true);
+  expect(challengeSave.challenges[0].bestTime).toBeGreaterThan(0);
+  expect(
+    challengeSave.progress[0].garden.timed.completed,
+    "challenge records never overwrite world boss records",
+  ).toBe(false);
+  await garden.screenshot({
+    path: "artifacts/garden-challenge-finish.png",
+    fullPage: true,
+  });
+  await garden.close();
+  console.log(
+    "PASS living garden: real coin earning/no frame duplication, locked/unlocked challenges, playable grove, cosmetic purchases/equip/reload, persisted modes, actual-input challenge finish and separate records",
+  );
+
+  // This is deliberately a CSS fixture, not a simulated boss win. The engine
+  // acceptance tests finish each real world and guardian using normal input.
+  const bossLayout = await rulesPage(browser, []);
+  for (const [width, height] of [
+    [844, 390],
+    [568, 320],
+    [390, 844],
+  ]) {
+    await bossLayout.setViewportSize({ width, height });
+    await bossLayout.clock.runFor(64);
+    await bossLayout.evaluate(() => {
+      const boss = document.querySelector("#boss-hud");
+      boss.hidden = false;
+      boss.dataset.state = "warning";
+      document.querySelector("#boss-name").textContent =
+        "Bramble, the Stag Beetle · Phase 3";
+      document.querySelector("#boss-health").textContent = "●○○";
+      document.querySelector("#boss-instruction").textContent =
+        "A charge is coming — get ready to jump!";
+    });
+    const boxes = await bossLayout.evaluate(() => {
+      const rect = (selector) => {
+        const r = document.querySelector(selector).getBoundingClientRect();
+        return { x: r.x, y: r.y, width: r.width, height: r.height };
+      };
+      return {
+        boss: rect("#boss-hud"),
+        controls: [rect(".touch-dpad"), rect(".touch-jump")],
+        section: rect(".section-status"),
+      };
+    });
+    expect(boxes.boss.x).toBeGreaterThanOrEqual(0);
+    expect(boxes.boss.x + boxes.boss.width).toBeLessThanOrEqual(width);
+    expect(boxes.boss.y).toBeGreaterThanOrEqual(0);
+    expect(boxes.boss.y + boxes.boss.height).toBeLessThanOrEqual(height);
+    for (const other of [...boxes.controls, boxes.section]) {
+      const overlapX =
+        Math.min(boxes.boss.x + boxes.boss.width, other.x + other.width) -
+        Math.max(boxes.boss.x, other.x);
+      const overlapY =
+        Math.min(boxes.boss.y + boxes.boss.height, other.y + other.height) -
+        Math.max(boxes.boss.y, other.y);
+      expect(
+        overlapX > 1 && overlapY > 1,
+        `boss HUD avoids controls/status at ${width}×${height}`,
+      ).toBe(false);
+    }
+    await bossLayout.screenshot({
+      path: `artifacts/garden-boss-layout-${width}.png`,
+      fullPage: true,
+    });
+  }
+  await bossLayout.close();
+  console.log(
+    "PASS boss HUD layout fixture: warnings and health fit landscape, small phone and portrait without covering controls/status",
   );
 
   for (const [label, width, height] of [

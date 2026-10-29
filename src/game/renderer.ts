@@ -108,6 +108,9 @@ export class Renderer {
   private previousDiamonds: boolean[] = [];
   private previousFireflies: boolean[] = [];
   private previousBroken: boolean[] = [];
+  private previousAwakened: boolean[] = [];
+  private previousBossHealth = 3;
+  private escapeCelebration = 0;
   private previousCollapsed: boolean[] = [];
   private previousEnemies: boolean[] = [];
   private previousForm: "small" | "big" = "small";
@@ -187,6 +190,11 @@ export class Renderer {
         (firefly) => firefly.collected,
       );
       this.previousBroken = game.platforms.map((platform) => platform.broken);
+      this.previousAwakened = game.platforms.map(
+        (platform) => platform.awakened,
+      );
+      this.previousBossHealth = game.boss?.health ?? 3;
+      this.escapeCelebration = 0;
       this.previousCollapsed = game.platforms.map(
         (platform) => platform.crumbleRemaining === 0,
       );
@@ -237,6 +245,7 @@ export class Renderer {
     this.landing = Math.max(0, this.landing - dt);
     this.formChange = Math.max(0, this.formChange - dt);
     this.bouncePulse = Math.max(0, this.bouncePulse - dt);
+    this.escapeCelebration = Math.max(0, this.escapeCelebration - dt);
     if (!titleMode && game.elapsed !== this.previousElapsed)
       this.feedback(game);
     this.previousDeaths = game.deaths;
@@ -257,6 +266,8 @@ export class Renderer {
       }
     }
     if (!titleMode) {
+      this.gardenLandmarks(game, time);
+      this.homeGrove(game, time);
       this.sectionLandmarks(game, time, p);
       this.treasuryRooms(game, time);
     }
@@ -287,8 +298,57 @@ export class Renderer {
             index + 1,
           );
       });
-      if (this.visible(game.level.goal.x, 90))
+      if (game.level.kind !== "grove" && this.visible(game.level.goal.x, 90)) {
         this.portal(game.level.goal.x, game.level.goal.y, p, time);
+        this.sealedGoal(game);
+      }
+      this.secretClues(game, time);
+      if (game.boss && game.boss.state !== "defeated") {
+        const gateX = game.boss.maxX + game.boss.w + 26;
+        if (this.visible(gateX, 40)) {
+          this.rounded(
+            gateX - 5,
+            0,
+            10,
+            game.boss.groundY,
+            4,
+            "rgba(211,238,153,.22)",
+          );
+          this.line(
+            [
+              [gateX, 0],
+              [gateX, game.boss.groundY],
+            ],
+            "rgba(190,226,138,.65)",
+            2,
+          );
+          for (let i = 0; i < 8; i++)
+            this.ellipse(
+              gateX,
+              (i * 57 + time * 14) % game.boss.groundY,
+              3,
+              4,
+              "#e9f8b4",
+            );
+          this.line(
+            [
+              [gateX, game.boss.groundY],
+              [gateX - 6, game.boss.groundY - 37],
+              [gateX, game.boss.groundY - 79],
+            ],
+            "#62996a",
+            8,
+          );
+          for (let i = 0; i < 4; i++)
+            this.leaf(
+              gateX - 3,
+              game.boss.groundY - 12 - i * 17,
+              16,
+              i % 2 ? 0.9 : -0.9,
+              i % 2 ? "#9ac57c" : "#7eb377",
+            );
+        }
+      }
       game.coins.forEach((coin, i) => {
         if (!coin.collected && this.visible(coin.x, 24))
           this.coin(coin.x, coin.y, time, i);
@@ -309,10 +369,25 @@ export class Renderer {
         if ((enemy.alive || enemy.squashed > 0) && this.visible(enemy.x, 40))
           this.bug(enemy, time, enemy.alive ? 0 : enemy.squashed);
       }
+      this.bossCreature(game, time);
+      this.bossHazards(game, time);
       const player = game.player;
       const center = player.x + player.w / 2;
       const feet = player.y + player.h;
       const size = player.h / 38;
+      if (game.starPowerRemaining <= 0) {
+        const glow = c.createRadialGradient(
+          center,
+          feet - 23 * size,
+          3,
+          center,
+          feet - 23 * size,
+          45 * size,
+        );
+        glow.addColorStop(0, "rgba(255,241,173,.14)");
+        glow.addColorStop(1, "rgba(255,241,173,0)");
+        this.ellipse(center, feet - 23 * size, 45 * size, 45 * size, glow);
+      }
       if (game.starPowerRemaining > 0)
         this.starAura(center, feet, size, game.starPowerRemaining, time, false);
       if (this.formChange > 0)
@@ -331,13 +406,25 @@ export class Renderer {
         time,
         this.landing,
         size,
-        game.state === "won"
+        game.state === "won" || this.escapeCelebration > 0
           ? "won"
           : game.state === "lost"
             ? "lost"
             : player.invulnerable > 1.1
               ? "hurt"
               : "normal",
+        game.outfit,
+        game.enemies.some(
+          (e) =>
+            e.alive &&
+            Math.abs(e.x - player.x) < 135 &&
+            Math.abs(e.y - player.y) < 85,
+        ) ||
+          !!(
+            game.boss &&
+            game.boss.state !== "defeated" &&
+            Math.abs(game.boss.x - player.x) < 220
+          ),
       );
       c.restore();
       if (game.starPowerRemaining > 0)
@@ -689,6 +776,785 @@ export class Renderer {
     c.restore();
   }
 
+  /** Garden objects sit behind their authored collision platforms. */
+  private gardenLandmarks(game: Game, time: number) {
+    const c = this.ctx;
+    for (const r of game.level.landmarks ?? []) {
+      if (r.x + r.w < this.cameraX - 80 || r.x > this.cameraX + WIDTH + 80)
+        continue;
+      c.save();
+      const x = r.x,
+        y = r.y,
+        w = r.w,
+        h = r.h;
+      if (r.kind === "watering-can") {
+        // A broad enamel body and curved handle are readable from several screens away.
+        c.strokeStyle = "#448b8d";
+        c.lineWidth = 16;
+        c.beginPath();
+        c.ellipse(
+          x + w * 0.74,
+          y + h * 0.45,
+          w * 0.23,
+          h * 0.33,
+          -0.25,
+          0,
+          Math.PI * 2,
+        );
+        c.stroke();
+        c.beginPath();
+        c.moveTo(x + w * 0.25, y + h * 0.7);
+        c.lineTo(x - w * 0.08, y + h * 0.22);
+        c.lineTo(x - w * 0.19, y + h * 0.29);
+        c.lineTo(x + w * 0.1, y + h * 0.9);
+        c.closePath();
+        c.fillStyle = "#64b2b1";
+        c.fill();
+        this.rounded(
+          x + w * 0.1,
+          y + h * 0.12,
+          w * 0.6,
+          h * 0.88,
+          24,
+          "#70bdb7",
+          "#3c8184",
+        );
+        this.ellipse(
+          x + w * 0.4,
+          y + h * 0.12,
+          w * 0.3,
+          14,
+          "#9fd4c0",
+          "#3c8184",
+        );
+        this.ellipse(x + w * 0.4, y + h * 0.12, w * 0.2, 8, "#3e8184");
+        this.rounded(
+          x + w * 0.18,
+          y + h * 0.28,
+          w * 0.07,
+          h * 0.5,
+          10,
+          "#a3d8c8",
+        );
+        this.ellipse(
+          x - w * 0.14,
+          y + h * 0.25,
+          w * 0.1,
+          15,
+          "#aad7c7",
+          "#448b8d",
+        );
+        for (let i = 0; i < 5; i++)
+          this.ellipse(
+            x - w * 0.2 + i * w * 0.03,
+            y + h * 0.25,
+            2,
+            2,
+            "#508b8b",
+          );
+        this.leaf(x + w * 0.5, y + h * 0.7, 32, 0.5, "#b4e1c4");
+      } else if (r.kind === "flowerpot") {
+        c.beginPath();
+        c.moveTo(x + 8, y + 18);
+        c.lineTo(x + w - 8, y + 18);
+        c.lineTo(x + w * 0.83, y + h);
+        c.lineTo(x + w * 0.17, y + h);
+        c.closePath();
+        c.fillStyle = "#d99778";
+        c.fill();
+        c.strokeStyle = "#a56859";
+        c.lineWidth = 3;
+        c.stroke();
+        this.rounded(x, y, w, 29, 8, "#f1b58d", "#a56859");
+        this.line(
+          [
+            [x + w * 0.22, y + 43],
+            [x + w * 0.3, y + h - 16],
+          ],
+          "#efb18b",
+          12,
+        );
+        this.line(
+          [
+            [x + w * 0.65, y + 40],
+            [x + w * 0.54, y + h * 0.5],
+            [x + w * 0.63, y + h * 0.63],
+          ],
+          "#b87961",
+          3,
+        );
+        this.ellipse(x + w * 0.5, y + 10, w * 0.38, 5, "#916d54");
+      } else if (r.kind === "log") {
+        this.rounded(x, y, w, h, Math.min(h * 0.45, 60), "#aa8058", "#735e44");
+        for (let row = 0; row < 4; row++) {
+          const yy = y + 15 + (row * (h - 25)) / 4;
+          this.line(
+            [
+              [x + 25, yy],
+              [x + w * 0.42, yy + 6],
+              [x + w - 25, yy - 3],
+            ],
+            row % 2 ? "#bb9164" : "#8a6e4b",
+            4,
+          );
+        }
+        this.ellipse(
+          x + w - 18,
+          y + h * 0.5,
+          18,
+          h * 0.43,
+          "#ddbc83",
+          "#8a6e4b",
+          3,
+        );
+        for (let ring = 1; ring < 4; ring++) {
+          c.beginPath();
+          c.ellipse(
+            x + w - 18,
+            y + h * 0.5,
+            ring * 4,
+            h * 0.1 * ring,
+            0,
+            0,
+            Math.PI * 2,
+          );
+          c.strokeStyle = "#bb955f";
+          c.lineWidth = 2;
+          c.stroke();
+        }
+        for (let i = 0; i < 7; i++)
+          this.leaf(
+            x + 35 + (i * (w - 65)) / 7,
+            y + 12,
+            14,
+            -0.6 + i * 0.3,
+            "#73a96a",
+          );
+      } else if (r.kind === "web") {
+        const cx = x + w / 2,
+          cy = y + h / 2;
+        c.strokeStyle = "rgba(235,245,237,.65)";
+        c.lineWidth = 2;
+        for (let i = 0; i < 8; i++) {
+          const a = (i * Math.PI) / 4;
+          this.line(
+            [
+              [cx, cy],
+              [cx + (Math.cos(a) * w) / 2, cy + (Math.sin(a) * h) / 2],
+            ],
+            "rgba(235,245,237,.55)",
+            2,
+          );
+        }
+        for (let ring = 1; ring < 5; ring++) {
+          c.beginPath();
+          for (let i = 0; i <= 8; i++) {
+            const a = (i * Math.PI) / 4;
+            const xx = cx + (Math.cos(a) * w * ring) / 10;
+            const yy = cy + (Math.sin(a) * h * ring) / 10;
+            if (!i) c.moveTo(xx, yy);
+            else c.lineTo(xx, yy);
+          }
+          c.stroke();
+        }
+        this.ellipse(cx + w * 0.21, cy - h * 0.2, 3, 4, "#e6fff2");
+      } else {
+        // Water stays below the playable ledges; highlights never suggest a solid floor.
+        this.rounded(x, y - 18, w, h + 18, 14, "#83c9d1");
+        for (let i = 0; i < 12; i++) {
+          const xx = x + ((i * 87 + time * 28) % Math.max(1, w - 30));
+          const yy = y - 12 + (i % 3) * Math.max(4, h / 4);
+          this.line(
+            [
+              [xx, yy],
+              [xx + 23, yy],
+            ],
+            "#c1eddf",
+            2,
+          );
+        }
+      }
+      c.restore();
+    }
+  }
+
+  private wakingPlant(r: Game["platforms"][number], time: number) {
+    const c = this.ctx;
+    const cx = r.x + r.w / 2;
+    const floor = Math.max(r.y + 40, 430);
+    this.line(
+      [
+        [cx, floor],
+        [cx - 7, (r.y + floor) / 2],
+        [cx, r.y + 12],
+      ],
+      "#4d9666",
+      6,
+    );
+    this.leaf(cx - 3, r.y + (floor - r.y) * 0.5, 24, -0.9, "#82bd6b");
+    this.leaf(cx, r.y + (floor - r.y) * 0.7, 21, 0.9, "#69a964");
+    if (!r.awakened) {
+      if (r.kind === "curled") {
+        c.beginPath();
+        for (let i = 0; i < 70; i++) {
+          const a = i * 0.12,
+            radius = 2 + i * 0.24;
+          const x = cx + Math.cos(a) * radius,
+            y = r.y + 23 + Math.sin(a) * radius;
+          if (!i) c.moveTo(x, y);
+          else c.lineTo(x, y);
+        }
+        c.lineWidth = 9;
+        c.strokeStyle = "#87b77b";
+        c.stroke();
+      } else {
+        this.ellipse(cx, r.y + 24, 14, 22, "#c8adc2", "#967d9b");
+        this.leaf(cx, r.y + 45, 20, -0.5, "#7aaa72");
+        this.leaf(cx, r.y + 45, 20, 0.5, "#9bc087");
+      }
+      // Sleeping buds have no horizontal rim, matching their inactive collision state.
+      this.ellipse(cx + Math.sin(time * 1.2) * 14, r.y - 5, 2, 2, "#fff0a9");
+      return;
+    }
+    if (r.kind === "curled") {
+      c.beginPath();
+      c.moveTo(r.x, r.y + 3);
+      c.quadraticCurveTo(cx, r.y + 40, r.x + r.w, r.y + 3);
+      c.closePath();
+      c.fillStyle = "#75bc72";
+      c.fill();
+      for (let i = 1; i < 5; i++)
+        this.line(
+          [
+            [r.x + (i * r.w) / 5, r.y + 5],
+            [cx, r.y + 20],
+          ],
+          "#4f9d62",
+          2,
+        );
+      this.rounded(r.x, r.y, r.w, Math.min(8, r.h), 4, "#c2e797", "#569e65");
+    } else {
+      for (let i = 0; i < 7; i++)
+        this.ellipse(
+          r.x + 10 + ((r.w - 20) * i) / 6,
+          r.y + 12,
+          r.w / 10,
+          13,
+          i % 2 ? "#f3b7d3" : "#ffd3df",
+          "#c98eac",
+          1,
+        );
+      this.rounded(r.x, r.y, r.w, Math.min(8, r.h), 4, "#fff1b0", "#c9a564");
+      this.ellipse(cx, r.y + 9, r.w * 0.21, 6, "#f1c76a");
+    }
+    for (let i = 0; i < 3; i++)
+      this.ellipse(
+        cx + Math.sin(time + i * 2) * r.w * 0.5,
+        r.y + 25 + Math.cos(time + i * 2) * 8,
+        1.7,
+        1.7,
+        "#fff6bf",
+      );
+  }
+
+  private secretClues(game: Game, time: number) {
+    const c = this.ctx;
+    for (const clue of game.level.clues ?? []) {
+      if (!this.visible(clue.x, 60)) continue;
+      const distance = Math.hypot(
+        game.player.x + game.player.w / 2 - clue.x,
+        game.player.y + game.player.h / 2 - clue.y,
+      );
+      const near = Math.max(0, 1 - distance / 180);
+      c.save();
+      if (clue.kind === "footprints") {
+        c.globalAlpha = 0.12 + near * 0.78;
+        for (let i = 0; i < 6; i++) {
+          this.ellipse(
+            clue.x - 24 + i * 9,
+            clue.y + (i % 2 ? 3 : -3),
+            3.5,
+            1.8,
+            "#fff7b1",
+          );
+        }
+      } else if (clue.kind === "glow") {
+        this.ellipse(
+          clue.x,
+          clue.y,
+          16 + near * 10,
+          22,
+          `rgba(255,228,148,${0.09 + near * 0.16})`,
+        );
+        this.line(
+          [
+            [clue.x - 4, clue.y - 13],
+            [clue.x + 3, clue.y - 3],
+            [clue.x - 2, clue.y + 6],
+            [clue.x + 5, clue.y + 13],
+          ],
+          "#ffe89c",
+          2.5,
+        );
+      } else {
+        for (let i = 0; i < 5; i++) {
+          this.line(
+            [
+              [clue.x - 12 + i * 6, clue.y + 8],
+              [
+                clue.x - 15 + i * 7 + Math.sin(time * 3 + i) * (2 + near * 3),
+                clue.y - 8 - (i % 2) * 5,
+              ],
+            ],
+            "#88bc6b",
+            3,
+          );
+        }
+        this.ellipse(clue.x + 8, clue.y - 9, 2, 2, "#ffe99d");
+      }
+      if (near > 0.65 && clue.text) {
+        c.font = "600 11px 'DM Sans', sans-serif";
+        const width = Math.min(230, c.measureText(clue.text).width + 20);
+        this.rounded(
+          clue.x - width / 2,
+          clue.y - 48,
+          width,
+          24,
+          8,
+          "#fff7dded",
+        );
+        c.fillStyle = "#456b54";
+        c.textAlign = "center";
+        c.textBaseline = "middle";
+        c.fillText(clue.text, clue.x, clue.y - 36, width - 16);
+      }
+      c.restore();
+    }
+  }
+
+  private homeGrove(game: Game, time: number) {
+    if (game.level.kind !== "grove") return;
+    const c = this.ctx;
+    const total = Math.max(0, Math.min(9, game.rescuedTotal));
+    const span = Math.min(1500, game.level.width - 430);
+    for (let i = 0; i < 9; i++) {
+      const x = 270 + (i * span) / 9;
+      if (!this.visible(x, 90)) continue;
+      const lit = i < total;
+      const y = 430;
+      const bob = Math.sin(time * 1.5 + i * 2) * 4;
+      this.rounded(
+        x - 25,
+        y - 47,
+        50,
+        47,
+        16,
+        lit ? "#b8c88a" : "#9fab91",
+        "#6f8a68",
+      );
+      this.ellipse(x, y - 47, 35, 14, lit ? "#d6b57c" : "#a3a58a", "#7f8a68");
+      for (let stripe = 0; stripe < 4; stripe++)
+        this.line(
+          [
+            [x - 20 + stripe * 13, y - 54],
+            [x - 19 + stripe * 13, y - 44],
+          ],
+          "#a58d67",
+          2,
+        );
+      this.rounded(x - 8, y - 25, 16, 25, 8, lit ? "#fff0a0" : "#688774");
+      if (lit) {
+        this.ellipse(x, y - 18, 26, 26, "rgba(255,235,143,.17)");
+        this.firefly(x + Math.sin(time + i) * 18, y - 73 + bob, time + i, 0.85);
+      }
+      this.leaf(x + 4, y - 60, 11, 0.5, lit ? "#7ca760" : "#8b9f7a");
+    }
+    if (game.groveDecorations.includes("lanterns")) {
+      for (let i = 0; i < 5; i++) {
+        const x = 205 + i * Math.min(370, game.level.width / 5);
+        if (!this.visible(x, 50)) continue;
+        this.line(
+          [
+            [x, 430],
+            [x, 270],
+            [x + 29, 267],
+            [x + 29, 286],
+          ],
+          "#78976b",
+          5,
+        );
+        this.rounded(x + 18, 286, 23, 32, 9, "#fff0ac", "#ac9764");
+        this.ellipse(x + 29, 302, 31, 35, "rgba(255,234,142,.12)");
+        this.firefly(x + 29, 300, time, 0.45);
+      }
+    }
+    if (game.groveDecorations.includes("flowers")) {
+      for (let i = 0; i < 24; i++) {
+        const x = 180 + (i * (game.level.width - 350)) / 24;
+        if (!this.visible(x, 24)) continue;
+        const yy = 423 - (i % 3) * 9;
+        this.line(
+          [
+            [x, 430],
+            [x, yy - 20],
+          ],
+          "#6fa168",
+          2.5,
+        );
+        for (let j = 0; j < 5; j++) {
+          const a = (j * Math.PI * 2) / 5;
+          this.ellipse(
+            x + Math.cos(a) * 7,
+            yy - 20 + Math.sin(a) * 7,
+            5,
+            5,
+            i % 2 ? "#ebabc5" : "#ffe8a1",
+          );
+        }
+        this.ellipse(x, yy - 20, 4, 4, "#b48d57");
+      }
+    }
+    if (game.groveDecorations.includes("fountain")) {
+      const x = game.level.width - 130;
+      if (this.visible(x, 95)) {
+        this.ellipse(x, 424, 63, 15, "#8badac", "#5e9396");
+        this.ellipse(x, 420, 55, 10, "#b2e1d6");
+        this.rounded(x - 9, 366, 18, 55, 7, "#a0b9a9");
+        this.ellipse(x, 366, 34, 8, "#bbd1b6", "#819f90");
+        for (let i = 0; i < 5; i++) {
+          c.beginPath();
+          c.moveTo(x, 365);
+          c.quadraticCurveTo(
+            x - 40 + i * 20,
+            305 - Math.sin(time * 2 + i) * 3,
+            x - 45 + i * 22,
+            414,
+          );
+          c.strokeStyle = "#cff7e5";
+          c.lineWidth = 2;
+          c.stroke();
+        }
+      }
+    }
+    c.save();
+    c.font = "700 14px 'DM Sans', sans-serif";
+    c.textAlign = "center";
+    if (this.visible(130, 120)) {
+      this.rounded(47, 300, 166, 38, 10, "#fff3ce", "#86a67b");
+      c.fillStyle = "#496e54";
+      c.fillText(`${total} / 9 lights home`, 130, 324);
+    }
+    c.restore();
+  }
+
+  private bossCreature(game: Game, time: number) {
+    const b = game.boss;
+    if (!b || !this.visible(b.x + b.w / 2, b.w + 60)) return;
+    const c = this.ctx;
+    const defeated = b.state === "defeated";
+    const warning = b.state === "warning";
+    const recovering = b.state === "recover";
+    const cx = b.x + b.w / 2,
+      feet = b.y + b.h;
+    if (defeated) {
+      this.ellipse(cx, feet - 6, b.w * 0.45, 9, "rgba(255,241,173,.4)");
+      for (let i = 0; i < 3; i++)
+        this.firefly(
+          cx + Math.sin(time + i * 2) * 26,
+          feet - 25 - i * 17,
+          time,
+          0.65,
+        );
+      return;
+    }
+    this.ellipse(cx, b.groundY - 1, b.w * 0.46, 5, "rgba(38,60,53,.2)");
+    if (warning) {
+      const direction = b.facing;
+      const start = cx + direction * b.w * 0.55;
+      const end =
+        b.kind === "spider"
+          ? start + direction * 170
+          : b.attackTargetX + b.w / 2;
+      c.save();
+      c.globalAlpha = 0.8 + Math.sin(time * 7) * 0.08;
+      this.line(
+        [
+          [start, b.groundY - 5],
+          [end, b.groundY - 5],
+        ],
+        "#c97050",
+        6,
+      );
+      this.line(
+        [
+          [end - direction * 13, b.groundY - 14],
+          [end, b.groundY - 5],
+          [end - direction * 13, b.groundY + 3],
+        ],
+        "#c97050",
+        4,
+      );
+      for (let i = 1; i <= 3; i++) {
+        const marker = start + ((end - start) * i) / 4;
+        this.line(
+          [
+            [marker - direction * 6, b.groundY - 11],
+            [marker, b.groundY - 5],
+            [marker - direction * 6, b.groundY + 1],
+          ],
+          "#fff1c0",
+          2.5,
+        );
+      }
+      if (b.kind === "moth") {
+        c.setLineDash([5, 9]);
+        this.line(
+          [
+            [cx, b.y + b.h / 2],
+            [end, b.groundY - b.h / 2],
+          ],
+          "#b4d4ee",
+          3,
+        );
+        c.setLineDash([]);
+        this.ellipse(end, b.groundY - 4, b.w / 2, 7, "rgba(177,207,234,.3)");
+      }
+      c.restore();
+      this.rounded(cx - 12, b.y - 41, 24, 29, 9, "#fff0ba", "#be7652");
+      c.save();
+      c.font = "800 21px 'DM Sans', sans-serif";
+      c.textAlign = "center";
+      c.fillStyle = "#a35b44";
+      c.fillText("!", cx, b.y - 19);
+      c.restore();
+    }
+    if (recovering) {
+      this.ellipse(cx, b.y - 5, b.w * 0.36, 5, "rgba(255,248,176,.65)");
+      for (let i = 0; i < 3; i++) {
+        const a = time * 3 + (i * Math.PI * 2) / 3;
+        this.starPath(cx + Math.cos(a) * 25, b.y - 21 + Math.sin(a) * 5, 5);
+        c.fillStyle = "#ffe18b";
+        c.fill();
+      }
+    }
+    c.save();
+    c.translate(cx, feet);
+    c.scale(b.facing < 0 ? -1 : 1, 1);
+    c.scale(b.w / 82, b.h / 58);
+    if (b.invulnerable > 0) c.globalAlpha = 0.65 + Math.sin(time * 16) * 0.15;
+    const stride = Math.sin(time * (b.state === "attack" ? 25 : 9)) * 3;
+    const shell =
+      b.phase === 3 ? "#b56d72" : b.phase === 2 ? "#bf895a" : "#809c70";
+    if (b.kind === "stag") {
+      for (let i = 0; i < 3; i++)
+        this.line(
+          [
+            [-27 + i * 23, -17],
+            [-33 + i * 23, -5 + (i % 2 ? stride : -stride)],
+            [-23 + i * 23, -2],
+          ],
+          "#526b51",
+          5,
+        );
+      this.ellipse(-4, -30, 34, 25, shell, "#4f6b52", 3);
+      this.ellipse(-13, -39, 17, 9, "#bed39b");
+      this.line(
+        [
+          [-2, -52],
+          [3, -12],
+        ],
+        "#536f52",
+        3,
+      );
+      this.ellipse(25, -23, 16, 20, "#849867", "#4f6b52", 2);
+      this.line(
+        [
+          [31, -34],
+          [47, -46],
+          [44, -55],
+        ],
+        "#ddbc7d",
+        6,
+      );
+      this.line(
+        [
+          [33, -27],
+          [53, -29],
+          [57, -39],
+        ],
+        "#ddbc7d",
+        6,
+      );
+      this.line(
+        [
+          [47, -46],
+          [53, -47],
+        ],
+        "#ddbc7d",
+        4,
+      );
+    } else if (b.kind === "spider") {
+      for (const side of [-1, 1])
+        for (let i = 0; i < 4; i++) {
+          this.line(
+            [
+              [side * 18, -24 - i * 3],
+              [side * (37 + i * 3), -38 + i * 9],
+              [side * (35 + i * 5), -4 + (i % 2 ? stride : -stride)],
+            ],
+            "#715782",
+            4,
+          );
+        }
+      this.ellipse(-4, -34, 29, 23, "#b99bc4", "#725784", 3);
+      this.ellipse(-10, -41, 13, 7, "#d7c5dc");
+      this.ellipse(22, -23, 18, 18, "#9b7bac", "#725784", 2);
+      for (let i = 0; i < 3; i++)
+        this.ellipse(-15 + i * 13, -30, 4, 4, "#eee0c6");
+      this.line(
+        [
+          [27, -9],
+          [26, -3],
+        ],
+        "#fff0d5",
+        3,
+      );
+      this.line(
+        [
+          [35, -12],
+          [36, -6],
+        ],
+        "#fff0d5",
+        3,
+      );
+    } else {
+      const flutter =
+        b.state === "attack"
+          ? Math.sin(time * 18) * 0.12
+          : Math.sin(time * 7) * 0.08;
+      for (const side of [-1, 1]) {
+        c.save();
+        c.rotate(side * flutter);
+        this.ellipse(side * 26, -36, 26, 29, "#9daddb", "#5e709f", 3);
+        this.ellipse(side * 26, -17, 19, 16, "#c9bddf", "#7a7daa", 2);
+        this.ellipse(side * 30, -39, 11, 13, "#ebd7aa");
+        this.ellipse(side * 30, -39, 5, 6, "#737da9");
+        c.restore();
+      }
+      this.ellipse(0, -28, 12, 25, "#ddd7ad", "#8a8f88", 2);
+      this.ellipse(1, -46, 14, 12, "#e9e3ba", "#8a8f88", 2);
+      this.line(
+        [
+          [-5, -54],
+          [-10, -66],
+          [-17, -69],
+        ],
+        "#7b8396",
+        3,
+      );
+      this.line(
+        [
+          [6, -54],
+          [12, -66],
+          [19, -69],
+        ],
+        "#7b8396",
+        3,
+      );
+    }
+    const eyeX = b.kind === "moth" ? 0 : 27,
+      eyeY = b.kind === "moth" ? -47 : -26;
+    if (recovering) {
+      this.line(
+        [
+          [eyeX - 4, eyeY],
+          [eyeX + 1, eyeY + 2],
+          [eyeX + 6, eyeY - 1],
+        ],
+        "#3f4359",
+        2.5,
+      );
+    } else {
+      this.ellipse(eyeX, eyeY, 6, 8, "#fff4d4");
+      this.ellipse(eyeX + 2, eyeY + 1, 2.5, 4, "#394858");
+      if (warning || b.state === "attack")
+        this.line(
+          [
+            [eyeX - 5, eyeY - 9],
+            [eyeX + 7, eyeY - 5],
+          ],
+          "#42505b",
+          3,
+        );
+    }
+    c.restore();
+  }
+
+  private bossHazards(game: Game, time: number) {
+    const c = this.ctx;
+    for (const r of game.hazards) {
+      if (!this.visible(r.x, r.w + 20)) continue;
+      const cx = r.x + r.w / 2,
+        cy = r.y + r.h / 2;
+      if (r.kind === "web") {
+        this.ellipse(cx, cy, r.w / 2, r.h / 2, "#f5dce9", "#ad79a7", 2);
+        for (let i = 0; i < 3; i++) {
+          const a = (i * Math.PI) / 3 + time * 2;
+          this.line(
+            [
+              [cx - Math.cos(a) * r.w * 0.4, cy - Math.sin(a) * r.h * 0.4],
+              [cx + Math.cos(a) * r.w * 0.4, cy + Math.sin(a) * r.h * 0.4],
+            ],
+            "#ba89b0",
+            1.5,
+          );
+        }
+      } else {
+        c.save();
+        c.translate(cx, cy);
+        c.scale(r.vx < 0 ? -1 : 1, 1);
+        for (let i = -1; i <= 1; i++) {
+          c.beginPath();
+          c.moveTo(-r.w / 2, i * r.h * 0.3);
+          c.quadraticCurveTo(
+            r.w * 0.5,
+            i * r.h * 0.3 - 7,
+            r.w * 0.35,
+            i * r.h * 0.3 + 3,
+          );
+          c.strokeStyle = i === 0 ? "#5c98bd" : "#b4e7f1";
+          c.lineWidth = 3;
+          c.stroke();
+        }
+        c.restore();
+      }
+    }
+  }
+
+  private sealedGoal(game: Game) {
+    if (!game.boss || game.boss.state === "defeated") return;
+    const { x, y } = game.level.goal;
+    for (let i = 0; i < 3; i++)
+      this.line(
+        [
+          [x - 1, y - 16 - i * 27],
+          [x + 61, y - 29 - i * 27],
+        ],
+        "#608f69",
+        7,
+      );
+    this.ellipse(x + 30, y - 51, 15, 18, "#e0c890", "#9f8b60", 2);
+    this.ellipse(x + 30, y - 54, 4, 5, "#7d805c");
+    this.line(
+      [
+        [x + 30, y - 51],
+        [x + 30, y - 44],
+      ],
+      "#7d805c",
+      3,
+    );
+  }
+
   private sectionLandmarks(game: Game, time: number, p: Palette) {
     const c = this.ctx;
     game.level.sections.forEach((section, index) => {
@@ -889,6 +1755,10 @@ export class Renderer {
   private platform(r: Game["platforms"][number], p: Palette, time: number) {
     const c = this.ctx;
     const { x, y, w, h } = r;
+    if (r.kind === "flower" || r.kind === "curled") {
+      this.wakingPlant(r, time);
+      return;
+    }
     if (r.kind === "mushroom") {
       this.bounceMushroom(r, time);
       return;
@@ -1179,7 +2049,9 @@ export class Renderer {
     c.restore();
   }
 
-  private crackedBlock(r: Rect & { rewardCoins?: number }) {
+  private crackedBlock(
+    r: Rect & { rewardCoins?: number; enemyBreakable?: boolean },
+  ) {
     const c = this.ctx;
     const { x, y, w, h } = r;
     this.rounded(x, y, w, h, 5, "#d7a36c", "#8e6849");
@@ -1210,6 +2082,17 @@ export class Renderer {
       "#b17d54",
       2,
     );
+    if (r.enemyBreakable) {
+      for (let i = 0; i < 3; i++)
+        this.line(
+          [
+            [x + w * 0.67 + i * 4, y + h * 0.25],
+            [x + w * 0.61 + i * 4, y + h * 0.7],
+          ],
+          "#9c6449",
+          2,
+        );
+    }
     if ((r.rewardCoins ?? 0) > 0 && w >= 30 && h >= 24) {
       this.ellipse(x + w * 0.24, y + h * 0.42, 5, 7, "#ffdf8c", "#b18448", 1);
       c.fillStyle = "#9a7342";
@@ -1758,9 +2641,29 @@ export class Renderer {
     landing: number,
     size = 1,
     pose: "normal" | "hurt" | "won" | "lost" = "normal",
+    outfit: "leaf" | "berry" | "moon" = "leaf",
+    danger = false,
   ) {
     const c = this.ctx;
     const running = grounded && Math.abs(vx) > 15;
+    const outfitColor =
+      outfit === "berry"
+        ? "#b86c94"
+        : outfit === "moon"
+          ? "#829ac5"
+          : "#69b86c";
+    const outfitLight =
+      outfit === "berry"
+        ? "#e4a1b9"
+        : outfit === "moon"
+          ? "#c4d8ed"
+          : "#8cce79";
+    const scarf =
+      outfit === "berry"
+        ? "#e3b86a"
+        : outfit === "moon"
+          ? "#e6dba7"
+          : "#eb745d";
     const stride = running ? Math.sin(time * 19) : 0;
     const celebration = pose === "won";
     const hurt = pose === "hurt" || pose === "lost";
@@ -1782,7 +2685,12 @@ export class Renderer {
     const riseStretch =
       !grounded && vy < -180 ? Math.min(0.07, -vy / 10000) : 0;
     c.scale(1 + squash - riseStretch, 1 - squash + riseStretch);
-    // A streaming coral scarf makes direction and speed easy to read.
+    if (!grounded && vy > 260) {
+      const flutter = 5 + Math.abs(Math.sin(time * 30)) * 8;
+      this.ellipse(-17, -23, flutter, 7, "rgba(226,255,224,.72)", "#92c9a2", 1);
+      this.ellipse(14, -23, flutter, 7, "rgba(226,255,224,.72)", "#92c9a2", 1);
+    }
+    // A streaming scarf makes direction and speed easy to read.
     c.beginPath();
     c.moveTo(-9, -26 + bob);
     c.quadraticCurveTo(
@@ -1795,7 +2703,7 @@ export class Renderer {
     c.lineTo(-24, -12 + bob);
     c.quadraticCurveTo(-14, -15, -7, -22);
     c.closePath();
-    c.fillStyle = "#eb745d";
+    c.fillStyle = scarf;
     c.fill();
     // Satchel, arms, and boots remain behind the face and body.
     this.rounded(-18, -26 + bob, 9, 18, 4, "#bf874c", "#936b43");
@@ -1832,7 +2740,7 @@ export class Renderer {
       3,
       "#386a53",
     );
-    this.ellipse(0, -16 + bob, 12, 14, "#70ba69", "#326d4b", 2);
+    this.ellipse(0, -16 + bob, 12, 14, outfitColor, "#326d4b", 2);
     this.ellipse(2, -15 + bob, 7, 9, "#b8e6a0");
     this.line(
       [
@@ -1865,9 +2773,9 @@ export class Renderer {
       "#b8e6a0",
     );
     // Cream face, leaf hood, and large eyes read well at phone scale.
-    this.ellipse(0, -33 + bob, 16, 14, "#69b86c", "#326d4b", 2);
+    this.ellipse(0, -33 + bob, 16, 14, outfitColor, "#326d4b", 2);
     this.ellipse(2, -31 + bob, 12.5, 10.5, "#fff1c9");
-    this.ellipse(-9, -36 + bob, 3.4, 7.3, "#8cce79");
+    this.ellipse(-9, -36 + bob, 3.4, 7.3, outfitLight);
     const blink = hurt || Math.sin(time * 0.72) > 0.996;
     if (blink) {
       this.line(
@@ -1906,19 +2814,47 @@ export class Renderer {
     c.lineWidth = 1.3;
     c.lineCap = "round";
     c.stroke();
-    this.rounded(-11, -23 + bob, 24, 5, 2.5, "#ff9d76");
-    this.ellipse(10, -21 + bob, 3, 3, "#eb745d");
-    const leafSway = Math.sin(time * 4) * 0.13 + vx / 1800;
+    this.rounded(
+      -11,
+      -23 + bob,
+      24,
+      5,
+      2.5,
+      outfit === "leaf" ? "#ff9d76" : scarf,
+    );
+    this.ellipse(10, -21 + bob, 3, 3, scarf);
+    const leafSway =
+      Math.sin(time * (danger ? 9 : 4)) * (danger ? 0.08 : 0.13) + vx / 1800;
+    const alertLift = danger ? 6 : 0;
     this.line(
       [
         [-1, -45 + bob],
-        [1 + Math.sin(time * 4), -52 + bob],
+        [1 + Math.sin(time * 4), -52 + bob - alertLift],
       ],
       "#326d4b",
       2.7,
     );
-    this.leaf(1, -49 + bob, 11, -0.72 + leafSway, "#8bcb62");
-    this.leaf(1, -49 + bob, 10, 1.07 + leafSway, "#398c59");
+    this.leaf(
+      1,
+      -49 + bob - alertLift,
+      11,
+      -0.72 + leafSway,
+      outfit === "leaf" ? "#8bcb62" : outfitLight,
+    );
+    this.leaf(
+      1,
+      -49 + bob - alertLift,
+      10,
+      1.07 + leafSway,
+      outfit === "leaf" ? "#398c59" : outfitColor,
+    );
+    if (outfit === "berry") {
+      for (let i = 0; i < 3; i++)
+        this.ellipse(-7 + i * 4, -47 + bob, 3.2, 3.2, "#b94f76", "#8b456a", 1);
+    } else if (outfit === "moon") {
+      this.ellipse(-7, -43 + bob, 4, 4, "#fff0b3");
+      this.ellipse(-5, -44 + bob, 3.3, 3.3, outfitColor);
+    }
     // A slightly tucked pose communicates rising/falling without moving the feet origin.
     if (!grounded && vy < -100) {
       this.ellipse(-8, -3, 5, 3, "#386a53");
@@ -2106,6 +3042,23 @@ export class Renderer {
       this.previousFireflies[i] = firefly.collected;
     });
     game.platforms.forEach((platform, i) => {
+      if (platform.awakened && !this.previousAwakened[i]) {
+        this.burst(
+          platform.x + platform.w / 2,
+          platform.y + 7,
+          "#fff0ad",
+          17,
+          80,
+        );
+        this.burst(
+          platform.x + platform.w / 2,
+          platform.y + 7,
+          "#bceca5",
+          9,
+          60,
+        );
+      }
+      this.previousAwakened[i] = platform.awakened;
       if (platform.broken && !this.previousBroken[i]) {
         this.burst(
           platform.x + platform.w / 2,
@@ -2151,6 +3104,16 @@ export class Renderer {
         );
       this.previousEnemies[i] = enemy.alive;
     });
+    if (game.boss && game.boss.health < this.previousBossHealth) {
+      this.burst(
+        game.boss.x + game.boss.w / 2,
+        game.boss.y + game.boss.h / 2,
+        "#ffe0a0",
+        game.boss.health === 0 ? 40 : 20,
+        130,
+      );
+    }
+    this.previousBossHealth = game.boss?.health ?? 3;
     const player = game.player;
     if (player.form !== this.previousForm) {
       this.formChange = 0.55;
@@ -2173,6 +3136,12 @@ export class Renderer {
         70,
       );
     if (player.grounded && !this.previousGrounded) {
+      if (
+        player.invulnerable > 0.2 &&
+        player.invulnerable < 1 &&
+        this.previousDeaths === game.deaths
+      )
+        this.escapeCelebration = 0.35;
       this.landing = 0.14;
       this.burst(
         player.x + player.w / 2,

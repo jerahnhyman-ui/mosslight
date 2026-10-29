@@ -166,6 +166,90 @@ describe("audio playback lifecycle", () => {
     audio.suspend();
   });
 
+  it("keeps one boss score through phase updates and restores it after star power", () => {
+    const audio = new AudioPlayer();
+    audio.unlock();
+    audio.setMusic("meadow", true);
+    const trail = [...context().oscillators];
+    audio.setMusic("meadow", true, false, "boss");
+    const bossFrequency = firstFrequency(context().oscillators[trail.length]!);
+    expect(bossFrequency).not.toBe(firstFrequency(trail[0]!));
+    expect(trail.every((voice) => voice.disconnect.mock.calls.length > 0)).toBe(
+      true,
+    );
+    const bossNotes = context().oscillators.length;
+    for (let i = 0; i < 120; i++) audio.setMusic("meadow", true, false, "boss");
+    expect(context().oscillators).toHaveLength(bossNotes);
+    expect(vi.getTimerCount()).toBe(1);
+    audio.setMusic("meadow", true, true, "boss");
+    expect(firstFrequency(context().oscillators[bossNotes]!)).not.toBe(
+      bossFrequency,
+    );
+    const afterStar = context().oscillators.length;
+    audio.setMusic("meadow", true, false, "boss");
+    expect(firstFrequency(context().oscillators[afterStar]!)).toBe(
+      bossFrequency,
+    );
+    expect(vi.getTimerCount()).toBe(1);
+    audio.setMusic("meadow", false, false, "boss");
+    expect(vi.getTimerCount()).toBe(0);
+    expect(
+      context().oscillators.every(
+        (voice) => voice.disconnect.mock.calls.length,
+      ),
+    ).toBe(true);
+    const stopped = context().oscillators.length;
+    audio.play("boss-defeat");
+    expect(context().oscillators.length).toBeGreaterThan(stopped);
+  });
+
+  it("switches to the quiet grove score and stops it on background interruption", async () => {
+    const audio = new AudioPlayer();
+    audio.unlock();
+    audio.setMusic("meadow", true, false, "grove");
+    expect(context().oscillators[0]!.type).toBe("sine");
+    const initial = context().oscillators.length;
+    audio.setMusic("meadow", true, false, "grove");
+    expect(context().oscillators).toHaveLength(initial);
+    audio.suspend();
+    audio.play("awaken");
+    audio.play("purchase");
+    vi.advanceTimersByTime(10000);
+    expect(context().oscillators).toHaveLength(initial);
+    expect(vi.getTimerCount()).toBe(0);
+    audio.unlock();
+    await Promise.resolve();
+    expect(vi.getTimerCount()).toBe(1);
+    expect(context().oscillators[initial]!.type).toBe("sine");
+    audio.suspend();
+  });
+
+  it("coalesces nearby plants without swallowing a boss warning or later wakeups", () => {
+    const audio = new AudioPlayer();
+    audio.unlock();
+    audio.play("awaken");
+    const onePlant = context().oscillators.length;
+    expect(onePlant).toBeGreaterThan(0);
+    for (let i = 0; i < 5; i++) audio.play("awaken");
+    expect(context().oscillators).toHaveLength(onePlant);
+    audio.play("boss-warning");
+    const warning = context().oscillators.length;
+    expect(warning).toBeGreaterThan(onePlant);
+    expect(context().oscillators[0]!.type).toBe("sine");
+    expect(context().oscillators[onePlant]!.type).toBe("triangle");
+    audio.play("boss-warning");
+    expect(context().oscillators).toHaveLength(warning);
+    vi.advanceTimersByTime(200);
+    audio.play("awaken");
+    expect(context().oscillators.length).toBe(warning + onePlant);
+    audio.enabled = false;
+    const muted = context().oscillators.length;
+    audio.play("boss-hit");
+    audio.play("unlock");
+    audio.play("purchase");
+    expect(context().oscillators).toHaveLength(muted);
+  });
+
   it("suspends all sound when interrupted and resumes only after another gesture", async () => {
     const audio = new AudioPlayer();
     audio.unlock();
@@ -261,6 +345,29 @@ describe("audio playback lifecycle", () => {
 });
 
 describe("optional native haptics", () => {
+  it("reserves tactile cues for player interactions and celebrations", () => {
+    vi.mocked(Capacitor.isNativePlatform).mockReturnValue(true);
+    const audio = new AudioPlayer();
+    audio.enabled = false;
+    audio.musicEnabled = false;
+    audio.play("boss-warning");
+    audio.play("hopper-bounce");
+    audio.play("enemy-break");
+    expect(Haptics.impact).not.toHaveBeenCalled();
+    audio.play("awaken");
+    expect(Haptics.impact).toHaveBeenLastCalledWith({ style: "LIGHT" });
+    vi.advanceTimersByTime(150);
+    audio.play("boss-hit");
+    expect(Haptics.impact).toHaveBeenCalledTimes(2);
+    vi.advanceTimersByTime(150);
+    audio.play("boss-defeat");
+    expect(Haptics.notification).toHaveBeenCalledTimes(1);
+    audio.suspend();
+    vi.advanceTimersByTime(150);
+    audio.play("purchase");
+    expect(Haptics.notification).toHaveBeenCalledTimes(1);
+  });
+
   it("doesn't invoke native haptics on the web or for ordinary coins", () => {
     const audio = new AudioPlayer();
     audio.play("stomp");

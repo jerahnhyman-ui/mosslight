@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Game, type GameInput } from "./engine";
-import { levels, type Level } from "./levels";
+import { levels, groveLevel, challengeLevels, type Level } from "./levels";
 
 const idle: GameInput = {
   left: false,
@@ -84,6 +84,44 @@ function jumpTo(
   throw new Error(
     `Cannot jump ${takeoff}→${target}, ${y}; at ${game.player.x}, ${game.player.y + game.player.h}`,
   );
+}
+
+/** Read the fight and use only the same directional/jump input available to players. */
+function defeatBossAndFinish(game: Game) {
+  const phases = new Set<number>();
+  const events = new Set<string>();
+  for (let frame = 0; frame < 120 * 90 && game.state === "playing"; frame++) {
+    const boss = game.boss!;
+    const p = game.player;
+    phases.add(boss.phase);
+    let target =
+      boss.state === "defeated"
+        ? game.level.goal.x
+        : boss.x + (boss.w - p.w) / 2;
+    let shouldJump = boss.state !== "defeated";
+    if (boss.kind === "stag" && boss.state === "attack")
+      target += boss.facing * 120;
+    if (boss.kind === "moth" && boss.state !== "defeated") {
+      if (boss.state === "warning" || boss.state === "attack")
+        target = boss.attackTargetX - 140;
+      shouldJump = boss.state === "recover";
+    }
+    tick(game, {
+      ...steer(game, target),
+      jump: true,
+      jumpPressed: p.grounded && shouldJump,
+    });
+    for (const event of game.events) events.add(event);
+  }
+  expect(
+    game.state,
+    `${game.level.name}: complete the fight and reach the finish`,
+  ).toBe("won");
+  expect(game.boss?.health).toBe(0);
+  expect(phases).toEqual(new Set([1, 2, 3]));
+  expect(events.has("boss-warning")).toBe(true);
+  expect(events.has("boss-hit")).toBe(true);
+  expect(events.has("boss-defeat")).toBe(true);
 }
 
 type RouteStep = [
@@ -280,7 +318,15 @@ describe("Long authored adventures", () => {
         if (takeoff === null) walkTo(game, target, y);
         else jumpTo(game, takeoff, target, y, via);
       }
-      expect(game.state).toBe("won");
+      const lastCheckpoint = level.checkpoints.at(-1)!;
+      walkTo(game, lastCheckpoint.x, lastCheckpoint.y);
+      defeatBossAndFinish(game);
+      expect(
+        game.platforms.some(
+          (tile) =>
+            (tile.kind === "flower" || tile.kind === "curled") && tile.awakened,
+        ),
+      ).toBe(true);
       expect(game.collectedFireflies).toBe(3);
       expect(game.deaths).toBe(0);
       expect(game.activeCheckpointIndex).toBe(level.checkpoints.length - 1);
@@ -324,6 +370,57 @@ describe("Long authored adventures", () => {
     expect(game.player.form).toBe("big");
   });
 
+  it("lets an authored hopper trigger the mushroom beside the canopy route", () => {
+    const game = new Game(0);
+    for (let n = 0; n < 12; n++) tick(game);
+    for (const [takeoff, target, y, via] of [
+      ...openingRoutes[0]!,
+      ...extensions[0]!.slice(0, 1),
+    ]) {
+      if (takeoff === null) walkTo(game, target, y);
+      else jumpTo(game, takeoff, target, y, via);
+    }
+    let bounced = false;
+    for (let n = 0; n < 120 * 12 && !bounced; n++) {
+      tick(game);
+      bounced = game.events.includes("hopper-bounce");
+    }
+    expect(bounced).toBe(true);
+    expect(
+      game.enemies.some(
+        (enemy) => enemy.kind === "hopper" && enemy.alive && enemy.vy < -400,
+      ),
+    ).toBe(true);
+    expect(game.deaths).toBe(0);
+  });
+
+  it("uses a living charging beetle to open the authored orchard shortcut", () => {
+    const game = new Game(0);
+    const gate = game.platforms.find((tile) => tile.enemyBreakable)!;
+    expect(gate.broken).toBe(false);
+    for (let n = 0; n < 12; n++) tick(game);
+    for (const [takeoff, target, y, via] of [
+      ...openingRoutes[0]!,
+      ...extensions[0]!.slice(0, 14),
+    ]) {
+      if (takeoff === null) walkTo(game, target, y);
+      else jumpTo(game, takeoff, target, y, via);
+    }
+    const beetle = game.enemies.find(
+      (enemy) => enemy.kind === "charger" && enemy.minX === 7310,
+    )!;
+    expect(beetle.alive).toBe(true);
+    walkTo(game, 7670, 430);
+    walkTo(game, 7600, 430);
+    for (let n = 0; n < 120 * 8 && !gate.broken; n++) tick(game);
+    expect(gate.broken).toBe(true);
+    expect(beetle.alive).toBe(true);
+    expect(game.deaths).toBe(0);
+    expect(game.coins.some((coin) => coin.x === 7615 && coin.collected)).toBe(
+      true,
+    );
+  });
+
   it.each(levels)("keeps $name long, readable, and recoverable", (level) => {
     expect(level.width).toBeGreaterThanOrEqual(
       [3460, 3740, 4070][level.id - 1]! * 3,
@@ -333,10 +430,28 @@ describe("Long authored adventures", () => {
     expect(level.checkpoints.length).toBeGreaterThanOrEqual(3);
     const grounds = level.platforms.filter((p) => p.kind === "ground");
     for (const [i, g] of grounds.entries()) {
-      if (i)
+      if (i) {
+        const previousEdge = grounds[i - 1]!.x + grounds[i - 1]!.w;
+        let supportedUntil = previousEdge;
+        // Long setpiece gaps need an authored platform bridge. The complete
+        // input route above also demonstrates the vertical jumps are reachable.
+        const bridge = level.platforms
+          .filter(
+            (tile) =>
+              tile.kind !== "ground" &&
+              tile.x + tile.w > previousEdge &&
+              tile.x < g.x,
+          )
+          .sort((a, b) => a.x - b.x);
+        for (const tile of bridge) {
+          if (tile.x - supportedUntil <= 180)
+            supportedUntil = Math.max(supportedUntil, tile.x + tile.w);
+        }
         expect(
-          g.x - (grounds[i - 1]!.x + grounds[i - 1]!.w),
+          g.x - supportedUntil,
+          `${level.name}: every gap has a reachable landing`,
         ).toBeLessThanOrEqual(180);
+      }
     }
     for (const cp of level.checkpoints) {
       expect(
@@ -368,5 +483,157 @@ describe("Long authored adventures", () => {
       expect(p.y - (m.axis === "y" ? m.range : 0)).toBeGreaterThan(80);
       expect(p.y + p.h + (m.axis === "y" ? m.range : 0)).toBeLessThan(430);
     }
+  });
+});
+
+describe("Living garden level safety", () => {
+  it("gives each world a distinct boss and a safe recovery point", () => {
+    expect(levels.map((level) => level.boss?.kind)).toEqual([
+      "stag",
+      "spider",
+      "moth",
+    ]);
+    for (const level of levels) {
+      const boss = level.boss!;
+      const checkpoint = level.checkpoints.at(-1)!;
+      expect(checkpoint.x).toBeLessThan(boss.minX);
+      expect(boss.minX - checkpoint.x).toBeLessThanOrEqual(500);
+      expect(level.goal.x).toBeGreaterThan(boss.maxX);
+      const floor = level.platforms
+        .filter((tile) => tile.kind === "ground" && tile.y === boss.y)
+        .sort((a, b) => a.x - b.x);
+      let safeUntil = checkpoint.x;
+      for (const tile of floor) {
+        if (tile.x <= safeUntil && tile.x + tile.w > safeUntil)
+          safeUntil = tile.x + tile.w;
+      }
+      expect(
+        safeUntil,
+        `${level.name}: uninterrupted arena floor`,
+      ).toBeGreaterThan(level.goal.x + 60);
+      expect(
+        level.diamonds.some(
+          (diamond) => diamond.x > checkpoint.x && diamond.x < boss.minX,
+        ),
+      ).toBe(true);
+      expect(
+        level.enemies.some(
+          (enemy) =>
+            enemy.maxX + 32 > checkpoint.x && enemy.minX < level.goal.x,
+        ),
+      ).toBe(false);
+    }
+  });
+
+  it.each(levels)(
+    "places discoverable light routes and landmarks in $name",
+    (level) => {
+      const plants = level.platforms.filter(
+        (tile) => tile.kind === "flower" || tile.kind === "curled",
+      );
+      expect(plants.length).toBeGreaterThanOrEqual(2);
+      expect(level.clues?.length).toBeGreaterThanOrEqual(3);
+      expect(level.landmarks?.length).toBeGreaterThanOrEqual(2);
+      for (const plant of plants) {
+        expect(plant.wakeRadius).toBeGreaterThan(0);
+        expect(plant.y).toBeGreaterThan(70);
+        expect(plant.x).toBeGreaterThanOrEqual(0);
+        expect(plant.x + plant.w).toBeLessThanOrEqual(level.width);
+      }
+      for (const clue of level.clues ?? []) {
+        expect(clue.x).toBeGreaterThanOrEqual(0);
+        expect(clue.x).toBeLessThan(level.width);
+        expect(clue.text.length).toBeGreaterThan(8);
+      }
+    },
+  );
+
+  it("provides a safe playable home and three separate challenge rooms", () => {
+    expect(groveLevel.kind).toBe("grove");
+    expect(groveLevel.enemies).toHaveLength(0);
+    expect(groveLevel.boss).toBeUndefined();
+    expect(groveLevel.coins).toHaveLength(0);
+    expect(challengeLevels).toHaveLength(3);
+    expect(new Set(challengeLevels.map((level) => level.name)).size).toBe(3);
+    for (const level of challengeLevels) {
+      expect(level.kind).toBe("challenge");
+      expect(level.challengeTime).toBeGreaterThan(0);
+      expect(level.goal.x).toBeGreaterThan(level.spawn.x + 500);
+      expect(level.goal.x + 60).toBeLessThan(level.width);
+      expect(level.fireflies).toHaveLength(0);
+    }
+  });
+});
+
+const challengeRoutes: RouteStep[][] = [
+  [
+    [160, 310, 340],
+    [350, 530, 265],
+    [null, 650, 430],
+    [650, 960, 205, 730],
+    [null, 1210, 295],
+    [1230, 1360, 430],
+    [1340, 1690, 205, 1450],
+    [null, 1850, 430],
+    [1840, 1970, 310],
+    [null, 2190, 430],
+  ],
+  [
+    [140, 290, 340],
+    [340, 510, "moving"],
+    [510, 760, 205],
+    [780, 940, "moving"],
+    [970, 1225, 340],
+    [1270, 1470, "moving"],
+    [1470, 1720, 205],
+    [1770, 1960, "moving"],
+    [2010, 2250, 340],
+    [null, 2410, 430],
+  ],
+  [
+    [150, 300, 340],
+    [350, 550, 275],
+    [600, 780, 340],
+    [null, 1300, 340],
+    [1300, 1540, 340],
+    [1580, 1790, 265],
+    [1840, 2045, 195],
+    [null, 2280, 310],
+    [null, 2510, 430],
+  ],
+];
+describe("Playable rewards", () => {
+  it.each(challengeLevels.map((level, index) => ({ level, index })))(
+    "finishes $level.name using normal input within the gold target",
+    ({ level, index }) => {
+      const game = new Game(index, { level, mode: "timed" });
+      for (let n = 0; n < 12; n++) tick(game);
+      for (const [takeoff, target, y, via] of challengeRoutes[index]!) {
+        if (takeoff === null) walkTo(game, target, y);
+        else jumpTo(game, takeoff, target, y, via);
+      }
+      expect(game.state).toBe("won");
+      expect(game.deaths).toBe(0);
+      expect(game.collectedCoins).toBeGreaterThan(10);
+      expect(game.elapsed).toBeLessThanOrEqual(level.challengeTime!);
+      if (process.env.REPORT_ROUTE_TIMES)
+        console.info(
+          `${level.name}: ${game.elapsed.toFixed(1)}s / gold ${level.challengeTime}s`,
+        );
+    },
+  );
+
+  it("lets Pip explore the home grove without ending the run or farming coins", () => {
+    const game = new Game(0, { level: groveLevel });
+    for (let n = 0; n < 12; n++) tick(game);
+    walkTo(game, 1810, 430);
+    for (let n = 0; n < 120; n++) tick(game, { ...idle, right: true });
+    expect(game.state).toBe("playing");
+    expect(game.deaths).toBe(0);
+    expect(game.lives).toBe(3);
+    expect(game.collectedCoins).toBe(0);
+    expect(
+      game.platforms.some((tile) => tile.kind === "flower" && tile.awakened),
+    ).toBe(true);
   });
 });
