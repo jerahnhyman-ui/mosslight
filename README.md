@@ -71,6 +71,10 @@ challenge medals and historical trail records are separate as well.
 See [the living garden guide](docs/LIVING_GARDEN.md) for the content and release
 acceptance criteria, including the physical-device playtest.
 
+The next expansion is specified in the [Windmill Garden design package](docs/windmill-garden/README.md).
+It covers feather flight, environmental puzzles, a separate beehive level, a new
+guardian and a flight minigame. This is a design proposal, not shipped content.
+
 Music, sound effects, and haptics have separate settings. Each world has an
 original looping score, with separate grove and guardian themes and a musical
 change during star power. Music pauses with gameplay. Haptics use the native
