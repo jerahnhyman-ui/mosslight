@@ -6,7 +6,14 @@ import {
 } from "./engine";
 import type { Rect } from "./levels";
 
-type Theme = "meadow" | "dusk" | "alpine" | "windmill" | "hive";
+type Theme =
+  | "meadow"
+  | "dusk"
+  | "alpine"
+  | "windmill"
+  | "hive"
+  | "grotto"
+  | "cloud";
 type Palette = {
   sky: string;
   horizon: string;
@@ -37,6 +44,40 @@ type Particle = {
 const WIDTH = 960;
 const HEIGHT = 540;
 const palettes: Record<Theme, Palette> = {
+  grotto: {
+    sky: "#123f58",
+    horizon: "#4ca5a9",
+    sun: "#b5f4de",
+    far: "#215e70",
+    middle: "#286f79",
+    near: "#387e7c",
+    leaf: "#459d85",
+    leafLight: "#a4e8bf",
+    leafShade: "#286e70",
+    trunk: "#548176",
+    grass: "#78bba5",
+    grassLight: "#b6e8ca",
+    soil: "#688d88",
+    soilShade: "#3b666a",
+    rock: "#a6c5b5",
+  },
+  cloud: {
+    sky: "#70c9e9",
+    horizon: "#e8f8f1",
+    sun: "#fff6bf",
+    far: "#d2eced",
+    middle: "#badde3",
+    near: "#9dced6",
+    leaf: "#5eaa89",
+    leafLight: "#b6e3a7",
+    leafShade: "#478b80",
+    trunk: "#8fa8a2",
+    grass: "#a9d8b0",
+    grassLight: "#e9f8d2",
+    soil: "#d2e5e2",
+    soilShade: "#accfd2",
+    rock: "#f4fcf6",
+  },
   windmill: {
     sky: "#81d9e7",
     horizon: "#f6efb8",
@@ -304,12 +345,13 @@ export class Renderer {
     )
       this.cameraX = target;
     else this.cameraX += (target - this.cameraX) * (1 - Math.exp(-9 * dt));
-    // The original trails and grove have open skies above their high branches.
-    // Follow feather-equipped Pip there without moving Windmill's authored
-    // trellis rooms, the guardian arena, or the separate challenge courses.
+    // Follow Pip through the open skies of the trails, grove, and new areas,
+    // while preserving the authored framing of enclosed challenge courses.
     const followFlight =
       game.hasWindFeather &&
       (game.level.kind === "grove" ||
+        game.level.theme === "cloud" ||
+        game.level.theme === "grotto" ||
         game.level.contentId === "world.sunlit-meadow" ||
         game.level.contentId === "world.firefly-hollow" ||
         game.level.contentId === "world.cloudtop-crossing");
@@ -380,7 +422,12 @@ export class Renderer {
 
     // The trees sit on actual ground sections; no scenery suggests a floor over a pit.
     for (const platform of game.platforms) {
-      if (game.level.theme === "hive") continue;
+      if (
+        game.level.theme === "hive" ||
+        game.level.theme === "grotto" ||
+        game.level.theme === "cloud"
+      )
+        continue;
       if (
         platform.kind !== "ground" ||
         platform.id?.startsWith("trellis.") ||
@@ -394,6 +441,8 @@ export class Renderer {
         }
       }
     }
+    if (!titleMode && game.level.theme === "grotto")
+      this.grottoWater(game, time);
     if (!titleMode) {
       this.gardenLandmarks(game, time);
       this.homeGrove(game, time);
@@ -429,7 +478,7 @@ export class Renderer {
           );
       });
       if (game.level.kind !== "grove" && this.visible(game.level.goal.x, 90)) {
-        if (game.level.kind === "secret")
+        if (game.level.kind === "secret" && game.level.theme !== "cloud")
           this.hiveBell(
             game.level.goal.x,
             game.level.goal.y,
@@ -721,6 +770,37 @@ export class Renderer {
     sky.addColorStop(1, p.middle);
     c.fillStyle = sky;
     c.fillRect(0, 0, this.viewportWidth, this.viewportHeight);
+    if (theme === "grotto") {
+      // Soft shafts and distant rock shelves keep the water legible without
+      // suggesting solid surfaces where no collision exists.
+      for (let i = 0; i < Math.ceil(this.viewportWidth / 240) + 1; i++) {
+        const x = i * 240 - ((camera * 0.08) % 240);
+        c.fillStyle = "rgba(189,255,229,.045)";
+        c.beginPath();
+        c.moveTo(x, 0);
+        c.lineTo(x + 75, 0);
+        c.lineTo(x - 90, this.viewportHeight);
+        c.lineTo(x - 165, this.viewportHeight);
+        c.closePath();
+        c.fill();
+        this.ellipse(
+          x + 85,
+          this.viewportHeight + 30,
+          160,
+          120,
+          "rgba(9,52,65,.25)",
+        );
+      }
+      return;
+    }
+    if (theme === "cloud") {
+      for (let i = -1; i < Math.ceil(this.viewportWidth / 230) + 2; i++) {
+        const x = i * 230 - ((camera * 0.08) % 230);
+        this.cloud(x, 145 + hash(i + 40) * 180, 1.5 + hash(i + 21), "#ffffff");
+      }
+      this.ellipse(this.viewportWidth * 0.77, 90, 40, 40, p.sun);
+      return;
+    }
     if (theme === "dusk") {
       const span = this.viewportWidth + 140;
       for (let i = 0; i < Math.ceil((35 * this.viewportWidth) / WIDTH); i++) {
@@ -835,6 +915,52 @@ export class Renderer {
       this.ellipse(x + 14, y + 5, 15, h * 0.45, p.middle);
     }
     c.globalAlpha = 1;
+  }
+
+  private grottoWater(game: Game, time: number) {
+    for (const zone of game.level.waterZones ?? []) {
+      if (
+        zone.x + zone.w < this.cameraX ||
+        zone.x > this.cameraX + this.viewportWidth
+      )
+        continue;
+      const c = this.ctx;
+      c.save();
+      c.beginPath();
+      c.rect(zone.x, zone.y, zone.w, zone.h);
+      c.clip();
+      if (!zone.currentY) {
+        c.fillStyle = "rgba(43, 183, 189, .22)";
+        c.fillRect(zone.x, zone.y, zone.w, zone.h);
+        this.line(
+          [
+            [zone.x, zone.y + 2],
+            [zone.x + zone.w, zone.y + 2],
+          ],
+          "rgba(202,255,240,.65)",
+          3,
+        );
+        for (let i = 0; i < Math.ceil(zone.w / 90); i++) {
+          const x = zone.x + i * 90 + Math.sin(time * 1.3 + i) * 5;
+          this.ellipse(x, zone.y + 5, 23, 2, "rgba(231,255,248,.45)");
+        }
+      } else if (game.puzzleState.water === "HIGH") {
+        // The rising bubbles mark the actual current's bounds.
+        for (let i = 0; i < Math.max(5, Math.floor(zone.w / 15)); i++) {
+          const x = zone.x + 6 + hash(i + zone.x) * Math.max(1, zone.w - 12);
+          const phase = (time * 38 + hash(i + 57) * zone.h) % zone.h;
+          const y = zone.y + zone.h - phase;
+          this.ellipse(
+            x + Math.sin(time * 2 + i) * 4,
+            y,
+            2 + hash(i) * 3,
+            3 + hash(i) * 4,
+            "rgba(202,255,245,.65)",
+          );
+        }
+      }
+      c.restore();
+    }
   }
 
   private cloud(x: number, y: number, scale: number, color: string) {
@@ -1607,15 +1733,23 @@ export class Renderer {
       this.rounded(x - 25, y - 24, 50, 24, 8, "#b37b4d", "#80583d");
       this.rounded(x - 21, y - 29, 42, 12, 5, "#f5d188", "#9a7047");
       const label =
-        m.kind === "wind"
-          ? state.wind
-          : m.kind === "brake"
-            ? state.brake
-            : m.kind === "water" || m.kind === "sluice"
-              ? state.water
-              : m.kind === "shutter" || m.kind === "receiver"
-                ? state.shutter
-                : "";
+        game.level.theme === "grotto" && m.kind === "water"
+          ? state.water === "HIGH"
+            ? "BUBBLES ON"
+            : "BUBBLES OFF"
+          : game.level.theme === "grotto" && m.kind === "sluice"
+            ? state.sluiceGateOpen
+              ? "OPEN"
+              : "LOCKED"
+            : m.kind === "wind"
+              ? state.wind
+              : m.kind === "brake"
+                ? state.brake
+                : m.kind === "water" || m.kind === "sluice"
+                  ? state.water
+                  : m.kind === "shutter" || m.kind === "receiver"
+                    ? state.shutter
+                    : "";
       if (m.kind === "wind") {
         this.line(
           [
@@ -1689,7 +1823,7 @@ export class Renderer {
       c.font = "bold 11px sans-serif";
       c.textAlign = "center";
       c.fillStyle = "#674a36";
-      c.fillText(label, x, y - 12);
+      c.fillText(label, x, y - 12, 46);
       c.restore();
     }
     const open: Record<string, boolean> = {
@@ -1701,17 +1835,35 @@ export class Renderer {
     };
     for (const gate of game.level.gates ?? []) {
       if (!this.visible(gate.x, gate.w + 30)) continue;
+      const gateBody =
+        game.level.theme === "cloud"
+          ? "#abcfd1"
+          : game.level.theme === "grotto"
+            ? "#608c85"
+            : "#ad8151";
+      const gateBorder =
+        game.level.theme === "cloud"
+          ? "#799fa9"
+          : game.level.theme === "grotto"
+            ? "#3f716d"
+            : "#75553c";
+      const gateBands =
+        game.level.theme === "cloud"
+          ? "#e6f8eb"
+          : game.level.theme === "grotto"
+            ? "#b7e6cc"
+            : "#e4be7b";
       if (open[gate.condition]) {
-        this.rounded(gate.x, gate.y, gate.w, 8, 4, "#bb9663");
+        this.rounded(gate.x, gate.y, gate.w, 8, 4, gateBody);
       } else {
-        this.rounded(gate.x, gate.y, gate.w, gate.h, 5, "#ad8151", "#75553c");
+        this.rounded(gate.x, gate.y, gate.w, gate.h, 5, gateBody, gateBorder);
         for (let y = gate.y + 18; y < gate.y + gate.h; y += 38)
           this.line(
             [
               [gate.x + 3, y],
               [gate.x + gate.w - 3, y],
             ],
-            "#e4be7b",
+            gateBands,
             4,
           );
       }
@@ -1752,7 +1904,13 @@ export class Renderer {
       c.textAlign = "center";
       c.fillStyle = "#684b38";
       c.fillText(
-        portal.target === "return" ? "HOME" : "HIVE",
+        portal.target === "return"
+          ? "BACK"
+          : portal.target === "cloud"
+            ? "CLOUD"
+            : portal.target === "moonpool"
+              ? "MOONPOOL"
+              : "HIVE",
         portal.x + portal.w / 2,
         portal.y - 12,
       );
@@ -2458,6 +2616,31 @@ export class Renderer {
   private platform(r: Game["platforms"][number], p: Palette, time: number) {
     const c = this.ctx;
     const { x, y, w, h } = r;
+    if (r.id?.startsWith("cloud.")) {
+      // The flat top is the collision surface; the rounded underside is
+      // decorative, leaving no apparent solid ground beyond the collider.
+      this.rounded(x, y, w, Math.max(8, h), 8, "#edf9f6");
+      for (let i = 0; i < Math.ceil(w / 25); i++) {
+        const cx = Math.min(x + w - 8, x + 10 + i * 25);
+        this.ellipse(cx, y + Math.max(8, h) - 3, 11, 7, "#d2e9e9");
+      }
+      this.line(
+        [
+          [x + 2, y + 2],
+          [x + w - 2, y + 2],
+        ],
+        "#ffffff",
+        4,
+      );
+      if (w > 65) {
+        for (let i = 0; i < Math.floor(w / 72); i++) {
+          const xx = x + 22 + i * 72;
+          this.ellipse(xx, y + 1, 7, 2, "#a9d9b4");
+          this.ellipse(xx + 2, y - 3, 2, 2, "#ffd8df");
+        }
+      }
+      return;
+    }
     if (r.id?.startsWith("gate.")) return; // Gates are drawn from their live latch state.
     if (r.id?.startsWith("trellis.")) {
       this.rounded(x, y, w, h, 3, "#739b57");

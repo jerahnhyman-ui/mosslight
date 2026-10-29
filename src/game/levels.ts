@@ -1,4 +1,5 @@
 import { windmillLevel } from "./expansion-levels";
+import { cloudAscentPlatforms } from "./cloud-garden";
 export {
   windmillLevel,
   beehiveLevel,
@@ -64,7 +65,14 @@ export interface Level {
   name: string;
   subtitle: string;
   width: number;
-  theme: "meadow" | "dusk" | "alpine" | "windmill" | "hive";
+  theme:
+    | "meadow"
+    | "dusk"
+    | "alpine"
+    | "windmill"
+    | "hive"
+    | "cloud"
+    | "grotto";
   spawn: { x: number; y: number };
   platforms: Platform[];
   coins: { x: number; y: number }[];
@@ -78,6 +86,7 @@ export interface Level {
   goal: { x: number; y: number };
   kind?: "world" | "grove" | "challenge" | "secret" | "minigame";
   featherFountains?: { x: number; y: number }[];
+  waterZones?: (Rect & { currentY?: number })[];
   mechanisms?: {
     id: string;
     kind:
@@ -102,7 +111,7 @@ export interface Level {
     x: number;
     y: number;
     w: number;
-    target: "beehive" | "return";
+    target: "beehive" | "return" | "cloud" | "moonpool";
     requires?: "discovery" | "completion";
   }[];
   flightTarget?: { x: number; y: number; radius: number };
@@ -1106,6 +1115,11 @@ export const groveLevel: Level = {
     mushroom(1060, 350, 100),
     wakingPlant(1240, 205, 190, "flower", 270),
     ledge(1530, 310, 180),
+    ...cloudAscentPlatforms,
+  ],
+  portals: [
+    { id: "moonpool-entrance", x: 780, y: 430, w: 100, target: "moonpool" },
+    { id: "cloud-entrance", x: 1560, y: -110, w: 90, target: "cloud" },
   ],
   landmarks: [
     {
@@ -1132,6 +1146,12 @@ export const groveLevel: Level = {
       y: 405,
       kind: "footprints",
       text: "Every rescued firefly makes this grove brighter.",
+    },
+    {
+      x: 1260,
+      y: 180,
+      kind: "glow",
+      text: "Soft clouds drift above the grove. A feather may carry you higher.",
     },
   ],
   tutorials: [

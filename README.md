@@ -63,6 +63,13 @@ toward both the run's extra-life counter and a persistent cosmetic wallet;
 purchases never change movement or combat strength. Rescue all three fireflies
 in each of the original three worlds to unlock its separate challenge room and earn time medals.
 
+The Home Grove also leads to two optional places. Enter Moonpool Grotto from
+the grove floor and hold Jump to swim upward; release it to sink. Its valves
+and bubble currents open a route through the water. Above the grove, a Wind
+Feather can reach a hidden stairway of clouds. Land on each cloud to recharge
+and discover Cloudbloom Sanctuary and its sky-flower puzzle. Stand still at a
+portal and press Jump when prompted; each area has a way back to the grove.
+
 Choose **Classic** for the three-life rules, **Relaxed** for unlimited checkpoint
 retries, or **Timed** for a separately recorded three-life run. The mode applies
 when starting a new run. Each mode has separate completion and time records;
@@ -153,6 +160,7 @@ be performed through Xcode Cloud and TestFlight.
 - `src/game/bosses.ts` — telegraphed guardian attacks and recovery phases.
 - `src/game/levels.ts` — authored worlds, secret routes, grove, and challenges.
 - `src/game/expansion-levels.ts` — Windmill Garden, Lantern Beehive, and Petal Post.
+- `src/game/moonpool-level.ts` and `src/game/cloud-garden.ts` — the optional grotto and cloud sanctuary.
 - `src/game/session.ts` — resource continuity across world/secret transitions.
 - `src/game/renderer.ts` — crisp cartoon canvas, camera, and animated effects.
 - `src/main.ts` — menus, HUD, progress, and game loop.

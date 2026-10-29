@@ -412,11 +412,19 @@ export class Game {
     this.coyote = p.grounded ? COYOTE_TIME : Math.max(0, this.coyote - STEP);
     this.jumpBuffer = Math.max(0, this.jumpBuffer - STEP);
     const direction = Number(input.right) - Number(input.left);
+    const water = (this.level.waterZones ?? []).filter((zone) =>
+      overlaps(p, zone),
+    );
+    const swimming = water.length > 0;
     if (this.hurtLock === 0) {
       let acceleration = p.grounded ? 3200 : 2600;
       if (direction === 0) acceleration = p.grounded ? 4200 : 1800;
       else if (p.vx * direction < 0) acceleration = p.grounded ? 4800 : 3600;
-      p.vx = approach(p.vx, direction * MAX_SPEED, acceleration * STEP);
+      p.vx = approach(
+        p.vx,
+        direction * (swimming ? 190 : MAX_SPEED),
+        acceleration * STEP,
+      );
       if (direction) p.facing = direction;
     }
     for (const edge of this.pendingEdges.splice(0)) {
@@ -432,6 +440,10 @@ export class Game {
           this.portalBlocked = true;
           this.jumpBuffer = 0;
           this.events.push("portal");
+          continue;
+        }
+        if (swimming) {
+          this.jumpBuffer = 0;
           continue;
         }
         this.jumpBuffer = JUMP_BUFFER_TIME;
@@ -452,13 +464,26 @@ export class Game {
       }
     }
     if (!input.jump && !this.jumpHeld) this.flightNeedsRelease = false;
-    this.tryJump(input);
+    if (!swimming) this.tryJump(input);
     if (this.jumpCanShorten && !input.jump) {
       p.vy = Math.max(p.vy, SHORT_JUMP);
       this.jumpCanShorten = false;
     }
     if (p.vy >= 0) this.jumpCanShorten = false;
-    if (
+    if (swimming) {
+      // Holding jump is a swim stroke. Releasing it lets Pip sink gently,
+      // including onto puzzle handles. Bubbles add an upward current.
+      this.liftActive = false;
+      this.glideArmed = false;
+      this.jumpCanShorten = false;
+      const current =
+        this.level.contentId === "secret.moonpool" &&
+        this.puzzleState.water === "LOW"
+          ? 0
+          : Math.min(0, ...water.map((zone) => zone.currentY ?? 0));
+      const target = (input.jump && this.hurtLock === 0 ? -160 : 115) + current;
+      p.vy = approach(p.vy, target, 440 * STEP);
+    } else if (
       this.liftActive &&
       input.jump &&
       this.liftTicks > 0 &&
@@ -534,7 +559,7 @@ export class Game {
     }
     if (p.grounded) {
       this.airborneMin = Infinity;
-      this.tryJump(input);
+      if (!swimming) this.tryJump(input);
     }
     if (p.grounded && rechargeSupport && this.hasWindFeather) {
       this.stableTicks++;

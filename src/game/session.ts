@@ -1,10 +1,12 @@
 import { Game } from "./engine";
 import { beehiveLevel } from "./levels";
+import { cloudGardenLevel } from "./cloud-garden";
+import { moonpoolLevel } from "./moonpool-level";
 
 /** Keeps room state and one set of run resources across a world/secret detour. */
 export class AdventureSession {
   readonly parent: Game;
-  private secret: Game | null = null;
+  private secrets = new Map<string, Game>();
   private returnPoint: { x: number; feetY: number } | null = null;
   active: Game;
 
@@ -18,22 +20,41 @@ export class AdventureSession {
   }
 
   enterBeehive(): Game {
+    return this.enter("beehive");
+  }
+
+  enter(target: "beehive" | "cloud" | "moonpool"): Game {
     if (this.inSecret || this.parent.state !== "playing") return this.active;
-    const portal = this.parent.level.portals?.find(
-      (p) => p.target === "beehive",
-    );
-    if (!portal || !this.parent.puzzleState.hiveDiscovered) return this.active;
-    this.returnPoint = { x: portal.x + portal.w + 26, feetY: portal.y };
-    this.secret ??= new Game(0, {
-      level: beehiveLevel,
-      mode: this.parent.mode,
-    });
-    this.secret.transferPlayerFrom(this.parent, {
-      x: beehiveLevel.spawn.x,
-      feetY: beehiveLevel.spawn.y + 38,
+    const portal = this.parent.level.portals?.find((p) => p.target === target);
+    if (
+      !portal ||
+      (target === "beehive" && !this.parent.puzzleState.hiveDiscovered)
+    )
+      return this.active;
+    const level =
+      target === "beehive"
+        ? beehiveLevel
+        : target === "cloud"
+          ? cloudGardenLevel
+          : moonpoolLevel;
+    this.returnPoint = {
+      x:
+        target === "beehive"
+          ? portal.x + portal.w + 26
+          : portal.x + portal.w / 2 - this.parent.player.w / 2,
+      feetY: portal.y,
+    };
+    let secret = this.secrets.get(target);
+    if (!secret) {
+      secret = new Game(0, { level, mode: this.parent.mode });
+      this.secrets.set(target, secret);
+    }
+    secret.transferPlayerFrom(this.parent, {
+      x: level.spawn.x,
+      feetY: level.spawn.y + 38,
     });
     this.parent.requestedPortal = null;
-    this.active = this.secret;
+    this.active = secret;
     return this.active;
   }
 

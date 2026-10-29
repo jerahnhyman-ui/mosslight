@@ -19,6 +19,8 @@ export async function checkFlightCamera(browser) {
     import { Game } from ${source("engine")};
     import { Renderer } from ${source("renderer")};
     import { levels, groveLevel, challengeLevels } from ${source("levels")};
+    import { cloudGardenLevel } from ${source("cloud-garden")};
+    import { moonpoolLevel } from ${source("moonpool-level")};
 
     const canvas = document.querySelector("canvas");
     const renderer = new Renderer(canvas);
@@ -47,7 +49,7 @@ export async function checkFlightCamera(browser) {
       const scale = (bounds.height - safeTop - safeBottom) / 540;
       const baseline = -safeTop / scale;
       window.dispatchEvent(new Event("resize"));
-      for (const level of [...levels.slice(0, 3), groveLevel]) {
+      for (const level of [...levels.slice(0, 3), groveLevel, cloudGardenLevel, moonpoolLevel]) {
         const game = new Game(0, { level });
         game.hasWindFeather = true;
         draw(game);
@@ -173,7 +175,7 @@ export async function checkFlightCamera(browser) {
         },
         { safeTop, safeBottom },
       );
-      if (result?.checked.length !== 4)
+      if (result?.checked.length !== 6)
         throw new Error("Flight camera checks did not complete.");
       const expectedHeight = width > height ? height : (width * 9) / 16;
       if (

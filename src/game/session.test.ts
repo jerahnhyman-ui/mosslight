@@ -3,6 +3,9 @@ import { AdventureSession } from "./session";
 import { Game } from "./engine";
 import { windmillLevel, beehiveLevel } from "./expansion-levels";
 import { RunCoinLedger, readSave } from "../storage";
+import { groveLevel } from "./levels";
+import { cloudGardenLevel } from "./cloud-garden";
+import { moonpoolLevel } from "./moonpool-level";
 
 // Fixture tests exercise the scene handoff directly; these are not full play routes.
 function setup() {
@@ -23,6 +26,53 @@ function pickup(game: Game, x: number, y: number) {
 }
 
 describe("AdventureSession scene handoffs", () => {
+  it.each([
+    ["cloud", cloudGardenLevel],
+    ["moonpool", moonpoolLevel],
+  ] as const)(
+    "enters %s from the grove through the real portal controls and returns safely",
+    (target, level) => {
+      const parent = new Game(0, { level: groveLevel, mode: "relaxed" });
+      const session = new AdventureSession(parent);
+      const portal = parent.level.portals!.find((p) => p.target === target)!;
+      parent.player.x = portal.x + portal.w / 2 - parent.player.w / 2;
+      parent.player.y = portal.y - parent.player.h;
+      parent.player.grounded = true;
+      for (let i = 0; i < 50; i++)
+        parent.update(1 / 120, {
+          left: false,
+          right: false,
+          jump: false,
+          jumpPressed: false,
+        });
+      expect(parent.portalReady).toBe(target);
+      parent.update(1 / 120, {
+        left: false,
+        right: false,
+        jump: true,
+        jumpPressed: true,
+      });
+      expect(parent.requestedPortal).toBe(target);
+      parent.collectedCoins = 7;
+      const detour = session.enter(target);
+      expect(detour.level).toBe(level);
+      expect(detour.collectedCoins).toBe(7);
+      detour.collectedCoins = 9;
+      expect(session.returnToWorld()).toBe(parent);
+      expect(parent.collectedCoins).toBe(9);
+      expect(parent.player.y + parent.player.h).toBe(portal.y);
+      expect(
+        parent.platforms.some(
+          (p) =>
+            !p.broken &&
+            p.y === portal.y &&
+            parent.player.x >= p.x &&
+            parent.player.x + parent.player.w <= p.x + p.w,
+        ),
+      ).toBe(true);
+      expect(session.enter(target)).toBe(detour);
+    },
+  );
   it("carries resources and clears motion/flight at safe entry and return anchors", () => {
     const { parent, session } = setup();
     const nest = parent.level.featherFountains![0];
