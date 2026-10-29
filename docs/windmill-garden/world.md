@@ -1,5 +1,10 @@
 # Windmill Garden — world and secret-level blueprint
 
+> Historical blueprint: the fountain and collectible placements below have
+> been superseded by the marked power blocks in the current level data. Bump
+> those blocks from below to earn diamonds, feathers, and star power. The world
+> also now continues beyond the Mill Keeper to Briarheart's final arena.
+
 Status: implemented world blueprint. Geometry is covered by automated input routes; timing, difficulty and pacing below remain initial human-playtest hypotheses. [Flight](flight.md) owns flight physics; [encounters](encounters.md) owns the guardian and Grove minigame. This document owns world and beehive layout, puzzle conditions, traversal, checkpoints and discovery.
 
 ## Baseline and scope

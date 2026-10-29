@@ -19,8 +19,15 @@ const tick = (game: Game, input: GameInput = idle, n = 1) => {
 describe("wind feather and expansion simulation", () => {
   it("requires a fresh airborne press and spends finite charge, then recharges on stable ground", () => {
     const g = new Game(0, { level: windmillLevel });
-    g.player.x = 170;
-    tick(g, idle, 3);
+    // Physics fixture begins underneath the authored first feather block;
+    // the separate route tests prove the block is reachable from the spawn.
+    const block = g.platforms.find((p) => p.rewardPower === "feather")!;
+    g.player.x = block.x + (block.w - g.player.w) / 2;
+    g.player.y = 430 - g.player.h;
+    g.player.grounded = true;
+    tick(g, { ...idle, jump: true, jumpPressed: true });
+    tick(g, { ...idle, jump: true }, 90);
+    tick(g, idle, 30);
     expect(g.hasWindFeather).toBe(true);
     tick(g, { ...idle, jump: true, jumpPressed: true });
     tick(g, { ...idle, jump: true }, 30);

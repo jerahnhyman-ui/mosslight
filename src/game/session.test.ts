@@ -75,16 +75,30 @@ describe("AdventureSession scene handoffs", () => {
   );
   it("carries resources and clears motion/flight at safe entry and return anchors", () => {
     const { parent, session } = setup();
-    const nest = parent.level.featherFountains![0];
-    parent.player.x = nest.x - parent.player.w / 2;
-    parent.player.y = nest.y - parent.player.h;
+    const block = parent.platforms.find((p) => p.rewardPower === "feather")!;
+    const ground = parent.platforms.find(
+      (p) =>
+        p.kind === "ground" &&
+        p.y === 430 &&
+        p.x <= block.x &&
+        p.x + p.w >= block.x + block.w,
+    )!;
+    parent.player.x = block.x + (block.w - parent.player.w) / 2;
+    parent.player.y = ground.y - parent.player.h;
     parent.player.grounded = true;
     parent.update(1 / 120, {
       left: false,
       right: false,
-      jump: false,
-      jumpPressed: false,
+      jump: true,
+      jumpPressed: true,
     });
+    for (let i = 0; i < 90; i++)
+      parent.update(1 / 120, {
+        left: false,
+        right: false,
+        jump: true,
+        jumpPressed: false,
+      });
     expect(parent.hasWindFeather).toBe(true);
     parent.player.form = "big";
     parent.lives = 2;
@@ -159,13 +173,21 @@ describe("AdventureSession scene handoffs", () => {
     expect(save.wallet).toBe(4);
   });
 
-  it("resets parent diamonds after a death in the secret and refuses to restore a lost run", () => {
+  it("resets parent diamond blocks after a death in the secret and refuses to restore a lost run", () => {
     const { parent, session } = setup();
-    parent.diamonds[0].collected = true;
+    const block = parent.platforms.find((p) => p.rewardPower === "diamond")!;
+    block.rewardUsed = true;
+    parent.diamonds.push({
+      x: block.x,
+      y: block.y,
+      collected: true,
+      fromRewardBlock: true,
+    });
     const secret = session.enterBeehive();
     secret.deaths++;
     session.returnToWorld();
-    expect(parent.diamonds[0].collected).toBe(false);
+    expect(block.rewardUsed).toBe(false);
+    expect(parent.diamonds.some((d) => d.fromRewardBlock)).toBe(false);
     session.enterBeehive();
     secret.state = "lost";
     expect(session.returnToWorld()).toBe(secret);

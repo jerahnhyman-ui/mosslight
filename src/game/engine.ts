@@ -32,13 +32,19 @@ export type Player = Rect & {
   grounded: boolean;
   invulnerable: number;
 };
-export type Collectible = { x: number; y: number; collected: boolean };
+export type Collectible = {
+  x: number;
+  y: number;
+  collected: boolean;
+  fromRewardBlock?: boolean;
+};
 export type PlatformState = Platform & {
   baseX: number;
   baseY: number;
   previousX: number;
   previousY: number;
   broken: boolean;
+  rewardUsed: boolean;
   awakened: boolean;
   crumbleRemaining: number;
   respawnRemaining: number;
@@ -92,6 +98,8 @@ export class Game {
   readonly level: Level;
   readonly mode: RunMode;
   boss: BossState | null = null;
+  /** A fourth-world finale is a separate encounter after the level guardian. */
+  finalBossStarted = false;
   hazards: BossHazard[] = [];
   outfit: "leaf" | "berry" | "moon" | "cosmetic.bee_scarf" = "leaf";
   groveDecorations: string[] = [];
@@ -212,6 +220,7 @@ export class Game {
     this.events = [];
     this.accumulator = 0;
     this.boss = this.level.boss ? createBoss(this.level.boss) : null;
+    this.finalBossStarted = false;
     this.hazards = [];
     this.platforms = this.level.platforms.map((tile) => {
       const offset = tile.motion
@@ -228,6 +237,7 @@ export class Game {
         previousX: x,
         previousY: y,
         broken: false,
+        rewardUsed: false,
         awakened: tile.kind !== "flower" && tile.kind !== "curled",
         crumbleRemaining: -1,
         respawnRemaining: 0,
@@ -242,6 +252,7 @@ export class Game {
         previousX: gate.x,
         previousY: gate.y,
         broken: false,
+        rewardUsed: false,
         awakened: true,
         crumbleRemaining: -1,
         respawnRemaining: 0,
@@ -330,8 +341,7 @@ export class Game {
       invulnerable: 1.5,
     });
     this.lives = source.lives;
-    if (source.deaths > this.deaths)
-      for (const diamond of this.diamonds) diamond.collected = false;
+    if (source.deaths > this.deaths) this.resetRetryRewards();
     this.deaths = source.deaths;
     this.elapsed = source.elapsed;
     this.collectedCoins = source.collectedCoins;
@@ -547,7 +557,33 @@ export class Game {
           this.events.push("crumble");
         }
       } else if (solid(tile) && p.vy < 0 && oldTop >= tile.y + tile.h - 1) {
-        if (tile.kind === "brick" && p.form === "big") {
+        if (tile.rewardPower) {
+          p.y = tile.y + tile.h;
+          p.vy = 0;
+          if (
+            !tile.rewardUsed &&
+            (tile.rewardPower !== "feather" || !this.hasWindFeather)
+          ) {
+            tile.rewardUsed = true;
+            this.events.push("reward-block");
+            if (tile.rewardPower === "diamond") {
+              // Drop the diamond below the block. Growth waits until Pip has
+              // enough headroom, so the solid block cannot consume the reward.
+              this.diamonds.push({
+                x: p.x + p.w / 2,
+                y: tile.y + tile.h + 16,
+                collected: false,
+                fromRewardBlock: true,
+              });
+            } else if (tile.rewardPower === "feather") {
+              this.equipFeather();
+            } else {
+              this.collectedStars++;
+              this.starPowerRemaining = STAR_POWER_DURATION;
+              this.events.push("star");
+            }
+          }
+        } else if (tile.kind === "brick" && p.form === "big") {
           tile.broken = true;
           this.events.push("break");
           this.awardCoins(tile.rewardCoins ?? 0);
@@ -653,10 +689,23 @@ export class Game {
       } else if (this.hurt(enemy)) return true;
     }
     if (this.updateBoss(oldBottom)) return true;
+    // Keep the defeated subboss cleared while Pip walks to the next checkpoint.
+    // Activate the finale only on its approach, leaving room to recover first.
+    if (
+      this.level.finalBoss &&
+      !this.finalBossStarted &&
+      this.boss?.state === "defeated" &&
+      p.x + p.w >= this.level.finalBoss.minX - 200
+    ) {
+      this.finalBossStarted = true;
+      this.boss = createBoss(this.level.finalBoss);
+      this.hazards = [];
+    }
     if (
       this.level.kind !== "grove" &&
       this.level.kind !== "secret" &&
       this.level.kind !== "minigame" &&
+      (!this.level.finalBoss || this.finalBossStarted) &&
       (!this.boss || this.boss.state === "defeated") &&
       overlaps(p, {
         x: this.level.goal.x,
@@ -1213,6 +1262,9 @@ export class Game {
 
   private loseLife() {
     if (this.level.kind === "grove") {
+      // The grove returns Pip safely instead of charging a life. Reset
+      // recoverable blocks as well, since spawn removes the feather.
+      this.resetRetryRewards();
       this.spawn();
       this.events.push("grove-return");
       return true;
@@ -1222,13 +1274,12 @@ export class Game {
     this.starPowerRemaining = 0;
     this.events.push("life-lost");
     this.hazards = [];
-    if (this.boss && this.boss.state !== "defeated" && this.level.boss)
-      this.boss = retryBoss(
-        this.level.boss,
-        this.boss,
-        this.mode === "relaxed",
-      );
-    for (const diamond of this.diamonds) diamond.collected = false;
+    const retrySpec = this.finalBossStarted
+      ? this.level.finalBoss
+      : this.level.boss;
+    if (this.boss && this.boss.state !== "defeated" && retrySpec)
+      this.boss = retryBoss(retrySpec, this.boss, this.mode === "relaxed");
+    this.resetRetryRewards();
     // Clouds must be available on retry. Broken coin caches stay broken so rewards
     // cannot be farmed, just as ordinary collected coins stay collected after death.
     for (const platform of this.platforms) {
@@ -1245,5 +1296,13 @@ export class Game {
       this.events.push("lose");
     } else this.spawn();
     return true;
+  }
+
+  private resetRetryRewards() {
+    this.diamonds = this.diamonds.filter((diamond) => !diamond.fromRewardBlock);
+    for (const diamond of this.diamonds) diamond.collected = false;
+    for (const tile of this.platforms)
+      if (tile.rewardPower === "diamond" || tile.rewardPower === "feather")
+        tile.rewardUsed = false;
   }
 }

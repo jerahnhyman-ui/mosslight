@@ -19,7 +19,18 @@ function advance(game: Game, seconds: number, input: GameInput = idle) {
     game.update(1 / 120, input);
 }
 
+// These tests isolate pickup collision and duration mechanics. Authored worlds
+// release their pickups from reward blocks; explicit fixtures keep the tests
+// independent of their placement while exercising the same collision path.
+function installPowerFixtures(game: Game) {
+  if (!game.diamonds.length)
+    game.diamonds = [180, 300].map((x) => ({ x, y: 400, collected: false }));
+  if (!game.stars.length)
+    game.stars = [400, 500].map((x) => ({ x, y: 400, collected: false }));
+}
+
 function collectDiamond(game: Game, index = 0) {
+  installPowerFixtures(game);
   const diamond = game.diamonds[index]!;
   game.player.x = diamond.x - game.player.w / 2;
   game.player.y = 430 - game.player.h;
@@ -28,6 +39,7 @@ function collectDiamond(game: Game, index = 0) {
 }
 
 function collectStar(game: Game, index = 0) {
+  installPowerFixtures(game);
   const star = game.stars[index]!;
   game.player.x = star.x - game.player.w / 2;
   game.player.y = star.y - game.player.h / 2;
@@ -193,6 +205,15 @@ describe("Mosslight simulation", () => {
       for (const [takeoff, target, y] of routes[level.id - 1]!) {
         if (takeoff === null) walkTo(game, target, y);
         else jumpTo(game, takeoff, target, y);
+        if (level.id === 3 && target === 1990) {
+          const block = game.platforms.find(
+            (tile) => tile.rewardPower === "diamond" && tile.x === 1920,
+          )!;
+          walkTo(game, block.x + block.w / 2 - game.player.w / 2, 430);
+          game.update(1 / 120, { ...idle, jump: true, jumpPressed: true });
+          advance(game, 1, { ...idle, jump: true });
+          expect(game.player.form).toBe("big");
+        }
       }
       expect(game.state).toBe("playing");
       expect(game.collectedFireflies).toBe(1);
@@ -342,6 +363,7 @@ describe("Mosslight simulation", () => {
 
   it("collects a seed and star only once", () => {
     const game = new Game();
+    installPowerFixtures(game);
     game.player.x = game.coins[0]!.x - 14;
     game.player.y = game.coins[0]!.y - 19;
     game.update(1 / 60, idle);
@@ -398,6 +420,7 @@ describe("Mosslight simulation", () => {
 
   it("does not reuse grounded jump permission during damage knockback", () => {
     const game = new Game();
+    installPowerFixtures(game);
     advance(game, 0.1);
     game.player.x = game.diamonds[0]!.x - game.player.w / 2;
     game.update(1 / 120, idle);
@@ -450,6 +473,7 @@ describe("Mosslight simulation", () => {
 
   it("grows from a diamond with a larger collision body and fixed feet/center", () => {
     const game = new Game();
+    installPowerFixtures(game);
     const diamond = game.diamonds[0]!;
     expect(game.player.form).toBe("small");
     expect([game.player.w, game.player.h]).toEqual([28, 38]);
@@ -770,15 +794,18 @@ describe("Mosslight simulation", () => {
   });
 
   it.each(levels.slice(0, 3))(
-    "$name has reachable growth before enemies and after respawn",
+    "$name has a head-knocker diamond available after a guardian checkpoint retry",
     (level) => {
       const game = new Game(level.id - 1);
-      advance(game, 0.1);
-      walkTo(game, level.diamonds[0]!.x, 430);
-      expect(game.player.form).toBe("big");
-      expect(game.deaths).toBe(0);
-      expect(level.diamonds[0]!.x).toBeLessThan(level.enemies[0]!.minX);
-      game.player.x = level.checkpoints[0]!.x;
+      const checkpoint = level.checkpoints.at(-1)!;
+      const block = level.platforms.find(
+        (tile) =>
+          tile.rewardPower === "diamond" &&
+          tile.x >= checkpoint.x - 150 &&
+          tile.x < level.boss!.minX,
+      )!;
+      expect(block).toBeDefined();
+      game.player.x = checkpoint.x;
       game.player.y = 430 - game.player.h;
       game.player.vx = game.player.vy = 0;
       game.update(1 / 120, idle);
@@ -786,11 +813,13 @@ describe("Mosslight simulation", () => {
       game.player.y = 700;
       game.update(1 / 120, idle);
       expect(game.player.form).toBe("small");
-      expect(game.player.x).toBe(level.checkpoints[0]!.x);
-      walkTo(game, level.diamonds[1]!.x, 430);
+      expect(game.player.x).toBe(checkpoint.x);
+      walkTo(game, block.x + block.w / 2 - game.player.w / 2, 430);
+      game.update(1 / 120, { ...idle, jump: true, jumpPressed: true });
+      advance(game, 1, { ...idle, jump: true });
       expect(game.player.form).toBe("big");
       expect(game.lives).toBe(2);
-      expect(game.diamonds[1]!.collected).toBe(true);
+      expect(game.diamonds.some((diamond) => diamond.collected)).toBe(true);
     },
   );
 

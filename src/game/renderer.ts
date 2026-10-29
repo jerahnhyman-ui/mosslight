@@ -186,6 +186,7 @@ export class Renderer {
   private previousDiamonds: boolean[] = [];
   private previousFireflies: boolean[] = [];
   private previousBroken: boolean[] = [];
+  private previousRewardUsed: boolean[] = [];
   private previousAwakened: boolean[] = [];
   private previousBossHealth = 3;
   private escapeCelebration = 0;
@@ -291,6 +292,9 @@ export class Renderer {
         (firefly) => firefly.collected,
       );
       this.previousBroken = game.platforms.map((platform) => platform.broken);
+      this.previousRewardUsed = game.platforms.map(
+        (platform) => platform.rewardUsed,
+      );
       this.previousAwakened = game.platforms.map(
         (platform) => platform.awakened,
       );
@@ -325,12 +329,15 @@ export class Renderer {
       game.boss?.kind === "millkeeper" &&
       game.boss.state !== "dormant" &&
       game.boss.state !== "defeated";
+    // The Mill Keeper is no longer at the end of the world: its separate
+    // finale arena lies beyond it. Anchor to this encounter's right edge.
+    const millFrameEnd = millArena ? game.boss!.maxX + 120 : 0;
     const target = titleMode
       ? 0
       : millArena && this.viewportWidth >= WIDTH
-        ? Math.max(0, game.level.width - this.viewportWidth)
+        ? Math.max(0, millFrameEnd - this.viewportWidth)
         : Math.max(
-            millArena ? game.level.width - WIDTH : 0,
+            millArena ? millFrameEnd - WIDTH : 0,
             Math.min(
               game.level.width - this.viewportWidth,
               game.player.x - this.viewportWidth * 0.5 + this.cameraLead,
@@ -350,6 +357,7 @@ export class Renderer {
     const followFlight =
       game.hasWindFeather &&
       (game.level.kind === "grove" ||
+        (game.finalBossStarted && game.boss?.kind === "heartwood") ||
         game.level.theme === "cloud" ||
         game.level.theme === "grotto" ||
         game.level.contentId === "world.sunlit-meadow" ||
@@ -1984,6 +1992,10 @@ export class Renderer {
       this.millKeeper(game, time);
       return;
     }
+    if (b.kind === "heartwood") {
+      this.heartwoodGuardian(game, time);
+      return;
+    }
     const defeated = b.state === "defeated";
     const warning = b.state === "warning";
     const recovering = b.state === "recover";
@@ -2223,6 +2235,175 @@ export class Renderer {
     c.restore();
   }
 
+  private heartwoodGuardian(game: Game, time: number) {
+    const b = game.boss!;
+    const c = this.ctx;
+    const cx = b.x + b.w / 2;
+    const feet = b.y + b.h;
+    if (b.state === "defeated") {
+      this.ellipse(cx, feet - 7, b.w * 0.52, 12, "rgba(255,238,149,.5)");
+      for (let i = 0; i < 5; i++)
+        this.firefly(
+          cx + Math.sin(time + i * 1.7) * 50,
+          feet - 20 - i * 18,
+          time,
+          0.7,
+        );
+      return;
+    }
+    const warning = b.state === "warning";
+    const attack = b.state === "attack";
+    const recovering = b.state === "recover";
+    if (warning) {
+      const direction = b.facing < 0 ? -1 : 1;
+      const start = cx + direction * b.w * 0.55;
+      const end = b.attackTargetX + b.w / 2;
+      c.save();
+      c.setLineDash([12, 8]);
+      this.line(
+        [
+          [start, b.groundY - 7],
+          [end, b.groundY - 7],
+        ],
+        "#d27655",
+        5,
+      );
+      if (b.phase > 1) {
+        const otherStart = cx - direction * b.w * 0.55;
+        const otherEnd = Math.max(
+          b.minX,
+          Math.min(b.maxX + b.w, cx - direction * 360),
+        );
+        this.line(
+          [
+            [otherStart, b.groundY - 7],
+            [otherEnd, b.groundY - 7],
+          ],
+          "#d27655",
+          5,
+        );
+      }
+      c.setLineDash([]);
+      this.rounded(cx - 16, b.y - 36, 32, 28, 9, "#fff0ba", "#be7652");
+      c.fillStyle = "#a35b44";
+      c.font = "800 20px 'DM Sans', sans-serif";
+      c.textAlign = "center";
+      c.fillText("!", cx, b.y - 15);
+      c.restore();
+    }
+    this.ellipse(cx, feet - 2, b.w * 0.5, 8, "rgba(38,60,53,.2)");
+    c.save();
+    c.translate(cx, b.y);
+    c.scale(b.w / 156, b.h / 100);
+    if (b.invulnerable > 0) c.globalAlpha = 0.7 + Math.sin(time * 16) * 0.2;
+    const sway = attack ? Math.sin(time * 18) * 3 : Math.sin(time * 3) * 1.5;
+    const bark =
+      b.phase >= 3 ? "#986051" : b.phase === 2 ? "#a97b50" : "#806745";
+    const leaf =
+      b.phase >= 3 ? "#b66c67" : b.phase === 2 ? "#bf9d5a" : "#5f9c60";
+    // Broad roots remain inside the real hitbox; the flat crown sits at the
+    // collision top so the highlighted landing point matches the stomp target.
+    this.line(
+      [
+        [-38, 68],
+        [-59, 88],
+        [-72, 98],
+      ],
+      "#614d3a",
+      10,
+    );
+    this.line(
+      [
+        [38, 68],
+        [59, 88],
+        [72, 98],
+      ],
+      "#614d3a",
+      10,
+    );
+    this.line(
+      [
+        [-44, 43],
+        [-66, 25 + sway],
+        [-72, 13 + sway],
+      ],
+      "#614d3a",
+      7,
+    );
+    this.line(
+      [
+        [44, 43],
+        [66, 25 - sway],
+        [72, 13 - sway],
+      ],
+      "#614d3a",
+      7,
+    );
+    this.rounded(-52, 19, 104, 78, 24, bark, "#4e4737");
+    this.rounded(-43, 28, 86, 59, 20, "rgba(241,201,135,.2)");
+    for (const x of [-29, -15, 15, 29])
+      this.line(
+        [
+          [x, 39],
+          [x - 3, 72],
+        ],
+        "rgba(67,56,43,.38)",
+        2,
+      );
+    this.ellipse(-39, 20, 25, 17, leaf, "#456c4c", 2);
+    this.ellipse(39, 20, 25, 17, leaf, "#456c4c", 2);
+    this.ellipse(0, 16, 41, 16, leaf, "#456c4c", 2);
+    this.line(
+      [
+        [-27, 2],
+        [27, 2],
+      ],
+      recovering ? "#fff2a5" : "#b3df9a",
+      recovering ? 5 : 3,
+    );
+    this.ellipse(-20, 53, 9, 10, "#fff3cf");
+    this.ellipse(20, 53, 9, 10, "#fff3cf");
+    this.ellipse(-18, 54, 3, 5, "#334c43");
+    this.ellipse(22, 54, 3, 5, "#334c43");
+    if (warning || attack) {
+      this.line(
+        [
+          [-31, 40],
+          [-13, 45],
+        ],
+        "#554335",
+        3,
+      );
+      this.line(
+        [
+          [31, 40],
+          [13, 45],
+        ],
+        "#554335",
+        3,
+      );
+    }
+    this.line(
+      [
+        [-9, 71],
+        [0, recovering ? 75 : 68],
+        [9, 71],
+      ],
+      "#584238",
+      3,
+    );
+    this.ellipse(0, 83, 7, 5, "#e3c08d");
+    if (recovering) {
+      this.ellipse(0, 2, 37, 7, "rgba(255,243,150,.55)");
+      for (let i = 0; i < 3; i++) {
+        this.starPath(-25 + i * 25, 3 + Math.sin(time * 5 + i) * 2, 4);
+        c.fillStyle = "#fff5a6";
+        c.fill();
+      }
+    }
+    c.restore();
+  }
+
   private millKeeper(game: Game, time: number) {
     const b = game.boss!;
     const c = this.ctx;
@@ -2366,6 +2547,31 @@ export class Renderer {
             1.5,
           );
         }
+      } else if (game.boss?.kind === "heartwood") {
+        // Seed waves use their real collision rectangle; contrasting leaf and
+        // thorn marks make them distinct from the earlier moth's gusts.
+        c.save();
+        c.translate(cx, cy);
+        c.scale(r.vx < 0 ? -1 : 1, 1);
+        this.ellipse(0, 0, r.w * 0.42, r.h * 0.42, "#b9874d", "#624934", 2);
+        this.ellipse(-r.w * 0.1, -r.h * 0.1, r.w * 0.15, r.h * 0.16, "#e6c17c");
+        this.line(
+          [
+            [-r.w * 0.18, r.h * 0.25],
+            [r.w * 0.19, -r.h * 0.25],
+          ],
+          "#684d36",
+          2,
+        );
+        this.line(
+          [
+            [r.w * 0.15, -r.h * 0.3],
+            [r.w * 0.33, -r.h * 0.4],
+          ],
+          "#7fb773",
+          3,
+        );
+        c.restore();
       } else {
         c.save();
         c.translate(cx, cy);
@@ -2705,6 +2911,10 @@ export class Renderer {
       return;
     }
     if (r.kind === "brick") {
+      if (r.rewardPower) {
+        this.rewardBlock(r, time);
+        return;
+      }
       this.crackedBlock(r);
       return;
     }
@@ -2980,6 +3190,97 @@ export class Renderer {
       c.fillRect(x + 7, y + h - 4, (w - 14) * (1 - urgency), 2);
     }
     c.restore();
+  }
+
+  private rewardBlock(r: Game["platforms"][number], time: number) {
+    const c = this.ctx;
+    const { x, y, w, h, rewardPower, rewardUsed } = r;
+    const colors = {
+      diamond: { face: "#69dbe4", edge: "#287d91", glyph: "#eaffff" },
+      feather: { face: "#a6d786", edge: "#568457", glyph: "#fff8d6" },
+      star: { face: "#f9cf68", edge: "#a6793e", glyph: "#fff8ce" },
+    } as const;
+    if (!rewardPower) return;
+    const tone = colors[rewardPower];
+    const face = rewardUsed ? "#a9a399" : tone.face;
+    const edge = rewardUsed ? "#77796f" : tone.edge;
+    this.rounded(x, y, w, h, 6, face, edge);
+    this.rounded(
+      x + 4,
+      y + 3,
+      w - 8,
+      h - 8,
+      4,
+      rewardUsed ? "#bdb9ae" : "rgba(255,255,255,.25)",
+    );
+    c.save();
+    c.translate(x + w / 2, y + h / 2 - 1);
+    c.fillStyle = rewardUsed ? "#8b8980" : tone.glyph;
+    c.strokeStyle = rewardUsed ? "#7c8074" : tone.edge;
+    c.lineWidth = 1.5;
+    c.lineJoin = "round";
+    if (rewardPower === "star") {
+      this.starPath(0, 0, 10);
+      c.fill();
+      c.stroke();
+    } else if (rewardPower === "diamond") {
+      c.beginPath();
+      c.moveTo(-9, -4);
+      c.lineTo(-5, -9);
+      c.lineTo(5, -9);
+      c.lineTo(9, -4);
+      c.lineTo(0, 9);
+      c.closePath();
+      c.fill();
+      c.stroke();
+      this.line(
+        [
+          [-8, -4],
+          [8, -4],
+        ],
+        edge,
+        1,
+      );
+      this.line(
+        [
+          [0, -8],
+          [0, 8],
+        ],
+        edge,
+        1,
+      );
+    } else {
+      c.rotate(0.65);
+      c.beginPath();
+      c.moveTo(0, 10);
+      c.bezierCurveTo(-10, 2, -8, -8, 0, -11);
+      c.bezierCurveTo(8, -8, 10, 2, 0, 10);
+      c.fill();
+      c.stroke();
+      this.line(
+        [
+          [0, -8],
+          [0, 10],
+        ],
+        edge,
+        1.3,
+      );
+    }
+    c.restore();
+    if (!rewardUsed) {
+      // A small upward chevron on the underside hints where Pip should bump.
+      this.line(
+        [
+          [x + w / 2 - 5, y + h - 3],
+          [x + w / 2, y + h - 7],
+          [x + w / 2 + 5, y + h - 3],
+        ],
+        edge,
+        1.5,
+      );
+      const glow = 0.4 + 0.3 * Math.sin(time * 2 + x);
+      this.ellipse(x + 7, y + 6, 2, 2, `rgba(255,255,255,${glow})`);
+    }
   }
 
   private crackedBlock(
@@ -4029,6 +4330,26 @@ export class Renderer {
       this.previousFireflies[i] = firefly.collected;
     });
     game.platforms.forEach((platform, i) => {
+      if (
+        platform.rewardPower &&
+        platform.rewardUsed &&
+        !this.previousRewardUsed[i]
+      ) {
+        const color =
+          platform.rewardPower === "diamond"
+            ? "#80eaf3"
+            : platform.rewardPower === "star"
+              ? "#ffe58a"
+              : "#c9edac";
+        this.burst(
+          platform.x + platform.w / 2,
+          platform.y + platform.h / 2,
+          color,
+          12,
+          85,
+        );
+      }
+      this.previousRewardUsed[i] = platform.rewardUsed;
       if (platform.awakened && !this.previousAwakened[i]) {
         this.burst(
           platform.x + platform.w / 2,

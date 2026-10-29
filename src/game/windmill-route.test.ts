@@ -27,7 +27,9 @@ function walk(g: Game, x: number, y: number) {
     const p = g.player;
     if (g.minigame.finished || g.state === "won") return;
     if (g.state !== "playing")
-      throw new Error(`state ${g.state} walking to ${x}`);
+      throw new Error(
+        `state ${g.state} walking to ${x} at ${g.player.x.toFixed(1)},${g.player.y.toFixed(1)}, checkpoint ${g.activeCheckpointIndex}, deaths ${g.deaths}`,
+      );
     if (
       Math.abs(p.x + p.w / 2 - x) < 6 &&
       Math.abs(p.vx) < 35 &&
@@ -61,7 +63,7 @@ function jump(g: Game, x: number, y: number, lift = false, short = false) {
     step(g, { ...steer(g, x), jump: held });
   }
   throw new Error(
-    `jump ${x},${y}: at ${g.player.x.toFixed(1)},${(g.player.y + g.player.h).toFixed(1)}`,
+    `jump ${x},${y}: at ${g.player.x.toFixed(1)},${(g.player.y + g.player.h).toFixed(1)}; feather ${g.hasWindFeather}, lives ${g.lives}, deaths ${g.deaths}`,
   );
 }
 
@@ -182,7 +184,46 @@ function defeatMill(g: Game) {
   expect(g.boss!.state).toBe("defeated");
 }
 
+/** Read Briarheart's warnings and dodge incoming seeds using player inputs. */
+function defeatHeartwoodAndFinish(g: Game) {
+  const hits: number[] = [];
+  const phases = new Set<number>();
+  for (let frame = 0; frame < 120 * 150 && g.state === "playing"; frame++) {
+    const b = g.boss!,
+      p = g.player;
+    expect(b.kind).toBe("heartwood");
+    phases.add(b.phase);
+    const target =
+      b.state === "defeated"
+        ? g.level.goal.x
+        : b.state === "recover"
+          ? b.x + (b.w - p.w) / 2
+          : b.x - 110;
+    const dx = target - p.x - (p.vx * Math.abs(p.vx)) / 3700;
+    const incoming = g.hazards.some(
+      (h) => h.vx < 0 && h.x > p.x && h.x - (p.x + p.w) < 25,
+    );
+    const jump = b.state === "recover" || incoming || !p.grounded;
+    step(g, {
+      left: dx < -2,
+      right: dx > 2,
+      jump,
+      jumpPressed: jump && p.grounded,
+    });
+    if (g.events.includes("boss-hit")) hits.push(g.boss!.health);
+  }
+  expect(g.state, `Briarheart fight hits: ${hits.join(", ")}`).toBe("won");
+  expect(hits).toEqual([5, 4, 3, 2, 1, 0]);
+  expect(phases).toEqual(new Set([1, 2, 3]));
+}
+
 function completeHive(g: Game) {
+  if (!g.hasWindFeather) {
+    walk(g, 174, 430);
+    jump(g, 174, 430);
+    expect(g.hasWindFeather).toBe(true);
+    walk(g, 220, 430);
+  }
   jump(g, 270, 350);
   jump(g, 520, 270);
   jump(g, 520, 270, false, true);
@@ -205,7 +246,8 @@ describe("Windmill Garden real-input routes", () => {
   it("completes the world, hive detour, all fireflies and guardian using only inputs", () => {
     const g = new Game(3);
     settle(g);
-    walk(g, 180, 430);
+    walk(g, 1184, 430);
+    jump(g, 1184, 430);
     expect(g.hasWindFeather).toBe(true);
     walk(g, 1250, 430);
     jump(g, 1600, 310, true);
@@ -231,7 +273,8 @@ describe("Windmill Garden real-input routes", () => {
     jump(g, 4640, 270);
     jump(g, 4640, 270, false, true);
     expect(g.puzzleState.sluiceGateOpen).toBe(true);
-    jump(g, 5000, 330, true);
+    jump(g, 4960, 330, true);
+    jump(g, 5300, 330, true);
     jump(g, 5570, 350, true);
     walk(g, 5760, 430);
     walk(g, 5440, 490);
@@ -289,10 +332,20 @@ describe("Windmill Garden real-input routes", () => {
     jump(g, 9900, 390);
     jump(g, 10080, 430, true);
     expect(g.puzzleState.workshopGateOpen).toBe(true);
+    // Jump over the late charger and hopper rather than relying on the old
+    // floor diamonds to absorb hits on the way to the Mill Keeper.
+    jump(g, 10300, 390);
+    walk(g, 10530, 430);
+    jump(g, 10820, 430);
     walk(g, 11690, 470);
     defeatMill(g);
     walk(g, 12460, 470);
-    expect(g.state).toBe("won");
+    expect(g.state).toBe("playing");
+    walk(g, 12800, 470);
+    expect(g.activeCheckpointIndex).toBe(g.level.checkpoints.length - 1);
+    walk(g, 13410, 470);
+    expect(g.finalBossStarted).toBe(true);
+    defeatHeartwoodAndFinish(g);
     expect(g.deaths).toBe(0);
   });
   it("lights all three hive flowers and reaches the exit on real inputs", () => {

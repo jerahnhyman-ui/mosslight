@@ -24,6 +24,19 @@ function approach(g: Game, x: number, limit = 1500) {
   );
 }
 
+function earnFeather(g: Game) {
+  const block = g.level.platforms.find(
+    (tile) => tile.rewardPower === "feather",
+  )!;
+  expect(block).toBeDefined();
+  approach(g, block.x + block.w / 2);
+  tick(g, { ...idle, jump: true, jumpPressed: true });
+  for (let n = 0; n < 100 && !g.hasWindFeather; n++)
+    tick(g, { ...idle, jump: true });
+  expect(g.hasWindFeather).toBe(true);
+  for (let n = 0; n < 100; n++) tick(g);
+}
+
 function enterPortal(g: Game, target: string) {
   for (let n = 0; n < 90 && g.portalReady !== target; n++) tick(g);
   expect(g.portalReady).toBe(target);
@@ -35,7 +48,7 @@ describe("new secret area playthrough", () => {
   it("flies to all three cloud flowers, opens the sanctuary and returns", () => {
     const g = new Game(0, { level: cloudGardenLevel });
     for (let n = 0; n < 10; n++) tick(g);
-    expect(g.hasWindFeather).toBe(true);
+    earnFeather(g);
     for (const flower of g.level.mechanisms!) {
       approach(g, flower.x - 25);
       for (let n = 0; n < 300 && !g.player.grounded; n++) tick(g);
@@ -61,6 +74,7 @@ describe("new secret area playthrough", () => {
   it("does not let feather flight bypass the closed Moonpool gate", () => {
     const grove = new Game(0, { level: groveLevel });
     const session = new AdventureSession(grove);
+    earnFeather(grove);
     approach(grove, 830);
     enterPortal(grove, "moonpool");
     const g = session.enter("moonpool");
@@ -80,6 +94,7 @@ describe("new secret area playthrough", () => {
   it("enters Moonpool, tries the latch before its valve, solves the water puzzle and returns", () => {
     const grove = new Game(0, { level: groveLevel });
     const session = new AdventureSession(grove);
+    earnFeather(grove);
     approach(grove, 830);
     expect(grove.hasWindFeather).toBe(true);
     enterPortal(grove, "moonpool");

@@ -1,4 +1,5 @@
 import type { Level, Platform } from "./levels";
+import { withRewardBlocks } from "./reward-layouts";
 
 // All authored positions are cell-local; translating them here keeps the
 // geometry aligned with the design's tables and avoids duplicated constants.
@@ -35,16 +36,17 @@ const cp = [
   { x: 7752, y: 430 },
   { x: 9672, y: 430 },
   { x: 11592, y: 470 },
+  { x: 12800, y: 470 },
 ];
 
-export const windmillLevel: Level = {
+export const windmillLevel: Level = withRewardBlocks({
   id: 4,
   contentId: "world.windmill-garden",
   name: "Windmill Garden",
   subtitle: "Follow the wind through a garden of turning sails.",
   kind: "world",
   theme: "windmill",
-  width: 12480,
+  width: 15180,
   spawn: { x: 80, y: 392 },
   platforms: [
     floor(0, 0, 430, 960),
@@ -105,6 +107,7 @@ export const windmillLevel: Level = {
     floor(11, 0, 430, 820),
     floor(11, 820, 470, 140),
     floor(12, 0, 470, 960),
+    floor(13, 0, 470, 2700),
     shelf(12, 280, 390, 140),
     shelf(12, 540, 390, 140),
     ...[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12].map(roof),
@@ -206,13 +209,28 @@ export const windmillLevel: Level = {
     "Flight Workshop",
     "Mill Rest",
     "Windmill Guardian",
-  ].map((name, i) => ({ x: i * 960, name })),
+  ]
+    .map((name, i) => ({ x: i * 960, name }))
+    .concat([
+      { x: 12700, name: "Heartwood Approach" },
+      { x: 13200, name: "The Thorn King's Grove" },
+    ]),
   tutorials: [
-    { x: 120, text: "Jump. Let go. Press and hold Jump again to lift." },
-    { x: 440, text: "Jump. Let go. Press and hold Jump again to lift." },
+    {
+      x: 120,
+      text: "Find glowing blocks and bump them from below to earn powers.",
+    },
+    {
+      x: 1100,
+      text: "Bump the feather block. Jump, let go, then hold Jump again to fly.",
+    },
     { x: 2040, text: "Jump onto a handle to turn it." },
     { x: 7280, text: "West wind. Low water. Light toward the hive." },
     { x: 9700, text: "Lift to the flower. Let go to land." },
+    {
+      x: 12800,
+      text: "Briarheart waits ahead. Gather yourself before the final guardian.",
+    },
   ],
   boss: {
     kind: "millkeeper",
@@ -222,10 +240,18 @@ export const windmillLevel: Level = {
     minX: 11660,
     maxX: 12360,
   },
-  goal: { x: 12430, y: 470 },
-};
+  finalBoss: {
+    kind: "heartwood",
+    name: "Briarheart, the Thorn King",
+    x: 13900,
+    y: 470,
+    minX: 13580,
+    maxX: 14600,
+  },
+  goal: { x: 15080, y: 470 },
+});
 
-export const beehiveLevel: Level = {
+export const beehiveLevel: Level = withRewardBlocks({
   id: 20,
   contentId: "secret.beehive",
   name: "Lantern Beehive",
@@ -295,7 +321,7 @@ export const beehiveLevel: Level = {
     { x: 200, text: "Jump onto each flower to light its honey cell." },
   ],
   goal: { x: 2750, y: 430 },
-};
+});
 
 export const flowerHoopsLevel: Level = {
   id: 21,

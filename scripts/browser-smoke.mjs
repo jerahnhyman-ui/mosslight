@@ -329,6 +329,97 @@ async function jumpToX(page, targetX, goalX = MEADOW_GOAL_X) {
   await page.clock.runFor(64);
 }
 const jumpToMeadowX = (page, targetX) => jumpToX(page, targetX);
+// The first flight rewards now sit beyond introductory obstacles, so reach
+// them with the same jumps and movement a fresh player uses.
+const entranceFeatherRoutes = [
+  [
+    [230, 386],
+    [445, 616],
+    [null, 750],
+    [775, 1000],
+    [1020, 1186],
+    [1255, 1431],
+    [null, 1555],
+  ],
+  [
+    [140, 286],
+    [335, 501],
+    [null, 590],
+    [585, 810],
+    [750, 901],
+    [955, 1146],
+    [null, 1315],
+    [1335, 1560],
+    [1490, 1641],
+    [1695, 1891],
+    [null, 2070],
+    [2085, 2310],
+    [2270, 2431],
+    [2495, 2686],
+    [null, 2810],
+    [2825, 3050],
+    [3100, 3121],
+    [3165, 3356],
+    [null, 3590],
+  ],
+  [
+    [140, 281],
+    [325, 481],
+    [525, 750],
+    [710, 856],
+    [905, 1096],
+    [null, 1250],
+    [1265, 1490],
+    [1450, 1551],
+    [1595, 1796],
+    [null, 1990],
+    [2005, 2230],
+    [2190, 2331],
+    [2375, 2566],
+    [null, 2730],
+    [2745, 2970],
+    [2910, 3051],
+    [3095, 3296],
+    [null, 3390],
+    [3370, 3521],
+    [null, 3620],
+    [3620, 3845],
+    [null, 3910],
+  ],
+];
+async function followEntranceFeatherRoute(page, selection, goalX) {
+  for (const [takeoff, target] of entranceFeatherRoutes[selection]) {
+    if (takeoff === null) {
+      await walkToX(page, target, goalX);
+      await page.clock.runFor(450);
+    } else {
+      await walkToX(page, takeoff, goalX);
+      await jumpToX(page, target, goalX);
+    }
+  }
+}
+// Stop beneath an authored reward block and hit it using the same jump input
+// as a player. The clock advances while the button is held on touch devices.
+async function bumpRewardBlock(page, targetX, goalX, touchSession = null) {
+  await walkToX(page, targetX, goalX);
+  if (touchSession) {
+    const jump = await controlCenter(page, "jump", 2);
+    await touchSession.send("Input.dispatchTouchEvent", {
+      type: "touchStart",
+      touchPoints: [jump],
+    });
+    await page.clock.runFor(200);
+    await touchSession.send("Input.dispatchTouchEvent", {
+      type: "touchEnd",
+      touchPoints: [jump],
+    });
+  } else {
+    await page.keyboard.down("Space");
+    await page.clock.runFor(200);
+    await page.keyboard.up("Space");
+  }
+  await page.clock.runFor(700);
+}
 async function readStoredSave(page) {
   return page.evaluate(() =>
     JSON.parse(localStorage.getItem("mosslight-save-v3") || "null"),
@@ -344,7 +435,8 @@ async function checkStarPickupVisibility(page, label) {
     const cameraY = Number(element.dataset.cameraY);
     const toast = document.querySelector("#game-toast").getBoundingClientRect();
     // Read actual horizontal progress from the HUD and project the full sprite
-    // and star aura through the current camera. This route lands at feet y=265.
+    // and star aura through the current camera. The star block is above the
+    // extension's floor, so Pip returns to feet y=430 after the bump.
     const progress = Number(
       document
         .querySelector(".trail-track span")
@@ -358,8 +450,8 @@ async function checkStarPickupVisibility(page, label) {
     const hero = {
       left: x(playerX - 25),
       right: x(playerX + 65),
-      top: y(175),
-      bottom: y(280),
+      top: y(340),
+      bottom: y(440),
     };
     return (
       toast.left < hero.right &&
@@ -467,17 +559,20 @@ try {
       flightTouch.send("Input.dispatchTouchEvent", { type, touchPoints });
     const flightRight = await controlCenter(flight, "right", 1);
     const flightJump = await controlCenter(flight, "jump", 2);
-    if (touchFlight) await sendFlightTouch("touchStart", [flightRight]);
-    else await flight.keyboard.down("ArrowRight");
+    const goalX =
+      selection === "grove" ? 1840 : [12140, 13340, 14540][selection];
+    if (selection !== "grove")
+      await followEntranceFeatherRoute(flight, selection, goalX);
+    // The Meadow's first feather sits under its high leaf; step off that leaf
+    // before walking back under the block and bumping it.
+    const bumpX = selection === "grove" ? 270 : [1490, 3610, 3870][selection];
+    await bumpRewardBlock(flight, bumpX, goalX, flightTouch);
     await advanceUntil(
       flight,
       () => flight.locator("#feather-meter").isVisible(),
-      `${label}: entrance feather pickup`,
-      2000,
+      `${label}: feather block`,
     );
-    if (touchFlight) await sendFlightTouch("touchEnd");
-    else await flight.keyboard.up("ArrowRight");
-    await flight.clock.runFor(200);
+    await walkToX(flight, bumpX - 70, goalX);
     await expect(flight.locator("#feather-label")).toHaveText("Ready");
     await expect(flight.locator(".feather-segments")).toHaveText("▰▰▰▰");
     await expect(flight.locator("#game-toast")).toContainText("Wind Feather!");
@@ -539,7 +634,7 @@ try {
     await expect(flight.locator('[data-menu-world="3"]')).toBeDisabled();
     await flight.close();
     console.log(
-      `PASS ${label}: fresh-save feather pickup, ${touchFlight ? "two-thumb" : "keyboard"} lift/glide/recharge, persisted Petal Post unlock before a guardian win`,
+      `PASS ${label}: fresh-save feather block, ${touchFlight ? "two-thumb" : "keyboard"} lift/glide/recharge, persisted Petal Post unlock before a guardian win`,
     );
   }
 
@@ -657,8 +752,12 @@ try {
     path: "artifacts/rules-small-phone.png",
     fullPage: true,
   });
-  // Check diamond feedback before continuing to the new entrance feather plant.
-  await walkToMeadowX(rules, 180);
+  // Reach the first checkpoint using the normal opening route, then earn the
+  // growth reward by bumping its nearby diamond block from below.
+  await followEntranceFeatherRoute(rules, 0, MEADOW_GOAL_X);
+  await walkToMeadowX(rules, 1575);
+  await jumpToMeadowX(rules, 1800);
+  await bumpRewardBlock(rules, 1760, MEADOW_GOAL_X);
   await expect(rules.locator("#player-form")).toHaveText("Big");
   await expect(rules.locator(".power-state")).toHaveAttribute(
     "data-form",
@@ -673,7 +772,6 @@ try {
     path: "artifacts/rules-diamond-growth.png",
     fullPage: true,
   });
-  await walkToMeadowX(rules, 225);
   await expect(rules.locator("#coin-count")).not.toHaveText("00");
   const earnedSave = await readStoredSave(rules);
   expect(
@@ -716,7 +814,9 @@ try {
     path: "artifacts/rules-enemy-shrink.png",
     fullPage: true,
   });
-  // Remain on solid ground while the patrolling bug comes back after hit immunity.
+  // Let the shrink immunity expire, then approach the patrolling bug again.
+  await rules.clock.runFor(1800);
+  await rules.keyboard.down("ArrowRight");
   await advanceUntil(
     rules,
     async () =>
@@ -725,12 +825,13 @@ try {
     "a subsequent small-form enemy hit losing a life",
     10000,
   );
+  await rules.keyboard.up("ArrowRight");
   await expect(rules.locator("#player-form")).toHaveText("Small");
   expect(
     await trailProgress(rules),
-    "losing a life respawns Pip near the start",
-  ).toBeLessThan(0.05);
-  await walkToMeadowX(rules, 225);
+    "losing a life respawns Pip at the first checkpoint",
+  ).toBeCloseTo(1810 / MEADOW_GOAL_X, 2);
+  await bumpRewardBlock(rules, 1760, MEADOW_GOAL_X);
   await expect(rules.locator("#player-form")).toHaveText("Big");
   // The diamond must respawn too, so a lost life never leaves growth unavailable.
   await expect(rules.locator("#lives")).toHaveAttribute(
@@ -751,24 +852,45 @@ try {
         "1 lives remaining"
       );
     },
-    "walking off the first pit losing a life",
+    "walking off a pit after the first checkpoint loses a life",
   );
   await rules.keyboard.up("ArrowRight");
   expect(
     furthestX,
-    "Pip actually crossed the first pit edge before life loss",
-  ).toBeGreaterThan(810);
+    "Pip actually crossed the pit edge before life loss",
+  ).toBeGreaterThan(2440);
   await expect(rules.locator("#player-form")).toHaveText("Small");
-  expect(await trailProgress(rules)).toBeLessThan(0.05);
+  expect(await trailProgress(rules)).toBeCloseTo(1810 / MEADOW_GOAL_X, 2);
   await rules.close();
 
   const stars = await rulesPage(browser, audioNotes);
-  await walkToMeadowX(stars, 230);
-  await jumpToMeadowX(stars, 386);
-  await walkToMeadowX(stars, 445);
+  await followEntranceFeatherRoute(stars, 0, MEADOW_GOAL_X);
+  await walkToMeadowX(stars, 1575);
+  await jumpToMeadowX(stars, 1800);
+  await bumpRewardBlock(stars, 1760, MEADOW_GOAL_X);
+  for (const [takeoff, target] of [
+    [1810, 1966],
+    [2025, 2201],
+    [null, 2380],
+    [2405, 2630],
+    [2650, 2801],
+    [2855, 3045],
+    [null, 3300],
+  ]) {
+    if (takeoff === null) {
+      await walkToMeadowX(stars, target);
+      await stars.clock.runFor(450);
+    } else {
+      await walkToMeadowX(stars, takeoff);
+      await jumpToMeadowX(stars, target);
+    }
+  }
+  const firefliesBeforeStar = await stars
+    .locator("#firefly-count")
+    .textContent();
   const notesBeforeStar = audioNotes.length;
-  await jumpToMeadowX(stars, 616);
-  await expect(stars.locator("#firefly-count")).toHaveText("0");
+  await bumpRewardBlock(stars, 3490, MEADOW_GOAL_X);
+  await expect(stars.locator("#firefly-count")).toHaveText(firefliesBeforeStar);
   // A power star must never count as a permanently rescued exploration firefly.
   await expect(stars.locator(".power-state")).toHaveAttribute(
     "data-powered",
@@ -1400,14 +1522,13 @@ try {
   await expect(windmill.locator("#world-label")).toHaveText("Windmill Garden");
   await windmill.locator("#start-button").click();
   await windmill.clock.runFor(64);
-  await windmill.keyboard.down("ArrowRight");
+  await bumpRewardBlock(windmill, 1170, 15080);
   await advanceUntil(
     windmill,
     async () => windmill.locator("#feather-meter").isVisible(),
-    "feather pickup",
+    "feather block pickup",
   );
-  await windmill.keyboard.up("ArrowRight");
-  await windmill.clock.runFor(200);
+  await walkToX(windmill, 1100, 15080);
   await expect(windmill.locator("#feather-label")).toHaveText("Ready");
   await windmill.keyboard.down("Space");
   await windmill.clock.runFor(200);
@@ -1475,10 +1596,10 @@ try {
       boss.hidden = false;
       boss.dataset.state = "warning";
       document.querySelector("#boss-name").textContent =
-        "Bramble, the Stag Beetle · Phase 3";
-      document.querySelector("#boss-health").textContent = "●○○";
+        "Briarheart, the Thorn King · Phase 3";
+      document.querySelector("#boss-health").textContent = "●●○○○○";
       document.querySelector("#boss-instruction").textContent =
-        "A charge is coming — get ready to jump!";
+        "Thorn seeds are coming — jump clear!";
     });
     const boxes = await bossLayout.evaluate(() => {
       const rect = (selector) => {

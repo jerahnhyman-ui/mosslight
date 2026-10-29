@@ -51,9 +51,10 @@ animated characters, and collectible/landing effects.
 - Pip's glow wakes flowers and curled leaves into platforms. Environmental
   clues suggest optional routes around giant garden landmarks.
 - Charging beetles break marked barriers, and hoppers bounce on mushrooms.
-- Each world ends with a guardian: a stag beetle, spider, or storm moth.
-  Watch the warning, avoid the attack, and stomp during recovery. A checkpoint
-  and recovery diamond precede each arena.
+- The first three worlds end with a stag beetle, spider, or storm moth guardian.
+  In Windmill Garden, the Mill Keeper is a sub-boss before the final encounter
+  with Briarheart, the Thorn King. Watch warnings, avoid attacks, and stomp
+  during recovery. Checkpoints and recovery power blocks precede the arenas.
 
 ## Home grove, rewards, and modes
 
@@ -79,7 +80,7 @@ See [the living garden guide](docs/LIVING_GARDEN.md) for the content and release
 acceptance criteria, including the physical-device playtest.
 
 The [Windmill Garden guide](docs/WINDMILL_GARDEN.md) explains flight, garden machinery,
-the secret beehive, the six-hit Mill Keeper, and Petal Post. Finding a feather
+the secret beehive, the Mill Keeper, Briarheart, and Petal Post. Finding a feather
 unlocks the flight minigame; discovering the beehive unlocks journal replay.
 Both activities award visual rewards. The [design package](docs/windmill-garden/README.md)
 records their controls, geometry and implementation contracts.
@@ -93,19 +94,23 @@ iOS plugin when supported.
 
 - In Classic and Timed modes, start each trail small with **3 lives**. Falling into a gap always costs one
   life, including while big or using star power.
-- **Wind Feathers let Pip fly in every world.** Find a feather plant on the opening path, before any guardian; the Home Grove has one for safe practice too. Jump, release, then hold Jump again to rise. Release to glide and land to refill. The camera follows high flights in the original trails and grove. Shrinking retains the feather; losing a life drops it, with free replacements at every world checkpoint. Challenge rooms keep their original jumping rules.
-- **Diamonds make Pip big.** A bug hit then shrinks Pip without taking a life.
+- **Earn power-ups by bumping marked blocks from below.** Small and Big Pip can
+  both hit these blocks. Feather and star blocks grant their powers when hit;
+  diamond blocks release a diamond to collect.
+- **Wind Feathers let Pip fly in every world.** Bump a feather-marked block on the opening path; the Home Grove has one for practice too. Jump, release, then hold Jump again to rise. Release to glide and land to refill. The camera follows high flights. Shrinking retains the feather; losing a life drops it and makes feather blocks available again. Challenge rooms keep their original jumping rules.
+- **Diamonds make Pip big.** Bump a diamond-marked block and collect its diamond. A bug hit then shrinks Pip without taking a life.
   A hit while small costs a life. A brief grace period after shrinking or
   respawning prevents one collision from counting as several hits.
 - **Every 50 coins earns one life, up to 3.** The counter rolls over at 50 even
   when lives are full. Coins stay collected after a death, so the same coins
   cannot be collected repeatedly for extra lives.
 - **Land on a bug to squash it** and bounce upward. Squashed bugs no longer hurt.
-- **Stars give 10 seconds of star power:** bugs cannot hurt Pip and touching them
-  squashes them. Another star refreshes the timer. Pausing freezes the timer;
+- **Stars give 10 seconds of star power:** bump a star-marked block to activate it.
+  Bugs cannot hurt Pip and touching them squashes them. Another star refreshes the timer. Pausing freezes the timer;
   falling still costs a life.
 - Losing a life returns small Pip to the checkpoint, or the start if no checkpoint
-  is active, and clears star power. Diamonds return so Pip can grow again.
+  is active, and clears star power. Diamond and feather blocks reset after a lost
+  life; spent star blocks stay spent for the run.
   Zero lives ends a Classic or Timed run. Relaxed mode keeps checkpoint retries
   available. Restarting or choosing another trail starts fresh.
 

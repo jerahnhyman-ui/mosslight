@@ -1,5 +1,10 @@
 # Terra implementation handoff
 
+> This is the original expansion handoff. Its feather fountain and collectible
+> placement details have been superseded by the marked power-block system, and
+> the Mill Keeper is followed by Briarheart's final arena; see [the current
+> guide](../WINDMILL_GARDEN.md).
+
 Status: implemented in this branch; see the [verification guide](../WINDMILL_GARDEN.md). Baseline: TestFlight build 16, main commit `01f7a098e2b7d6d8b4c3c4e8cacecdcd54e9217e`. Numeric targets are prototype hypotheses, not measured playtest results.
 
 Read the [overview](README.md), [flight contract](flight.md), [world and puzzles](world.md), and [guardian and minigame](encounters.md) together. This document owns integration, persistence and release acceptance. The feature documents own geometry, control timing and encounter rules.

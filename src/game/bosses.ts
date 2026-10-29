@@ -53,13 +53,15 @@ export function createBoss(spec: BossSpec): BossState {
         ? { w: 78, h: 66 }
         : spec.kind === "millkeeper"
           ? { w: 104, h: 122 }
-          : { w: 92, h: 64 };
+          : spec.kind === "heartwood"
+            ? { w: 156, h: 100 }
+            : { w: 92, h: 64 };
   return {
     ...spec,
     ...size,
     y: spec.y - size.h,
-    health: spec.kind === "millkeeper" ? 6 : 3,
-    maxHealth: spec.kind === "millkeeper" ? 6 : 3,
+    health: spec.kind === "millkeeper" || spec.kind === "heartwood" ? 6 : 3,
+    maxHealth: spec.kind === "millkeeper" || spec.kind === "heartwood" ? 6 : 3,
     phase: 1,
     state: "dormant",
     stateTime: 0,
@@ -77,6 +79,7 @@ export function createBoss(spec: BossSpec): BossState {
           millNextDirection: 0,
         }
       : {}),
+    ...(spec.kind === "heartwood" ? { phaseCheckpoint: 1 } : {}),
   };
 }
 
@@ -87,7 +90,7 @@ export function retryBoss(
   relaxed: boolean,
 ): BossState {
   const boss = createBoss(spec);
-  if (boss.kind === "millkeeper" && relaxed) {
+  if ((boss.kind === "millkeeper" || boss.kind === "heartwood") && relaxed) {
     boss.phaseCheckpoint = previous.phaseCheckpoint ?? previous.phase;
     boss.phase = boss.phaseCheckpoint;
     boss.health = 8 - 2 * boss.phase;
@@ -125,7 +128,12 @@ export function hitBoss(
     boss.phaseCheckpoint = Math.max(boss.phaseCheckpoint ?? 1, phase);
     setMillState(boss, crossed ? "transition" : "settle", crossed ? 1.5 : 1);
   } else {
-    boss.phase = boss.maxHealth - boss.health + 1;
+    boss.phase =
+      boss.kind === "heartwood"
+        ? Math.min(3, 1 + Math.floor((boss.maxHealth - boss.health) / 2))
+        : boss.maxHealth - boss.health + 1;
+    if (boss.kind === "heartwood")
+      boss.phaseCheckpoint = Math.max(boss.phaseCheckpoint ?? 1, boss.phase);
     warnBoss(boss, player, events);
   }
   return true;
@@ -170,7 +178,8 @@ function spawnSweep(
     y: boss.groundY - (high ? 220 : 56),
     w: 48,
     h: high ? 158 : 56,
-    vx: boss.facing * 260,
+    // The sweep remains fully telegraphed, but moves faster in later phases.
+    vx: boss.facing * (260 + (boss.phase - 1) * 35),
     vy: 0,
     remaining: 2.8,
   };
@@ -265,7 +274,8 @@ function stepMill(
 /** Each phase begins with a visible warning and ends with a generous stomp window. */
 export function warnBoss(boss: BossState, player: Rect, events: string[]) {
   boss.state = "warning";
-  boss.stateTime = 1.15 - (boss.phase - 1) * 0.1;
+  boss.stateTime =
+    boss.kind === "heartwood" ? 1.4 : 1.15 - (boss.phase - 1) * 0.1;
   boss.facing = player.x + player.w / 2 < boss.x + boss.w / 2 ? -1 : 1;
   boss.attackOriginX = boss.x;
   boss.attackTargetX = clamp(
@@ -280,7 +290,11 @@ export function warnBoss(boss: BossState, player: Rect, events: string[]) {
 
 function recover(boss: BossState) {
   boss.state = "recover";
-  boss.stateTime = 2.4;
+  // Later phases leave a shorter, still readable opportunity to stomp.
+  boss.stateTime =
+    boss.kind === "heartwood"
+      ? 2.4 - (boss.phase - 1) * 0.2
+      : 2.2 - (boss.phase - 1) * 0.25;
   boss.y = boss.groundY - boss.h;
 }
 
@@ -312,13 +326,19 @@ export function stepBoss(
     if (boss.stateTime > 0) return;
     boss.state = "attack";
     boss.stateTime =
-      boss.kind === "stag" ? 1.35 : boss.kind === "spider" ? 1.55 : 1.3;
+      boss.kind === "stag"
+        ? 1.35
+        : boss.kind === "spider"
+          ? 1.55
+          : boss.kind === "heartwood"
+            ? 2.05
+            : 1.3;
     boss.attackElapsed = 0;
   }
   if (boss.state === "attack") {
     boss.attackElapsed += dt;
     if (boss.kind === "stag") {
-      boss.x += boss.facing * (245 + boss.phase * 35) * dt;
+      boss.x += boss.facing * (265 + boss.phase * 45) * dt;
       if (boss.x <= boss.minX || boss.x >= boss.maxX) {
         boss.x = clamp(boss.x, boss.minX, boss.maxX);
         recover(boss);
@@ -326,8 +346,8 @@ export function stepBoss(
     } else if (boss.kind === "spider") {
       // Web balls travel along the floor; jumping is always a valid counter.
       if (
-        boss.shotsFired < boss.phase &&
-        boss.attackElapsed >= 0.18 + boss.shotsFired * 0.4
+        boss.shotsFired < boss.phase + 1 &&
+        boss.attackElapsed >= 0.18 + boss.shotsFired * 0.36
       ) {
         hazards.push({
           kind: "web",
@@ -335,7 +355,31 @@ export function stepBoss(
           y: boss.groundY - 28,
           w: 22,
           h: 22,
-          vx: boss.facing * (145 + boss.phase * 20),
+          vx: boss.facing * (155 + boss.phase * 25),
+          vy: 0,
+          remaining: 4,
+        });
+        boss.shotsFired++;
+      }
+    } else if (boss.kind === "heartwood") {
+      // After the visible warning, the rooted guardian sends a volley of
+      // ground-level thorn seeds. Later phases also send alternating seeds
+      // toward the other side, so standing behind it is not a safe shortcut.
+      if (
+        boss.shotsFired < boss.phase + 2 &&
+        boss.attackElapsed >= 0.24 + boss.shotsFired * 0.07
+      ) {
+        const direction =
+          boss.phase > 1 && boss.shotsFired % 2 === 1
+            ? -boss.facing
+            : boss.facing;
+        hazards.push({
+          kind: "gust",
+          x: boss.x + boss.w / 2 + direction * (boss.w / 2 + 8) - 12,
+          y: boss.groundY - 22,
+          w: 24,
+          h: 22,
+          vx: direction * (165 + boss.phase * 25),
           vy: 0,
           remaining: 4,
         });
@@ -349,7 +393,7 @@ export function stepBoss(
         (boss.attackTargetX - boss.attackOriginX) * fraction;
       boss.y = boss.groundY - boss.h - 90 * (1 - fraction);
       if (
-        boss.shotsFired < boss.phase &&
+        boss.shotsFired < boss.phase + 1 &&
         boss.attackElapsed >= 0.28 + boss.shotsFired * 0.28
       ) {
         hazards.push({
@@ -358,7 +402,7 @@ export function stepBoss(
           y: boss.groundY - 30,
           w: 24,
           h: 24,
-          vx: -boss.facing * (130 + boss.phase * 15),
+          vx: -boss.facing * (140 + boss.phase * 20),
           vy: 0,
           remaining: 3.2,
         });

@@ -48,6 +48,18 @@ function walkTo(game: Game, x: number, y: number | "moving") {
     `Cannot walk to ${x}, ${y}; at ${game.player.x}, ${game.player.y + game.player.h}`,
   );
 }
+/** Earn a reward with the same underside jump a player uses. */
+function bumpReward(game: Game, blockX: number) {
+  const block = game.platforms.find(
+    (tile) => tile.rewardPower === "diamond" && tile.x === blockX,
+  );
+  expect(block).toBeDefined();
+  walkTo(game, block!.x + block!.w / 2 - game.player.w / 2, 430);
+  tick(game, { ...idle, jump: true, jumpPressed: true });
+  for (let n = 0; n < 150; n++) tick(game, { ...idle, jump: true });
+  expect(block!.rewardUsed).toBe(true);
+  expect(game.player.form).toBe("big");
+}
 function jumpTo(
   game: Game,
   takeoff: number,
@@ -317,6 +329,10 @@ describe("Long authored adventures", () => {
       ]) {
         if (takeoff === null) walkTo(game, target, y);
         else jumpTo(game, takeoff, target, y, via);
+        if (level.id === 1 && target === 1800) bumpReward(game, 1750);
+        if (level.id === 1 && target === 4675) bumpReward(game, 4690);
+        if (level.id === 2 && target === 3590) bumpReward(game, 3510);
+        if (level.id === 3 && target === 1990) bumpReward(game, 1920);
       }
       const lastCheckpoint = level.checkpoints.at(-1)!;
       walkTo(game, lastCheckpoint.x, lastCheckpoint.y);
@@ -349,6 +365,7 @@ describe("Long authored adventures", () => {
       if (takeoff === null) walkTo(game, target, y);
       else jumpTo(game, takeoff, target, y, via);
     }
+    bumpReward(game, 4690);
     walkTo(game, 4870, 430);
     expect(game.player.form).toBe("big");
     const entry = game.platforms.find(
@@ -465,7 +482,20 @@ describe("Long authored adventures", () => {
           level.enemies.some((e) => cp.x + 40 >= e.minX && cp.x <= e.maxX + 32),
         ).toBe(false);
       }
-      expect(level.diamonds.length, `${level.name}: scarce diamonds`).toBe(4);
+      expect(level.diamonds, `${level.name}: no loose diamonds`).toHaveLength(
+        0,
+      );
+      const diamondBlocks = level.platforms.filter(
+        (p) => p.rewardPower === "diamond",
+      );
+      expect(
+        diamondBlocks.length,
+        `${level.name}: scarce diamond blocks`,
+      ).toBeGreaterThanOrEqual(2);
+      expect(
+        diamondBlocks.length,
+        `${level.name}: scarce diamond blocks`,
+      ).toBeLessThanOrEqual(3);
       for (const enemy of level.enemies) {
         expect(
           grounds.some(
@@ -513,8 +543,11 @@ describe("Living garden level safety", () => {
         `${level.name}: uninterrupted arena floor`,
       ).toBeGreaterThan(level.goal.x + 60);
       expect(
-        level.diamonds.some(
-          (diamond) => diamond.x > checkpoint.x && diamond.x < boss.minX,
+        level.platforms.some(
+          (block) =>
+            block.rewardPower === "diamond" &&
+            block.x >= checkpoint.x - 150 &&
+            block.x < boss.minX,
         ),
       ).toBe(true);
       expect(
@@ -574,7 +607,7 @@ const challengeRoutes: RouteStep[][] = [
     [650, 960, 205, 730],
     [null, 1210, 295],
     [1230, 1360, 430],
-    [1340, 1690, 205, 1450],
+    [1360, 1690, 205, 1450],
     [null, 1850, 430],
     [1840, 1970, 310],
     [null, 2190, 430],

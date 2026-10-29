@@ -1,5 +1,9 @@
 # Wind Feather: flight contract
 
+> Historical design note: feather fountain placement and pickup instructions
+> below have been superseded by feather-marked power blocks, which Pip bumps
+> from below. The current player instructions are in [the guide](../WINDMILL_GARDEN.md).
+
 Flight contract for the implemented expansion. Numbers below remain initial tuning values, not physical-device playtest results. Route layout lives in [world.md](world.md); guardian and hoop rules live in [encounters.md](encounters.md).
 
 ## Intent and existing behavior

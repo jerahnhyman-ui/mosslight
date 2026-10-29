@@ -15,7 +15,11 @@ const tick = (game: Game, input: GameInput = idle) =>
 
 describe("rebalanced encounters", () => {
   it("lets Pip choose the Windmill recovery diamond after a checkpoint retry before the boss starts", () => {
-    const checkpoint = windmillLevel.checkpoints.at(-1)!;
+    const checkpointIndex = windmillLevel.checkpoints.reduce(
+      (last, item, index) => (item.x < windmillLevel.boss!.minX ? index : last),
+      -1,
+    );
+    const checkpoint = windmillLevel.checkpoints[checkpointIndex]!;
     const game = new Game(3, {
       level: {
         ...windmillLevel,
@@ -23,15 +27,24 @@ describe("rebalanced encounters", () => {
       },
     });
     for (let i = 0; i < 8; i++) tick(game);
-    expect(game.activeCheckpointIndex).toBe(
-      windmillLevel.checkpoints.length - 1,
-    );
+    expect(game.activeCheckpointIndex).toBe(checkpointIndex);
     expect(game.player.form).toBe("small");
     game.player.y = 700;
     tick(game);
     expect(game.deaths).toBe(1);
-    for (let i = 0; i < 90 && game.player.form !== "big"; i++)
+    const reward = windmillLevel.platforms.find(
+      (tile) =>
+        tile.rewardPower === "diamond" &&
+        tile.x < checkpoint.x &&
+        tile.x > checkpoint.x - 120,
+    )!;
+    expect(reward).toBeDefined();
+    for (let i = 0; i < 90 && game.player.x > reward.x + 10; i++)
       tick(game, { ...idle, left: true });
+    for (let i = 0; i < 20; i++) tick(game);
+    tick(game, { ...idle, jump: true, jumpPressed: true });
+    for (let i = 0; i < 180 && game.player.form !== "big"; i++)
+      tick(game, { ...idle, jump: i < 50 });
     expect(game.player.form).toBe("big");
     expect(game.boss?.state).toBe("dormant");
     expect(game.player.x).toBeLessThan(checkpoint.x);

@@ -1,5 +1,8 @@
 # Windmill Garden encounters
 
+> Historical design: the Mill Keeper is now a sub-boss before Briarheart, the
+> Thorn King. See [the current guide](../WINDMILL_GARDEN.md) for both encounters.
+
 Status: implemented encounter and activity contract. Automated input routes cover the guardian and Gold hoop completion. Numerical values remain initial tuning choices; human-playtest targets below are not measured results. Movement and feather behavior are defined in [flight.md](flight.md); world placement is defined in [world.md](world.md).
 
 ## What the existing game supports

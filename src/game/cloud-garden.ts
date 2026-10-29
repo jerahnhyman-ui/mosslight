@@ -1,4 +1,5 @@
 import type { Level, Platform } from "./levels";
+import { withRewardBlocks } from "./reward-layouts";
 
 const cloud = (id: string, x: number, y: number, w: number): Platform => ({
   id: `cloud.${id}`,
@@ -19,7 +20,7 @@ export const cloudAscentPlatforms: Platform[] = [
 ];
 
 /** A gentle secret garden above the grove, with a three-flower sky puzzle. */
-export const cloudGardenLevel: Level = {
+export const cloudGardenLevel: Level = withRewardBlocks({
   id: 23,
   contentId: "secret.cloud-garden",
   name: "Cloudbloom Sanctuary",
@@ -111,4 +112,4 @@ export const cloudGardenLevel: Level = {
     },
   ],
   goal: { x: 2250, y: 430 },
-};
+});

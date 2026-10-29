@@ -13,12 +13,36 @@ const tick = (g: Game, input: GameInput = idle, count = 1) => {
   for (let i = 0; i < count; i++) g.update(1 / 120, input);
 };
 
+function earnFeather(game: Game) {
+  const block = game.level.platforms.find(
+    (tile) => tile.rewardPower === "feather",
+  )!;
+  const target = block.x + 10;
+  for (let i = 0; i < 1000; i++) {
+    const delta =
+      target -
+      game.player.x -
+      (game.player.vx * Math.abs(game.player.vx)) / 3700;
+    if (
+      Math.abs(delta) < 3 &&
+      Math.abs(game.player.vx) < 25 &&
+      game.player.grounded
+    )
+      break;
+    tick(game, { ...idle, left: delta < -3, right: delta > 3 });
+  }
+  tick(game, idle, 3);
+  tick(game, { ...idle, jump: true, jumpPressed: true });
+  for (let i = 0; i < 100 && !game.hasWindFeather; i++)
+    tick(game, { ...idle, jump: true });
+  expect(game.hasWindFeather).toBe(true);
+  tick(game, idle, 100);
+}
+
 function onGroveFlower(withFeather: boolean) {
   const g = new Game(0, { level: groveLevel });
   if (withFeather) {
-    g.player.x = 265;
-    tick(g, idle, 4);
-    expect(g.hasWindFeather).toBe(true);
+    earnFeather(g);
   }
   Object.assign(g.player, {
     x: 1340,
@@ -116,7 +140,7 @@ describe("Cloudbloom Sanctuary", () => {
   it("can reach and activate the flowers by flying and landing on the cloud route", () => {
     const g = new Game(0, { level: cloudGardenLevel });
     tick(g, idle, 5);
-    expect(g.hasWindFeather).toBe(true);
+    earnFeather(g);
     tick(g, { ...idle, right: true }, 50);
     tick(g, idle, 50);
     flyTo(g, 310, 340);

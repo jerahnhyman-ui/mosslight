@@ -31,13 +31,28 @@ describe("windmill expansion level definitions", () => {
     expect(beehiveLevel.fireflies).toHaveLength(0);
   });
 
-  it("provides a fountain at every checkpoint and full-height progress gates", () => {
+  it("places earned feather recovery near critical checkpoints and keeps full-height progress gates", () => {
     for (const level of [windmillLevel, beehiveLevel]) {
-      for (const checkpoint of level.checkpoints)
-        expect(level.featherFountains).toContainEqual(checkpoint);
+      expect(level.featherFountains ?? []).toHaveLength(0);
+      expect(level.diamonds).toHaveLength(0);
+      expect(level.stars).toHaveLength(0);
       for (const gate of level.gates ?? [])
         expect([gate.y, gate.h]).toEqual([0, 660]);
     }
+    for (const checkpoint of windmillLevel.checkpoints.slice(-2))
+      expect(
+        windmillLevel.platforms.some(
+          (p) =>
+            p.rewardPower === "feather" && Math.abs(p.x - checkpoint.x) < 100,
+        ),
+      ).toBe(true);
+    for (const checkpoint of beehiveLevel.checkpoints)
+      expect(
+        beehiveLevel.platforms.some(
+          (p) =>
+            p.rewardPower === "feather" && Math.abs(p.x - checkpoint.x) < 100,
+        ),
+      ).toBe(true);
     expect(windmillLevel.gates?.map((g) => g.x)).toEqual([
       2820, 5700, 6660, 10500,
     ]);
@@ -50,6 +65,7 @@ describe("windmill expansion level definitions", () => {
       { x: 7752, y: 430 },
       { x: 9672, y: 430 },
       { x: 11592, y: 470 },
+      { x: 12800, y: 470 },
     ]);
   });
 
@@ -67,6 +83,11 @@ describe("windmill expansion level definitions", () => {
       y: 470,
       minX: 11660,
       maxX: 12360,
+    });
+    expect(windmillLevel.finalBoss).toMatchObject({
+      kind: "heartwood",
+      x: 13900,
+      y: 470,
     });
     for (const i of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12])
       expect(windmillLevel.platforms).toContainEqual({

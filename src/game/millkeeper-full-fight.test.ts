@@ -20,6 +20,23 @@ describe("Mill Keeper full fight", () => {
     "wins from the nest without a star (big=%s)",
     (big) => {
       const game = new Game(0, { level: arena(big) });
+      // The actual retry checkpoint puts Pip under the feather block. Bump it
+      // before entering the arena, using the same jump input as the player.
+      for (let i = 0; i < 30; i++)
+        game.update(1 / 120, {
+          left: false,
+          right: false,
+          jump: false,
+          jumpPressed: false,
+        });
+      for (let i = 0; i < 90; i++)
+        game.update(1 / 120, {
+          left: false,
+          right: false,
+          jump: i < 35,
+          jumpPressed: i === 0,
+        });
+      expect(game.hasWindFeather).toBe(true);
       const hits: number[] = [];
       const phases = new Set<number>();
       let feather = false;

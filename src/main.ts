@@ -138,7 +138,7 @@ $("#app").innerHTML = `
     <div class="trail-track" aria-label="Trail progress"><span></span></div>
     <div class="section-status"><span id="section-name"></span><span id="checkpoint-count"></span><span id="run-mode"></span></div>
   </div>
-  <div class="boss-hud" id="boss-hud" hidden aria-label="Garden guardian"><div><strong id="boss-name"></strong><span id="boss-health"></span></div><p id="boss-instruction"></p></div>
+  <div class="boss-hud" id="boss-hud" hidden aria-label="Boss encounter"><div><strong id="boss-name"></strong><span id="boss-health"></span></div><p id="boss-instruction"></p></div>
   <div class="flight-activity-hud" id="activity-hud" hidden><strong id="activity-score">0 points</strong><span id="activity-hoops">0 / 16 hoops</span><b id="activity-clock">60s</b></div>
   <div class="portal-prompt" id="portal-prompt" hidden></div>
   <div class="grove-actions" id="grove-actions" hidden><button id="grove-shop-button">${icon("leaf")} Make it home</button><button id="grove-petal-button" hidden>✿ Petal Post</button><button id="grove-worlds-button">World map ${icon("arrow")}</button></div>
@@ -154,7 +154,7 @@ $("#app").innerHTML = `
   <div class="keyboard-hint"><span><kbd>←</kbd><kbd>→</kbd> move</span><span><kbd>SPACE</kbd> jump</span><span><kbd>P</kbd> pause</span></div>
 </main>
 <dialog id="menu-dialog" aria-labelledby="menu-title"><button class="round-button menu-close" aria-label="Close game menu">${icon("close")}</button><p class="eyebrow">THE FIREFLY TRAILS</p><h2 id="menu-title">Choose your adventure.</h2><p class="dialog-description">Rescue fireflies. Bring the forest back to light.</p><div id="forest-map" aria-label="Forest world map"><svg class="map-trails map-desktop" viewBox="0 0 680 255" preserveAspectRatio="none" aria-hidden="true"><path class="map-route" d="M110 145Q210 10 340 100T570 145"/><path class="map-route-light" d="M110 145Q210 10 340 100T570 145"/></svg><svg class="map-trails map-mobile" viewBox="0 0 320 480" preserveAspectRatio="none" aria-hidden="true"><path class="map-route" d="M95 80C280 40 290 230 230 240S30 290 95 400"/><path class="map-route-light" d="M95 80C280 40 290 230 230 240S30 290 95 400"/></svg><div class="map-decoration" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div><div id="menu-worlds"></div></div><div class="forest-progress"><div><strong id="restoration-count"></strong><span id="journey-progress"></span></div><div class="restoration-track"><span></span></div><p id="restoration-caption"></p></div><div class="adventure-choices"><div class="mode-choice"><label for="play-mode">Adventure mode</label><select id="play-mode"><option value="classic">Classic · 3 lives</option><option value="relaxed">Relaxed · unlimited retries</option><option value="timed">Timed · race your best</option></select><small id="mode-description"></small></div><button class="grove-entry" id="visit-grove">${icon("leaf")}<span><strong>Visit your home grove</strong><small id="grove-summary"></small></span>${icon("arrow")}</button></div><div class="journal-list" id="journal-list"></div><div class="challenge-list" id="challenge-list"></div><div class="menu-settings"><button class="menu-sound"></button><button class="menu-controls">${icon("settings")} Settings</button><button class="menu-help">${icon("help")} How to play</button></div></dialog>
-<dialog id="help-dialog" aria-labelledby="help-title"><button class="round-button dialog-close" aria-label="Close instructions">${icon("close")}</button><p class="eyebrow">MEET YOUR MOVES</p><h2 id="help-title">Little hero. Big leaps.</h2><div class="guide-grid"><div><span class="guide-symbol">↔</span><h3>Move & jump</h3><p>Slide your left thumb to steer. Tap jump for a short hop; hold for a higher leap. Keyboard: arrows or A/D, and Space. Gamepad: stick and A. Make the touch controls your own in Settings.</p></div><div><span class="guide-symbol diamond-guide">${icon("diamond")}</span><h3>Grow & discover</h3><p>Diamonds make Pip big. Bump cracked blocks from below to break them and discover coin caches. A bug hit shrinks big Pip; a hit while small costs a life.</p></div><div><span class="guide-symbol gold">★</span><h3>Star power</h3><p>Stars give ${STAR_POWER_DURATION} seconds of protection from bugs. Touch bugs to squash them while powered. Falling in a gap still costs a life.</p></div><div><span class="guide-symbol">${icon("firefly")}</span><h3>Rescue the light</h3><p>Find three hidden fireflies in each world. Every rescue is saved, even if you lose your lives. Their light restores the forest and welcomes residents to your playable home grove. The first three worlds each have a challenge room unlocked by rescuing all three fireflies.</p></div><div><span class="guide-symbol coral">${icon("pip")}</span><h3>Make every life count</h3><p>Start with ${MAX_LIVES} lives. Every ${COINS_PER_LIFE} coins earns one life, up to ${MAX_LIVES}. A lost life returns small Pip to the latest checkpoint. Zero lives ends a Classic or Timed run. Relaxed mode gives unlimited checkpoint retries.</p></div><div><span class="guide-symbol">↑</span><h3>A living forest</h3><p>Mushrooms bounce, leaves carry you, and cloud bridges crumble after you land. Jump on beetles and grasshoppers to squash them. Charging beetles pause and flash before rushing—time your jump!</p></div><div><span class="guide-symbol">${icon("leaf")}</span><h3>Wake the garden</h3><p>Walk near sleeping flowers and curled leaves. Pip’s glow opens new footholds. Follow golden cracks, footprints, and moving grass to discover secrets.</p></div><div><span class="guide-symbol coral">${icon("pip")}</span><h3>Meet the guardians</h3><p>Watch each guardian’s warning and avoid the attack. When it rests, jump on its back. The first three guardians need three hits. The Mill Keeper needs six: dodge low sweeps, fly to its high vane, and land below high sweeps. A checkpoint sits before every arena.</p></div><div><span class="guide-symbol gold">${icon("leaf")}</span><h3>A home for your light</h3><p>Every collected coin is saved for outfits and grove decorations, even at full lives. Visit your home grove from the world map. Cosmetics never change Pip’s powers.</p></div><div><span class="guide-symbol">➶</span><h3>Take flight</h3><p>Find a feather plant near the start of every world or in your Home Grove. Jump, let go, then hold Jump again to rise. Let go to glide. Land briefly to refill. A lost life drops the feather; free replacements grow beside every world checkpoint.</p></div><div><span class="guide-symbol">☁</span><h3>Find the cloud garden</h3><p>Look above the Home Grove for soft cloud ledges. Use a Wind Feather to climb, and land on each ledge to recharge before flying higher.</p></div><div><span class="guide-symbol">≈</span><h3>Explore Moonpool</h3><p>Find the Moonpool entrance in the Home Grove. Hold Jump to swim up, release to sink, and steer left or right. Land on the water valve to start the bubbles, then land on the sluice latch while they flow to open the gate.</p></div><div><span class="guide-symbol">✿</span><h3>Turn the garden</h3><p>Jump onto marked handles to change wind, water and light. Follow their symbols to open paths. At a glowing portal, stand still and press Jump when its prompt appears. Discover the beehive to replay it from your journal.</p></div></div><button class="primary-button close-guide">Got it ${icon("arrow")}</button></dialog>
+<dialog id="help-dialog" aria-labelledby="help-title"><button class="round-button dialog-close" aria-label="Close instructions">${icon("close")}</button><p class="eyebrow">MEET YOUR MOVES</p><h2 id="help-title">Little hero. Big leaps.</h2><div class="guide-grid"><div><span class="guide-symbol">↔</span><h3>Move & jump</h3><p>Slide your left thumb to steer. Tap jump for a short hop; hold for a higher leap. Keyboard: arrows or A/D, and Space. Gamepad: stick and A. Make the touch controls your own in Settings.</p></div><div><span class="guide-symbol diamond-guide">${icon("diamond")}</span><h3>Grow & discover</h3><p>Jump into a diamond-marked block from below, then collect the diamond it releases to grow. Big Pip can break cracked blocks to discover coin caches. A bug hit shrinks big Pip; a hit while small costs a life.</p></div><div><span class="guide-symbol gold">★</span><h3>Star power</h3><p>Jump into a star-marked block from below for ${STAR_POWER_DURATION} seconds of protection from bugs. Touch bugs to squash them while powered. Falling in a gap still costs a life.</p></div><div><span class="guide-symbol">${icon("firefly")}</span><h3>Rescue the light</h3><p>Find three hidden fireflies in each world. Every rescue is saved, even if you lose your lives. Their light restores the forest and welcomes residents to your playable home grove. The first three worlds each have a challenge room unlocked by rescuing all three fireflies.</p></div><div><span class="guide-symbol coral">${icon("pip")}</span><h3>Make every life count</h3><p>Start with ${MAX_LIVES} lives. Every ${COINS_PER_LIFE} coins earns one life, up to ${MAX_LIVES}. A lost life returns small Pip to the latest checkpoint. Zero lives ends a Classic or Timed run. Relaxed mode gives unlimited checkpoint retries.</p></div><div><span class="guide-symbol">↑</span><h3>A living forest</h3><p>Mushrooms bounce, leaves carry you, and cloud bridges crumble after you land. Jump on beetles and grasshoppers to squash them. Charging beetles pause and flash before rushing—time your jump!</p></div><div><span class="guide-symbol">${icon("leaf")}</span><h3>Wake the garden</h3><p>Walk near sleeping flowers and curled leaves. Pip’s glow opens new footholds. Follow golden cracks, footprints, and moving grass to discover secrets.</p></div><div><span class="guide-symbol coral">${icon("pip")}</span><h3>Meet the guardians</h3><p>Watch each guardian’s warning and avoid the attack. When it rests, jump on its back. The first three guardian sub-bosses need three hits. The Mill Keeper is a six-hit sub-boss: dodge sweeps and fly to its vane. Beyond it, Briarheart launches thorn seeds; jump over them, then stomp its glowing crown. Both have checkpoints.</p></div><div><span class="guide-symbol gold">${icon("leaf")}</span><h3>A home for your light</h3><p>Every collected coin is saved for outfits and grove decorations, even at full lives. Visit your home grove from the world map. Cosmetics never change Pip’s powers.</p></div><div><span class="guide-symbol">➶</span><h3>Take flight</h3><p>Jump into a feather-marked block from below to earn a Wind Feather. Jump, let go, then hold Jump again to rise. Let go to glide. Land briefly to refill. A lost life drops the feather; feather blocks can be used again after a retry.</p></div><div><span class="guide-symbol">☁</span><h3>Find the cloud garden</h3><p>Look above the Home Grove for soft cloud ledges. Use a Wind Feather to climb, and land on each ledge to recharge before flying higher.</p></div><div><span class="guide-symbol">≈</span><h3>Explore Moonpool</h3><p>Find the Moonpool entrance in the Home Grove. Hold Jump to swim up, release to sink, and steer left or right. Land on the water valve to start the bubbles, then land on the sluice latch while they flow to open the gate.</p></div><div><span class="guide-symbol">✿</span><h3>Turn the garden</h3><p>Jump onto marked handles to change wind, water and light. Follow their symbols to open paths. At a glowing portal, stand still and press Jump when its prompt appears. Discover the beehive to replay it from your journal.</p></div></div><button class="primary-button close-guide">Got it ${icon("arrow")}</button></dialog>
 <dialog id="grove-dialog" aria-labelledby="grove-title"><button class="round-button" id="grove-close" aria-label="Close grove shop">${icon("close")}</button><p class="eyebrow">A LITTLE PLACE TO CALL HOME</p><h2 id="grove-title">Make the garden yours.</h2><p class="dialog-description">Your coins decorate the grove and dress Pip. Every rescue brings a new neighbor home.</p><div class="grove-wallet"><strong id="wallet-count"></strong><span id="lifetime-count"></span></div><div id="shop-items" class="shop-items"></div><p id="shop-status" role="status"></p><button class="primary-button" id="grove-done">Back to the grove ${icon("arrow")}</button></dialog>
 <dialog id="settings-dialog" aria-labelledby="settings-title"><button class="round-button" id="settings-close" aria-label="Close settings">${icon("close")}</button><p class="eyebrow">PLAY YOUR WAY</p><h2 id="settings-title">Made for your thumbs.</h2><p class="dialog-description">Your choices stay saved. Controls fit safely within your screen.</p><div class="control-preview" aria-label="Touch control layout preview"><span class="preview-label">LAYOUT PREVIEW</span><div class="preview-pip">${icon("pip")}</div><div class="preview-controls"><span class="preview-dpad">${icon("left")}${icon("right")}</span><span class="preview-jump">${icon("jump")}</span></div></div><div class="control-settings"><label for="control-size"><span>Button size</span><select id="control-size"><option value="0.85">Compact</option><option value="1">Standard</option><option value="1.15">Large</option></select></label><label for="control-inset"><span>Move inward <output id="inset-value"></output></span><input id="control-inset" type="range" min="0" max="40" step="5" aria-label="Move controls inward" /></label><label for="control-height"><span>Move upward <output id="height-value"></output></span><input id="control-height" type="range" min="0" max="40" step="5" aria-label="Move controls upward" /></label><label class="switch-row" for="control-swap"><span>Jump on the left</span><input id="control-swap" type="checkbox" role="switch" /></label><button id="controls-reset" class="text-button">Reset control layout</button></div><div class="audio-settings"><label class="switch-row" for="sfx-toggle"><span>Sound effects</span><input id="sfx-toggle" type="checkbox" role="switch" /></label><label class="switch-row" for="music-toggle"><span>Music</span><input id="music-toggle" type="checkbox" role="switch" /></label><label class="switch-row" for="haptics-toggle"><span>Touch feedback<small>Gentle vibrations on supported devices</small></span><input id="haptics-toggle" type="checkbox" role="switch" /></label></div><button class="primary-button" id="settings-done">Done ${icon("arrow")}</button></dialog>
 `;
@@ -259,7 +259,7 @@ function updateWorlds() {
             : progress.bestTime !== null
               ? `Original trail ${formatTime(progress.bestTime)}`
               : "Meet this world’s guardian";
-      return `<button class="menu-world ${selected === i ? "selected" : ""} ${light > 0 ? "restored" : ""}" data-menu-world="${i}" ${worldUnlocked(save, i) ? "" : "disabled"} data-light="${light}" style="--world-light:${light}" aria-label="${level.name}, ${progress.fireflies.length} of 3 fireflies rescued, ${completed ? "guardian defeated" : "explore trail"}"><span class="map-island">${worldArt(i)}<span class="map-node-number">${completed ? "✓" : `0${i + 1}`}</span></span><span class="menu-world-info"><strong>${level.name}</strong><span>${!worldUnlocked(save, i) ? "Beat the Meadow guardian to open" : completed ? "Guardian defeated" : ["Bouncing mushrooms", "Ride the leaves", "Brave the cloud bridges", "Take flight. Turn the garden."][i]}</span><span class="map-fireflies" aria-hidden="true">${fireflyMarks(progress.fireflies)}</span><small class="world-best">${best}</small></span></button>`;
+      return `<button class="menu-world ${selected === i ? "selected" : ""} ${light > 0 ? "restored" : ""}" data-menu-world="${i}" ${worldUnlocked(save, i) ? "" : "disabled"} data-light="${light}" style="--world-light:${light}" aria-label="${level.name}, ${progress.fireflies.length} of 3 fireflies rescued, ${completed ? "trail completed" : "explore trail"}"><span class="map-island">${worldArt(i)}<span class="map-node-number">${completed ? "✓" : `0${i + 1}`}</span></span><span class="menu-world-info"><strong>${level.name}</strong><span>${!worldUnlocked(save, i) ? "Beat the Meadow guardian to open" : completed ? "Trail completed" : ["Bouncing mushrooms", "Ride the leaves", "Brave the cloud bridges", "Take flight. Turn the garden."][i]}</span><span class="map-fireflies" aria-hidden="true">${fireflyMarks(progress.fireflies)}</span><small class="world-best">${best}</small></span></button>`;
     })
     .join("");
   document
@@ -281,7 +281,7 @@ function updateWorlds() {
   $("#restoration-count").textContent =
     `${rescued} / ${levels.length * 3} fireflies home`;
   $("#journey-progress").textContent =
-    `${completed} / ${levels.length} guardians defeated`;
+    `${completed} / ${levels.length} trails completed`;
   $(".restoration-track span").style.width = `${restoration * 100}%`;
   $("#forest-map").style.setProperty("--restored", String(restoration));
   $("#forest-map").dataset.restored = String(restoration);
@@ -331,7 +331,7 @@ function updateJournal() {
   const hive = save.secrets.beehive;
   const hoops = save.minigames.flowerHoops;
   $("#journal-list").innerHTML =
-    `<h3>Pip’s discovery journal</h3><button class="challenge-entry" id="journal-hive" ${hive.discovered ? "" : "disabled"}><span><strong>Lantern Beehive</strong><small>${hive.discovered ? (hive.completed ? "Bee Scarf earned · replay the secret" : "Secret discovered · explore three honeycomb rooms") : "Follow the pollen clue in Windmill Garden"}</small></span><span>⌂</span></button><button class="challenge-entry" id="journal-hoops" ${save.unlocks.windFeatherDiscovered ? "" : "disabled"}><span><strong>Petal Post</strong><small>${save.unlocks.windFeatherDiscovered ? (hoops.best ? `${hoops.bestMedal === "none" ? "Practice" : hoops.bestMedal + " medal"} · best ${hoops.best.score} points` : "A little flight. Sixteen flower hoops.") : "Find a Wind Feather near a trail entrance"}</small></span><span>✿</span></button>`;
+    `<h3>Pip’s discovery journal</h3><button class="challenge-entry" id="journal-hive" ${hive.discovered ? "" : "disabled"}><span><strong>Lantern Beehive</strong><small>${hive.discovered ? (hive.completed ? "Bee Scarf earned · replay the secret" : "Secret discovered · explore three honeycomb rooms") : "Follow the pollen clue in Windmill Garden"}</small></span><span>⌂</span></button><button class="challenge-entry" id="journal-hoops" ${save.unlocks.windFeatherDiscovered ? "" : "disabled"}><span><strong>Petal Post</strong><small>${save.unlocks.windFeatherDiscovered ? (hoops.best ? `${hoops.bestMedal === "none" ? "Practice" : hoops.bestMedal + " medal"} · best ${hoops.best.score} points` : "A little flight. Sixteen flower hoops.") : "Bump a feather block near a trail entrance"}</small></span><span>✿</span></button>`;
   $("#journal-hive").addEventListener("click", replayBeehive);
   $("#journal-hoops").addEventListener("click", playPetalPost);
   $("#grove-petal-button").hidden = !save.unlocks.windFeatherDiscovered;
@@ -848,25 +848,30 @@ function updateHUD() {
     );
     setText(
       "#boss-instruction",
-      boss.kind === "millkeeper"
+      boss.kind === "heartwood"
         ? boss.state === "recover"
-          ? "Sails folded. Land on its back!"
-          : boss.millState === "highWarning" || boss.millState === "highSweep"
-            ? "Steer off the pad. Land below the high sweep."
-            : boss.millState === "vaneOpen" || boss.millState === "vaneWarning"
-              ? "Jump, release, hold again. Reach the feather vane!"
-              : boss.millState === "transition"
-                ? "The sails are changing. Find your footing."
-                : "Low sweep. Jump over it!"
-        : boss.state === "warning"
-          ? boss.kind === "stag"
-            ? "A charge is coming — get ready to jump!"
-            : boss.kind === "spider"
-              ? "Watch the web — keep moving!"
-              : "A gust is coming — find your footing!"
-          : boss.state === "recover"
-            ? "Now! Jump on the guardian’s back!"
-            : "Stay clear and wait for an opening",
+          ? "The crown is glowing — jump on top!"
+          : "Thorn seeds are coming — jump over them!"
+        : boss.kind === "millkeeper"
+          ? boss.state === "recover"
+            ? "Sails folded. Land on its back!"
+            : boss.millState === "highWarning" || boss.millState === "highSweep"
+              ? "Steer off the pad. Land below the high sweep."
+              : boss.millState === "vaneOpen" ||
+                  boss.millState === "vaneWarning"
+                ? "Jump, release, hold again. Reach the feather vane!"
+                : boss.millState === "transition"
+                  ? "The sails are changing. Find your footing."
+                  : "Low sweep. Jump over it!"
+          : boss.state === "warning"
+            ? boss.kind === "stag"
+              ? "A charge is coming — get ready to jump!"
+              : boss.kind === "spider"
+                ? "Watch the web — keep moving!"
+                : "A gust is coming — find your footing!"
+            : boss.state === "recover"
+              ? "Now! Jump on the guardian’s back!"
+              : "Stay clear and wait for an opening",
     );
   }
   setText("#player-form", game.player.form === "big" ? "Big" : "Small");
@@ -1067,7 +1072,15 @@ function frame(now: number) {
         `Checkpoint ${game.activeCheckpointIndex + 1} reached!`,
         "flag",
       ],
-      ["boss-defeat", "Guardian resting · the garden is awake!", "leaf"],
+      [
+        "boss-defeat",
+        game.boss?.kind === "millkeeper" && game.level.finalBoss
+          ? "Mill Keeper defeated · a greater guardian waits ahead!"
+          : game.boss?.kind === "heartwood"
+            ? "Briarheart defeated · the garden is awake!"
+            : "Guardian resting · the garden is awake!",
+        "leaf",
+      ],
       ["boss-hit", "A perfect opening!", "pip"],
       ["boss-start", "Watch the warning. Jump when the guardian rests!", "pip"],
       ["awaken", "Your glow woke a new path!", "leaf"],

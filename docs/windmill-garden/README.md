@@ -1,5 +1,11 @@
 # Mosslight: Windmill Garden
 
+> This package records the original expansion design. Its fountain and pickup
+> placement details have been superseded by the power-block system: Pip bumps
+> marked blocks from below for diamonds, feathers, and stars. The Mill Keeper
+> is now a sub-boss, followed by Briarheart's final arena. For current player
+> instructions, see [the Windmill Garden guide](../WINDMILL_GARDEN.md).
+
 **Astra design package, implemented by Terra in this branch.** See the [implementation and verification guide](../WINDMILL_GARDEN.md). This document records the expansion contracts and original pacing hypotheses. Automated routes now exercise the implementation; physical-device feel and first-time playtime targets remain to be evaluated. TestFlight status is verified separately.
 
 The expansion gives Pip a new way to travel, then builds a complete adventure around learning it: powered flight and glide, reversible garden machinery, branching routes, a discoverable beehive, a guardian that tests different skills, and a replayable flight activity at home.
