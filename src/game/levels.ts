@@ -1,5 +1,6 @@
 import { windmillLevel } from "./expansion-levels";
 import { cloudAscentPlatforms } from "./cloud-garden";
+import { withTrailChallenges } from "./challenge-balance";
 export {
   windmillLevel,
   beehiveLevel,
@@ -588,14 +589,7 @@ const trails: Level[] = [
       { x: 6330, y: 145 },
       { x: 9680, y: 150 },
     ],
-    diamonds: [
-      ...beginnings[0]!.diamonds,
-      { x: 3530, y: 400 },
-      { x: 4750, y: 400 },
-      { x: 6950, y: 400 },
-      { x: 9170, y: 400 },
-      { x: 10150, y: 400 },
-    ],
+    diamonds: [...beginnings[0]!.diamonds, { x: 4750, y: 400 }],
     enemies: [
       ...beginnings[0]!.enemies,
       bug(4120, 4040, 4320, "hopper"),
@@ -776,14 +770,7 @@ const trails: Level[] = [
       { x: 6640, y: 145 },
       { x: 10270, y: 140 },
     ],
-    diamonds: [
-      ...beginnings[1]!.diamonds,
-      { x: 3820, y: 400 },
-      { x: 4800, y: 400 },
-      { x: 7220, y: 400 },
-      { x: 9700, y: 400 },
-      { x: 10800, y: 400 },
-    ],
+    diamonds: [...beginnings[1]!.diamonds, { x: 7220, y: 400 }],
     enemies: [
       ...beginnings[1]!.enemies,
       bug(4250, 4160, 4400, "hopper"),
@@ -994,14 +981,7 @@ const trails: Level[] = [
       { x: 7210, y: 140 },
       { x: 10990, y: 140 },
     ],
-    diamonds: [
-      ...beginnings[2]!.diamonds,
-      { x: 4150, y: 400 },
-      { x: 5280, y: 400 },
-      { x: 7860, y: 400 },
-      { x: 10420, y: 400 },
-      { x: 11620, y: 400 },
-    ],
+    diamonds: [...beginnings[2]!.diamonds, { x: 7860, y: 400 }],
     enemies: [
       ...beginnings[2]!.enemies,
       bug(4620, 4500, 4800, "hopper"),
@@ -1057,7 +1037,7 @@ export const levels: Level[] = [
     const guardian = guardians[index]!;
     const checkpointX = trail.goal.x - 70;
     const checkpoints = [...trail.checkpoints, { x: checkpointX, y: 430 }];
-    return {
+    return withTrailChallenges({
       ...trail,
       contentId: [
         "world.sunlit-meadow",
@@ -1089,7 +1069,7 @@ export const levels: Level[] = [
         { x: checkpointX, text: guardian.hint },
       ],
       goal: { x: trail.width + 940, y: 430 },
-    };
+    });
   }),
   windmillLevel,
 ];

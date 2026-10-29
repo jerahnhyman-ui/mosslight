@@ -33,9 +33,15 @@ export const cloudGardenLevel: Level = {
     { x: 0, y: 430, w: 2500, h: 230, kind: "ground" },
     cloud("path.1", 270, 340, 170),
     cloud("flower.a", 480, 255, 170),
-    cloud("path.2", 760, 340, 170),
+    {
+      ...cloud("path.2", 760, 340, 170),
+      motion: { axis: "x", range: 45, period: 4.5 },
+    },
     cloud("flower.b", 970, 255, 170),
-    cloud("path.3", 1250, 340, 170),
+    {
+      ...cloud("path.3", 1250, 340, 170),
+      motion: { axis: "x", range: 45, period: 4.5, phase: Math.PI },
+    },
     cloud("flower.c", 1460, 255, 170),
     cloud("path.4", 1730, 340, 170),
   ],
@@ -52,7 +58,13 @@ export const cloudGardenLevel: Level = {
   ],
   stars: [],
   diamonds: [],
-  enemies: [],
+  // Patrols make the lower catch path a route to navigate, while the cloud
+  // tops remain safe places to land and recharge between short flights.
+  enemies: [
+    { kind: "beetle", x: 650, y: 402, minX: 610, maxX: 710 },
+    { kind: "hopper", x: 1380, y: 402, minX: 1330, maxX: 1440 },
+    { kind: "charger", x: 1880, y: 402, minX: 1800, maxX: 1970 },
+  ],
   fireflies: [],
   checkpoints: [
     { x: 90, y: 430 },
@@ -92,6 +104,10 @@ export const cloudGardenLevel: Level = {
     {
       x: 200,
       text: "Land on all three sky flowers to open the sanctuary. Clouds recharge your feather.",
+    },
+    {
+      x: 740,
+      text: "Some clouds drift. Land and pause to recharge before flying on.",
     },
   ],
   goal: { x: 2250, y: 430 },

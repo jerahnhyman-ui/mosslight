@@ -2616,6 +2616,32 @@ export class Renderer {
   private platform(r: Game["platforms"][number], p: Palette, time: number) {
     const c = this.ctx;
     const { x, y, w, h } = r;
+    if (r.id?.startsWith("moonpool.rock.")) {
+      // Keep the visible sides and top aligned with the solid collision box.
+      this.rounded(x, y, w, h, 3, "#527d7b", "#365f60");
+      this.rounded(x + 4, y + 4, w - 8, h - 8, 3, "#658f8a");
+      this.line(
+        [
+          [x + 2, y + 2],
+          [x + w - 2, y + 2],
+        ],
+        "#aad0b7",
+        4,
+      );
+      for (let yy = y + 28; yy < y + h - 12; yy += 45) {
+        this.line(
+          [
+            [x + 7, yy],
+            [x + w * 0.4, yy - 5],
+            [x + w - 7, yy - 1],
+          ],
+          "#456e6b",
+          2,
+        );
+        this.ellipse(x + w * 0.67, yy + 12, 5, 2.5, "#8fb5a3");
+      }
+      return;
+    }
     if (r.id?.startsWith("cloud.")) {
       // The flat top is the collision surface; the rounded underside is
       // decorative, leaving no apparent solid ground beyond the collider.

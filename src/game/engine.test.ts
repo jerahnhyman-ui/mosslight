@@ -911,7 +911,7 @@ describe("Long-adventure mechanics", () => {
   });
 
   it.each(levels.slice(0, 3))(
-    "$name gives every checkpoint a safe walk to a fresh growth diamond after death",
+    "$name respawns safely at every checkpoint and restores nearby diamonds after death",
     (level) => {
       for (const [index, checkpoint] of level.checkpoints.entries()) {
         const game = new Game(level.id - 1);
@@ -925,12 +925,11 @@ describe("Long-adventure mechanics", () => {
         const diamond = game.diamonds.find(
           (item) => item.x > checkpoint.x && item.x < checkpoint.x + 150,
         );
-        expect(
-          diamond,
-          `Checkpoint ${index + 1} needs nearby recovery growth`,
-        ).toBeDefined();
-        walkTo(game, diamond!.x, checkpoint.y);
-        expect(game.player.form).toBe("big");
+        expect(game.player.form).toBe("small");
+        if (diamond) {
+          walkTo(game, diamond.x, checkpoint.y);
+          expect(game.player.form).toBe("big");
+        }
         expect(game.deaths).toBe(1);
         expect(game.lives).toBe(2);
       }

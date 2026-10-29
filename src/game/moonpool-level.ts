@@ -12,6 +12,10 @@ export const moonpoolLevel: Level = {
   spawn: { x: 80, y: 452 },
   platforms: [
     { x: 0, y: 490, w: 2880, h: 170, kind: "ground" },
+    // Rising rock walls require Pip to swim above them. The surrounding
+    // shelves and bubble streams give the player a clear route around each.
+    { id: "moonpool.rock.1", x: 1050, y: 350, w: 58, h: 140, kind: "ground" },
+    { id: "moonpool.rock.2", x: 1850, y: 320, w: 58, h: 170, kind: "ground" },
     { x: 440, y: 390, w: 180, h: 20, kind: "platform" },
     { x: 800, y: 315, w: 180, h: 20, kind: "platform" },
     { x: 1200, y: 370, w: 180, h: 20, kind: "platform" },
@@ -80,6 +84,7 @@ export const moonpoolLevel: Level = {
     { x: 230, text: "Hold Jump to swim up. Release to sink gently." },
     { x: 390, text: "Land on the valve to start the bubbles." },
     { x: 760, text: "Bubble currents carry you upward." },
+    { x: 950, text: "Swim above the rocks to find a way through." },
     {
       x: 1920,
       text: "With bubbles flowing, land on the sluice latch to open the gate.",

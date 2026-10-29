@@ -461,14 +461,11 @@ describe("Long authored adventures", () => {
             (p) => cp.x >= p.x + 40 && cp.x + 80 < p.x + p.w && cp.y === p.y,
           ),
         ).toBe(true);
-        const diamond = level.diamonds.find(
-          (d) => d.x > cp.x && d.x < cp.x + 180,
-        );
-        expect(diamond).toBeDefined();
         expect(
           level.enemies.some((e) => cp.x + 40 >= e.minX && cp.x <= e.maxX + 32),
         ).toBe(false);
       }
+      expect(level.diamonds.length, `${level.name}: scarce diamonds`).toBe(4);
       for (const enemy of level.enemies) {
         expect(
           grounds.some(

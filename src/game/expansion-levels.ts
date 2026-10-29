@@ -130,9 +130,8 @@ export const windmillLevel: Level = {
   stars: [{ x: 3000, y: 398 }],
   diamonds: [
     { x: 620, y: 400 },
-    { x: 3940, y: 400 },
     { x: 7780, y: 400 },
-    { x: 10980, y: 400 },
+    { x: 11535, y: 440 },
   ],
   fireflies: [
     { x: 3390, y: 218, id: "windmill.firefly.rafters" },
@@ -141,8 +140,11 @@ export const windmillLevel: Level = {
   ],
   enemies: [
     { kind: "beetle", x: 3280, y: 402, minX: 3160, maxX: 3440 },
+    { kind: "hopper", x: 3600, y: 402, minX: 3525, maxX: 3675 },
     { kind: "beetle", x: 8300, y: 402, minX: 8180, maxX: 8420 },
     { kind: "hopper", x: 9000, y: 402, minX: 8900, maxX: 9110 },
+    { kind: "charger", x: 10100, y: 402, minX: 10025, maxX: 10175 },
+    { kind: "hopper", x: 10700, y: 402, minX: 10625, maxX: 10775 },
   ],
   checkpoints: cp,
   featherFountains: [

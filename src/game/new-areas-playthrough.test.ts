@@ -64,7 +64,10 @@ describe("new secret area playthrough", () => {
     approach(grove, 830);
     enterPortal(grove, "moonpool");
     const g = session.enter("moonpool");
-    approach(g, 2490);
+    // Swim above both new rock walls without touching the puzzle switches.
+    for (let n = 0; n < 2500 && center(g) < 2490; n++)
+      tick(g, { ...idle, jump: true, right: true });
+    expect(center(g)).toBeGreaterThanOrEqual(2490);
     for (let n = 0; n < 500 && g.player.y + g.player.h > 185; n++)
       tick(g, { ...idle, jump: true });
     tick(g);
