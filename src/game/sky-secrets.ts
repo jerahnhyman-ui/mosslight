@@ -123,7 +123,7 @@ const puzzles: Record<SkySecretTarget, SkyPuzzle> = {
     tutorials: [
       {
         x: 200,
-        text: "Wake all three sky flowers by landing on them to open the way.",
+        text: "Land on each sky flower, or stand on its pad and tap Jump, to open the way.",
       },
     ],
   },
@@ -145,7 +145,7 @@ const puzzles: Record<SkySecretTarget, SkyPuzzle> = {
     tutorials: [
       {
         x: 200,
-        text: "Land on the wind and brake handles to turn the sky gate.",
+        text: "Tap Jump at each pad: set wind EAST and the brake to RELEASED.",
       },
     ],
   },

@@ -136,6 +136,10 @@ export class Game {
   minigame = this.newMinigame();
   private hiveTicks = 0;
   private airborneMin = Infinity;
+  /** A jump launched from a pad must not toggle it again on landing. */
+  private takeoffActuators = new Set<string>();
+  /** Landing on a pad activates it; jumping away must not undo that. */
+  private landedActuators = new Set<string>();
   private padTicks = new Map<string, number>();
   private portalBlocked = false;
   private portalTicks = 0;
@@ -187,6 +191,11 @@ export class Game {
     return this.activeCheckpointIndex >= 0;
   }
 
+  /** A pad activated by landing stays latched until the player steps away. */
+  isActuatorLatched(id: string): boolean {
+    return this.landedActuators.has(id);
+  }
+
   constructor(levelIndex = 0, options: { mode?: RunMode; level?: Level } = {}) {
     this.mode = options.mode ?? "classic";
     this.level =
@@ -213,6 +222,8 @@ export class Game {
     this.portalTicks = 0;
     this.hiveTicks = 0;
     this.airborneMin = Infinity;
+    this.takeoffActuators.clear();
+    this.landedActuators.clear();
     this.padTicks.clear();
     this.portalBlocked = false;
     this.lives = MAX_LIVES;
@@ -313,6 +324,8 @@ export class Game {
     };
     this.coyote = 0;
     this.jumpBuffer = 0;
+    this.takeoffActuators.clear();
+    this.landedActuators.clear();
     this.jumpCanShorten = false;
     this.hurtLock = 0;
     this.blockedCarriers.clear();
@@ -429,6 +442,7 @@ export class Game {
     this.hurtLock = Math.max(0, this.hurtLock - STEP);
     this.wakePlants();
     this.movePlatforms();
+    this.rearmActuators();
     this.coyote = p.grounded ? COYOTE_TIME : Math.max(0, this.coyote - STEP);
     this.jumpBuffer = Math.max(0, this.jumpBuffer - STEP);
     const direction = Number(input.right) - Number(input.left);
@@ -463,6 +477,7 @@ export class Game {
           continue;
         }
         if (swimming) {
+          if (p.grounded) this.activateOnTakeoff(input);
           this.jumpBuffer = 0;
           continue;
         }
@@ -555,8 +570,12 @@ export class Game {
       const previousTop =
         tile.kind === "moving" ? Math.max(tile.previousY, tile.y) : tile.y;
       if (p.vy >= 0 && oldBottom <= previousTop + 1) {
-        if (!p.grounded && this.airborneMin <= tile.y - 16)
-          this.landOnActuators(tile.y);
+        if (!p.grounded && this.airborneMin <= tile.y - 1)
+          this.activateActuators(
+            tile.y,
+            this.landedActuators,
+            this.takeoffActuators,
+          );
         p.y = tile.y - p.h;
         p.vy = 0;
         p.grounded = true;
@@ -616,6 +635,7 @@ export class Game {
     }
     if (p.grounded) {
       this.airborneMin = Infinity;
+      this.takeoffActuators.clear();
       if (!swimming) this.tryJump(input);
     }
     if (p.grounded && rechargeSupport && this.hasWindFeather) {
@@ -762,12 +782,23 @@ export class Game {
     }
   }
 
-  private landOnActuators(y: number) {
-    const center = this.player.x + this.player.w / 2;
+  private activateActuators(
+    y: number,
+    activated?: Set<string>,
+    suppressed?: Set<string>,
+  ) {
+    const p = this.player;
     const q = this.puzzleState;
     for (const m of this.level.mechanisms ?? []) {
-      if (Math.abs(center - m.x) > (m.w ?? 64) / 2 || Math.abs(y - m.y) > 2)
+      const halfWidth = (m.w ?? 64) / 2;
+      if (
+        p.x >= m.x + halfWidth ||
+        p.x + p.w <= m.x - halfWidth ||
+        Math.abs(y - m.y) > 2 ||
+        suppressed?.has(m.id)
+      )
         continue;
+      let feedback = "mechanism";
       switch (m.kind) {
         case "wind":
           q.wind = q.wind === "WEST" ? "EAST" : "WEST";
@@ -782,19 +813,72 @@ export class Game {
           q.shutter = q.shutter === "HIVE" ? "BRIDGE" : "HIVE";
           break;
         case "sluice":
-          if (q.water === "HIGH") q.sluiceGateOpen = true;
+          if (q.sluiceGateOpen) continue;
+          if (q.water === "HIGH") {
+            q.sluiceGateOpen = true;
+            feedback = "mechanism-gate-open";
+          } else feedback = "mechanism-needs-water";
           break;
         case "receiver":
-          if (q.water === "HIGH" && q.shutter === "BRIDGE")
+          if (q.lightGateOpen) continue;
+          if (q.water === "HIGH" && q.shutter === "BRIDGE") {
             q.lightGateOpen = true;
+            feedback = "mechanism-gate-open";
+          } else
+            feedback =
+              q.water === "HIGH"
+                ? "mechanism-needs-light"
+                : "mechanism-needs-water";
           break;
         case "flower":
-          if (m.flower) q.flowers[m.flower] = true;
+          if (!m.flower || q.flowers[m.flower]) continue;
+          q.flowers[m.flower] = true;
           break;
       }
-      this.events.push("mechanism");
+      // Mark immediately so overlapping support tiles cannot trigger twice.
+      // Completed flowers and gates are one-way: there is no state to toggle
+      // back, so they must not show the instruction to rearm the pad.
+      if (m.kind !== "flower" && feedback !== "mechanism-gate-open")
+        activated?.add(m.id);
+      suppressed?.add(m.id);
+      this.events.push(feedback);
     }
     if (q.wind === "EAST" && q.brake === "RELEASED") q.vaneGateOpen = true;
+  }
+
+  private rearmActuators() {
+    const p = this.player;
+    for (const id of this.landedActuators) {
+      const m = this.level.mechanisms?.find((candidate) => candidate.id === id);
+      const halfWidth = (m?.w ?? 64) / 2;
+      if (
+        !m ||
+        Math.abs(p.y + p.h - m.y) > 2 ||
+        p.x >= m.x + halfWidth ||
+        p.x + p.w <= m.x - halfWidth
+      )
+        this.landedActuators.delete(id);
+    }
+  }
+
+  private activateOnTakeoff(input: GameInput) {
+    // Preserve landing activations while the player jumps away, including a
+    // vertical jump followed by steering. Walking off the pad rearms it.
+    if (
+      this.landedActuators.size &&
+      !input.left &&
+      !input.right &&
+      Math.abs(this.player.vx) < 30
+    )
+      this.events.push("mechanism-rearm");
+    for (const id of this.landedActuators) this.takeoffActuators.add(id);
+    this.landedActuators.clear();
+    if (!input.left && !input.right && Math.abs(this.player.vx) < 30)
+      this.activateActuators(
+        this.player.y + this.player.h,
+        this.takeoffActuators,
+        this.takeoffActuators,
+      );
   }
 
   private updateExpansion(previousX: number, previousY: number) {
@@ -1274,6 +1358,7 @@ export class Game {
       (!this.player.grounded && this.coyote <= 0)
     )
       return;
+    if (this.player.grounded) this.activateOnTakeoff(input);
     this.player.vy = input.jump ? JUMP : SHORT_JUMP;
     this.player.grounded = false;
     this.coyote = 0;

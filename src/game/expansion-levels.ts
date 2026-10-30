@@ -83,7 +83,10 @@ export const windmillLevel: Level = withRewardBlocks({
     shelf(5, 0, 330, 180),
     shelf(5, 360, 330, 180),
     shelf(5, 680, 350, 180),
-    shelf(5, 540, 410, 160),
+    // Leave a clear opening above the reed valve so the switch remains
+    // visible and a jump can return to its floor instead of landing on a roof.
+    shelf(5, 540, 410, 60),
+    shelf(5, 680, 410, 60),
     {
       id: "windmill.reed-screen",
       x: 5160,
@@ -229,6 +232,22 @@ export const windmillLevel: Level = withRewardBlocks({
       text: "Bump the feather block. Jump, let go, then hold Jump again to fly.",
     },
     { x: 2040, text: "Ride the moving sail, then jump to the far ledge." },
+    {
+      x: 3880,
+      text: "Stand on the water pad and tap Jump to set the water HIGH.",
+    },
+    {
+      x: 4530,
+      text: "With water HIGH, tap Jump on the latch to open the sluice gate.",
+    },
+    {
+      x: 5850,
+      text: "Set water HIGH and the light pad to BRIDGE for the house gate.",
+    },
+    {
+      x: 6200,
+      text: "With water HIGH and light on BRIDGE, tap Jump on the receiver.",
+    },
     { x: 7280, text: "West wind. Low water. Light toward the hive." },
     { x: 9700, text: "Lift to the flower. Let go to land." },
     {
@@ -322,7 +341,10 @@ export const beehiveLevel: Level = withRewardBlocks({
     { x: 1920, name: "Lantern Nursery" },
   ],
   tutorials: [
-    { x: 200, text: "Jump onto each flower to light its honey cell." },
+    {
+      x: 200,
+      text: "Land on each flower, or stand on its pad and tap Jump, to light its honey cell.",
+    },
   ],
   goal: { x: 2750, y: 430 },
 });

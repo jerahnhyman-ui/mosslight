@@ -118,20 +118,23 @@ export const moonpoolLevel: Level = {
   ],
   tutorials: [
     { x: 230, text: "Hold Jump to swim up. Release to sink gently." },
-    { x: 390, text: "Land on the valve to start the bubbles." },
+    {
+      x: 390,
+      text: "Land on the valve, or stand on its pad and tap Jump, to start the bubbles.",
+    },
     { x: 760, text: "Bubble currents carry you upward." },
     { x: 950, text: "Swim above the rocks to find a way through." },
     {
       x: 1180,
-      text: "Land on the current selector to send the bubbles up on the other side.",
+      text: "Tap Jump on the current selector to send the bubbles up on the other side.",
     },
     {
       x: 1570,
-      text: "With the right bubbles rising, land on the receiver to open the hidden cove.",
+      text: "With the right bubbles rising, tap Jump on the receiver to open the hidden cove.",
     },
     {
       x: 1920,
-      text: "With bubbles flowing, land on the sluice latch to open the gate.",
+      text: "With bubbles flowing, tap Jump on the sluice latch to open the gate.",
     },
   ],
   goal: { x: 2740, y: 490 },

@@ -111,7 +111,7 @@ export const cloudGardenLevel: Level = withRewardBlocks({
   tutorials: [
     {
       x: 200,
-      text: "Land on all three sky flowers to open the sanctuary. Clouds recharge your feather.",
+      text: "Wake all three sky flowers to open the sanctuary. Land on each or tap Jump on its pad.",
     },
     {
       x: 740,
@@ -119,7 +119,7 @@ export const cloudGardenLevel: Level = withRewardBlocks({
     },
     {
       x: 1610,
-      text: "Land on the wind flower to move a cloud bridge toward the high cove.",
+      text: "Tap Jump on the wind pad to move a cloud bridge toward the high cove.",
     },
   ],
   goal: { x: 2250, y: 430 },

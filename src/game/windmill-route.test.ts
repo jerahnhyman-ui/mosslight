@@ -320,6 +320,9 @@ describe("Windmill Garden real-input routes", () => {
     walk(g, 6800, 430);
     walk(g, 6880, 430);
     jump(g, 6880, 430, false, true);
+    // Step off and return to make a second deliberate switch activation.
+    walk(g, 6800, 430);
+    walk(g, 6880, 430);
     jump(g, 6880, 430, false, true);
     expect(g.puzzleState.wind).toBe("WEST");
     walk(g, 7040, 430);

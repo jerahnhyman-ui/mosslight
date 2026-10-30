@@ -1907,6 +1907,39 @@ export class Renderer {
   private expansionObjects(game: Game, time: number) {
     const c = this.ctx;
     const state = game.puzzleState;
+    // A readable status above the artwork makes the switch and its result
+    // visible even when the gate it controls is off screen.
+    const switchStatus = (
+      id: string,
+      x: number,
+      y: number,
+      label: string,
+      actionable = true,
+    ) => {
+      this.rounded(x + 32, y - 112, 126, 28, 8, "#fff9e6", "#825f43");
+      c.save();
+      c.font = "bold 15px sans-serif";
+      c.textAlign = "center";
+      c.fillStyle = "#523b2d";
+      c.fillText(label, x + 95, y - 93, 116);
+      const p = game.player;
+      if (
+        actionable &&
+        Math.abs(p.x + p.w / 2 - x) < 90 &&
+        Math.abs(p.y + p.h - y) < 85
+      ) {
+        this.rounded(x + 32, y - 142, 126, 24, 8, "#fff3be", "#825f43");
+        c.font = "bold 14px sans-serif";
+        c.fillStyle = "#523b2d";
+        c.fillText(
+          game.isActuatorLatched(id) ? "STEP OFF FIRST" : "STOP + JUMP",
+          x + 95,
+          y - 125,
+          116,
+        );
+      }
+      c.restore();
+    };
     for (const fountain of game.level.featherFountains ?? []) {
       if (!this.visible(fountain.x, 60)) continue;
       const { x, y } = fountain;
@@ -1970,6 +2003,7 @@ export class Renderer {
         c.fillStyle = "#76533d";
         c.fillText(m.flower ?? "", x, y - 39);
         c.restore();
+        switchStatus(m.id, x, y, on ? "FLOWER AWAKE" : "WAKE FLOWER", !on);
         continue;
       }
       this.rounded(x - 25, y - 24, 50, 24, 8, "#b37b4d", "#80583d");
@@ -1979,30 +2013,30 @@ export class Renderer {
           ? state.water === "HIGH"
             ? "BUBBLES ON"
             : "BUBBLES OFF"
-          : game.level.theme === "grotto" && m.kind === "sluice"
+          : m.kind === "sluice"
             ? state.sluiceGateOpen
-              ? "OPEN"
-              : "LOCKED"
+              ? "GATE OPEN"
+              : "GATE LOCKED"
             : m.id === "moonpool.current-selector"
               ? state.shutter === "HIVE"
                 ? "LEFT UP"
                 : "RIGHT UP"
-              : m.id === "moonpool.receiver"
+              : m.kind === "receiver"
                 ? state.lightGateOpen
-                  ? "OPEN"
-                  : "LOCKED"
+                  ? "GATE OPEN"
+                  : "GATE LOCKED"
                 : m.id === "cloud.wind-switch"
                   ? state.wind === "WEST"
                     ? "← BRIDGE"
                     : "BRIDGE →"
                   : m.kind === "wind"
-                    ? state.wind
+                    ? `WIND ${state.wind}`
                     : m.kind === "brake"
-                      ? state.brake
-                      : m.kind === "water" || m.kind === "sluice"
-                        ? state.water
-                        : m.kind === "shutter" || m.kind === "receiver"
-                          ? state.shutter
+                      ? `BRAKE ${state.brake}`
+                      : m.kind === "water"
+                        ? `WATER ${state.water}`
+                        : m.kind === "shutter"
+                          ? `LIGHT ${state.shutter}`
                           : "";
       if (m.kind === "wind") {
         this.line(
@@ -2073,12 +2107,14 @@ export class Renderer {
           "#80583d",
         );
       }
-      c.save();
-      c.font = "bold 11px sans-serif";
-      c.textAlign = "center";
-      c.fillStyle = "#674a36";
-      c.fillText(label, x, y - 12, 46);
-      c.restore();
+      switchStatus(
+        m.id,
+        x,
+        y,
+        label,
+        !(m.kind === "sluice" && state.sluiceGateOpen) &&
+          !(m.kind === "receiver" && state.lightGateOpen),
+      );
     }
     const open: Record<string, boolean> = {
       vane: state.vaneGateOpen,
