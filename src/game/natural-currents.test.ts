@@ -52,28 +52,37 @@ describe("natural environmental movement", () => {
   });
 });
 
-it("carries Pip on the autonomous drifting lily through its vertical movement", () => {
-  const game = new Game(0, { level: windmillLevel });
-  game.enemies = [];
-  const lily = game.platforms.find((p) => p.id === "windmill.drifting-lily")!;
-  expect(lily?.motion?.axis).toBe("y");
-  Object.assign(game.player, {
-    x: lily.x + 65,
-    y: lily.y - game.player.h,
-    vx: 0,
-    vy: 0,
-    grounded: true,
-  });
-  const startY = lily.y;
-  let greatestRise = 0;
-  for (let i = 0; i < 540; i++) {
-    tick(game);
-    greatestRise = Math.max(greatestRise, startY - lily.y);
-    expect(game.player.y + game.player.h).toBeCloseTo(lily.y, 2);
-    expect(game.player.grounded).toBe(true);
-  }
-  expect(greatestRise).toBeGreaterThan(50);
-});
+it.each(["clover", "meadow", "lily", "millstream", "sunpetal", "windward"])(
+  "carries Pip on the %s sliding sail through a full cycle",
+  (name) => {
+    const game = new Game(0, { level: windmillLevel });
+    game.enemies = [];
+    const lily = game.platforms.find((p) => p.id === `windmill.sail.${name}`)!;
+    expect(lily?.motion?.axis).toBe("x");
+    Object.assign(game.player, {
+      x: lily.x + 65,
+      y: lily.y - game.player.h,
+      vx: 0,
+      vy: 0,
+      grounded: true,
+    });
+    const startX = lily.x;
+    const offset = game.player.x - lily.x;
+    let greatestLeft = 0;
+    let greatestRight = 0;
+    const frames = Math.ceil(lily.motion!.period * 120);
+    for (let i = 0; i < frames; i++) {
+      tick(game);
+      greatestLeft = Math.min(greatestLeft, lily.x - startX);
+      greatestRight = Math.max(greatestRight, lily.x - startX);
+      expect(game.player.y + game.player.h).toBeCloseTo(lily.y, 2);
+      expect(game.player.x - lily.x).toBeCloseTo(offset, 2);
+      expect(game.player.grounded).toBe(true);
+    }
+    expect(greatestLeft).toBeLessThan(-40);
+    expect(greatestRight).toBeGreaterThan(40);
+  },
+);
 
 it("carries Pip along the autonomous cloud bridge in both directions", () => {
   const game = new Game(0, { level: cloudGardenLevel });

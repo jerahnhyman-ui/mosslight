@@ -1878,22 +1878,49 @@ export class Renderer {
         }
       c.restore();
     } else {
-      // Distant mill silhouettes turn behind the trail.
+      // Each distant mill has a different silhouette. They remain pale and
+      // behind the real terrain so no background roof looks like a platform.
       for (
         let x = Math.floor(this.cameraX / 1000) * 1000 + 650;
         x < this.cameraX + this.viewportWidth + 400;
         x += 1000
       ) {
-        this.rounded(x - 32, 290, 64, 110, 15, "#dfc18a");
-        this.ellipse(x, 291, 34, 14, "#b8865e");
+        const variant = Math.abs(Math.round((x - 650) / 1000)) % 3;
+        const width = [68, 80, 56][variant];
+        const top = [288, 310, 265][variant];
         c.save();
-        c.translate(x, 270);
-        c.rotate(time * 0.25);
+        c.globalAlpha = 0.74;
+        this.rounded(x - width / 2, top, width, 420 - top, 15, "#e9cd93");
+        this.ellipse(x, top, width / 2 + 1, 14, "#be8d61");
+        this.rounded(x - 10, top + 35, 20, 25, 8, "#a9d8bf", "#b58a5d");
+        this.line(
+          [
+            [x, top + 36],
+            [x, top + 58],
+          ],
+          "#fff0c1",
+          2,
+        );
+        this.rounded(x - 11, 379, 22, 42, 10, "#b88b65");
+        c.save();
+        c.translate(x, top - 20);
+        c.rotate(time * (variant === 1 ? -0.19 : 0.25));
         for (let i = 0; i < 4; i++) {
           c.rotate(Math.PI / 2);
-          this.rounded(-7, -74, 14, 64, 7, "#fff0a9", "#bd9865");
+          this.rounded(-8, -74, 16, 64, 7, "#fff0c7", "#bd9865");
+          this.line(
+            [
+              [-4, -64],
+              [4, -51],
+              [-4, -38],
+              [4, -25],
+            ],
+            "#d8ba80",
+            1.5,
+          );
         }
         this.ellipse(0, 0, 9, 9, "#c38c55");
+        c.restore();
         c.restore();
       }
     }
@@ -2814,6 +2841,44 @@ export class Renderer {
         c.closePath();
         c.fillStyle = "#ffae8a";
         c.fill();
+      } else if (game.level.theme === "windmill") {
+        // A small pennant and pinwheel mark a new stretch of the trail. They
+        // are attached to the sign, not to the platforms Pip lands on.
+        const poleX = signX - 26;
+        this.line(
+          [
+            [poleX, y],
+            [poleX, y - 143],
+          ],
+          "#a77950",
+          5,
+        );
+        const flutter = Math.sin(time * 2 + index) * 4;
+        c.beginPath();
+        c.moveTo(poleX, y - 139);
+        c.quadraticCurveTo(poleX + 24, y - 147 + flutter, poleX + 40, y - 133);
+        c.lineTo(poleX + 25, y - 124 + flutter);
+        c.lineTo(poleX, y - 129);
+        c.closePath();
+        c.fillStyle = ["#ed9e76", "#f6d482", "#9ad4bd"][index % 3];
+        c.fill();
+        this.ellipse(poleX, y - 95, 13, 13, "#fff0bd", "#aa8056");
+        this.line(
+          [
+            [poleX - 7, y - 95],
+            [poleX + 7, y - 95],
+          ],
+          "#d9a75e",
+          2,
+        );
+        this.line(
+          [
+            [poleX, y - 102],
+            [poleX, y - 88],
+          ],
+          "#d9a75e",
+          2,
+        );
       } else {
         this.line(
           [
@@ -2932,6 +2997,7 @@ export class Renderer {
     const c = this.ctx;
     const { x, y, w, h } = r;
     if (
+      r.id?.startsWith("windmill.sail.") ||
       r.id?.startsWith("windmill.vane-sail") ||
       r.id?.startsWith("windmill.house-sail") ||
       r.id?.startsWith("windmill.workshop-sail")
@@ -2980,6 +3046,24 @@ export class Renderer {
           "#c7a273",
           2,
         );
+      }
+      // The small chevrons point in the direction of actual movement. They
+      // sit entirely within the collider and cannot be mistaken for ledges.
+      if (r.motion?.axis === "x" && Math.abs(r.x - r.previousX) > 0.001) {
+        const direction = Math.sign(r.x - r.previousX);
+        const cy = y + h / 2;
+        for (const offset of [w / 2 - 7, w / 2 + 7]) {
+          const cx = x + offset;
+          this.line(
+            [
+              [cx - direction * 3, cy - 3],
+              [cx + direction * 2, cy],
+              [cx - direction * 3, cy + 3],
+            ],
+            "#956b42",
+            2,
+          );
+        }
       }
       return;
     }

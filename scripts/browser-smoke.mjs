@@ -1522,6 +1522,10 @@ try {
   await expect(windmill.locator("#world-label")).toHaveText("Windmill Garden");
   await windmill.locator("#start-button").click();
   await windmill.clock.runFor(64);
+  // The rebuilt opening has a beetle on the trail before the feather block.
+  // Reach it by jumping using real input, just as in a fresh playthrough.
+  await walkToX(windmill, 650, 15080);
+  await jumpToX(windmill, 900, 15080);
   await bumpRewardBlock(windmill, 1170, 15080);
   await advanceUntil(
     windmill,

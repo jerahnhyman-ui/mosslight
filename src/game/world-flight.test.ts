@@ -186,7 +186,9 @@ describe("feather flight throughout the garden", () => {
                   [3296, 3521, 320],
                   ...openingRoutes[2]!.slice(19),
                 ] as RouteStep[])
-              : [];
+              : worldIndex === 3
+                ? ([[650, 900, 430]] as RouteStep[])
+                : [];
       for (const [takeoff, target, y, mushroom] of route) {
         if (takeoff === null) walkTo(game, target, y);
         else jumpTo(game, takeoff, target, y, mushroom);

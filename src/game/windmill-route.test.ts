@@ -239,140 +239,265 @@ function completeHive(g: Game) {
 }
 
 describe("Windmill Garden real-input routes", () => {
-  it("returns a fallen player to the sail checkpoint with a recoverable feather", () => {
-    const g = new Game(3);
-    settle(g);
-    walk(g, 1184, 430);
-    jump(g, 1184, 430);
-    jump(g, 1600, 310, true);
-    walk(g, 1750, 310);
-    walk(g, 2000, 430);
-    expect(g.activeCheckpointIndex).toBe(1);
-    // Walking straight at the crossing is not a bypass; a fall returns to
-    // the checkpoint and removes the feather as in ordinary play.
-    for (let i = 0; i < 900 && g.deaths === 0; i++)
-      step(g, { ...idle, right: true });
-    expect(g.deaths).toBe(1);
-    expect(g.hasWindFeather).toBe(false);
-    settle(g);
-    walk(g, 2040, 430);
-    jump(g, 2040, 430);
-    expect(g.hasWindFeather).toBe(true);
-    walk(g, 2120, 430);
-    jump(g, 2180, 350);
-    jump(g, 2420, 350);
-    jump(g, 2700, 270, true);
-    expect(g.deaths).toBe(1);
+  it("keeps each checkpoint outside enemy patrols and safe while the player recovers", () => {
+    for (const checkpoint of windmillLevel.checkpoints) {
+      for (const enemy of windmillLevel.enemies) {
+        expect(
+          checkpoint.x + 28 < enemy.minX - 24 || checkpoint.x > enemy.maxX + 56,
+          `${checkpoint.x} overlaps the ${enemy.kind} patrol`,
+        ).toBe(true);
+      }
+      // Run actual enemy behavior with the authored positions; isolate the
+      // checkpoint from the bosses so this measures ordinary respawn safety.
+      const game = new Game(3, {
+        level: {
+          ...windmillLevel,
+          spawn: { x: checkpoint.x, y: checkpoint.y - 38 },
+          checkpoints: [checkpoint],
+          boss: undefined,
+          finalBoss: undefined,
+        },
+      });
+      settle(game, 480);
+      expect(game.deaths, `unsafe checkpoint at ${checkpoint.x}`).toBe(0);
+      expect(game.player.form, `unsafe checkpoint at ${checkpoint.x}`).toBe(
+        "small",
+      );
+    }
   });
 
-  it("retries the house sliding-sail crossing from its checkpoint", () => {
+  it.each([
+    {
+      name: "Clover Crossing",
+      checkpoint: 1250,
+      edge: 1300,
+      route: (g: Game) => {
+        walk(g, 1270, 430);
+        jump(g, 1390, 380);
+        jump(g, 1570, 430);
+      },
+    },
+    {
+      name: "Sail Run",
+      checkpoint: 1992,
+      edge: 2250,
+      route: (g: Game) => {
+        walk(g, 2250, 430);
+        jump(g, 2410, 350);
+        jump(g, 2660, 310);
+      },
+    },
+    {
+      name: "Millstream",
+      checkpoint: 5832,
+      edge: 6070,
+      route: (g: Game) => {
+        walk(g, 6070, 430);
+        for (let i = 0; i < 600; i++) {
+          if (
+            g.platforms.find((p) => p.id === "windmill.sail.millstream")!.x <=
+            6120
+          )
+            break;
+          step(g);
+        }
+        jump(g, 6200, 350);
+        jump(g, 6500, 430);
+      },
+    },
+    {
+      name: "Sunpetal Crossing",
+      checkpoint: 7752,
+      edge: 7930,
+      route: (g: Game) => {
+        walk(g, 7810, 430);
+        jump(g, 7900, 300);
+        jump(g, 8090, 360);
+        jump(g, 8370, 350);
+      },
+    },
+    {
+      name: "Windward Run",
+      checkpoint: 9672,
+      edge: 10120,
+      route: (g: Game) => {
+        walk(g, 10120, 430);
+        jump(g, 10245, 380);
+        jump(g, 10470, 430);
+      },
+    },
+  ])(
+    "retries $name after a fall without a feather",
+    ({ checkpoint, edge, route }) => {
+      const g = new Game(3, {
+        level: {
+          ...windmillLevel,
+          spawn: { x: checkpoint, y: 392 },
+          checkpoints: [{ x: checkpoint, y: 430 }],
+          enemies: [],
+          boss: undefined,
+          finalBoss: undefined,
+        },
+      });
+      settle(g);
+      expect(g.hasWindFeather).toBe(false);
+      walk(g, edge, 430);
+      for (let i = 0; i < 900 && g.deaths === 0; i++)
+        step(g, { ...idle, right: true });
+      expect(g.deaths).toBe(1);
+      expect(g.hasWindFeather).toBe(false);
+      settle(g);
+      route(g);
+      expect(g.deaths).toBe(1);
+      expect(g.state).toBe("playing");
+    },
+  );
+
+  it("reaches the sub-boss from a fresh start without ever collecting a feather", () => {
     const g = new Game(3);
     settle(g);
-    walk(g, 1184, 430);
-    jump(g, 1184, 430);
-    jump(g, 1600, 310, true);
-    walk(g, 1750, 310);
-    walk(g, 2000, 430);
-    walk(g, 2120, 430);
-    jump(g, 2180, 350);
-    jump(g, 2420, 350);
-    jump(g, 2700, 270, true);
-    jump(g, 3350, 250, true);
-    walk(g, 3390, 250);
-    walk(g, 3860, 430);
-    walk(g, 3800, 430);
-    walk(g, 4180, 490);
-    jump(g, 4470, 330, true);
-    jump(g, 4640, 270);
-    jump(g, 4960, 330, true);
-    jump(g, 5300, 330, true);
-    jump(g, 5570, 350, true);
-    walk(g, 5840, 430);
-    expect(g.activeCheckpointIndex).toBe(3);
-
-    // Walking straight into the break must not bypass the sliding platform.
-    for (let i = 0; i < 900 && g.deaths === 0; i++)
-      step(g, { ...idle, right: true });
-    expect(g.deaths).toBe(1);
+    walk(g, 680, 430);
+    jump(g, 910, 430);
+    walk(g, 1270, 430);
+    jump(g, 1390, 380);
+    jump(g, 1570, 430);
+    jump(g, 1870, 430);
+    walk(g, 2250, 430);
+    jump(g, 2410, 350);
+    jump(g, 2660, 310);
+    walk(g, 3070, 430);
+    jump(g, 3150, 350);
+    walk(g, 3220, 350);
+    jump(g, 3390, 250);
+    jump(g, 3670, 330);
+    walk(g, 4000, 430);
+    jump(g, 4300, 490);
+    walk(g, 4490, 490);
+    jump(g, 4650, 430);
+    walk(g, 5370, 430);
+    jump(g, 5500, 300);
+    jump(g, 5700, 350);
+    walk(g, 6070, 430);
+    for (let i = 0; i < 600; i++) {
+      if (
+        g.platforms.find((p) => p.id === "windmill.sail.millstream")!.x <= 6120
+      )
+        break;
+      step(g);
+    }
+    jump(g, 6200, 350);
+    jump(g, 6500, 430);
+    walk(g, 7810, 430);
+    jump(g, 7900, 300);
+    jump(g, 8090, 360);
+    for (let i = 0; i < 600 && g.player.x + g.player.w / 2 < 8115; i++) step(g);
+    jump(g, 8350, 350);
+    jump(g, 8800, 430);
+    jump(g, 9000, 350);
+    jump(g, 9140, 250);
+    jump(g, 9500, 320);
+    walk(g, 9950, 430);
+    jump(g, 10080, 430);
+    walk(g, 10140, 430);
+    jump(g, 10245, 380);
+    jump(g, 10470, 430);
+    walk(g, 10680, 430);
+    jump(g, 10950, 430);
+    walk(g, 11560, 470);
     expect(g.hasWindFeather).toBe(false);
-    settle(g);
-    walk(g, 5816, 430);
-    jump(g, 5816, 430);
-    expect(g.hasWindFeather).toBe(true);
-    walk(g, 5940, 430);
-    jump(g, 6030, 350);
-    jump(g, 6250, 350, true);
-    jump(g, 6550, 270, true);
-    expect(g.deaths).toBe(1);
+    expect(g.deaths).toBe(0);
+    expect(g.boss?.kind).toBe("millkeeper");
   });
 
-  it("retries the workshop sail from its checkpoint without a feather", () => {
-    // Begin at the existing workshop checkpoint to isolate its recovery route;
-    // platforms and all movement use the authored level and real inputs.
+  it("keeps a usable upper checkpoint when returning from the beehive and falling", () => {
     const g = new Game(3, {
       level: {
         ...windmillLevel,
-        spawn: { x: 9672, y: 392 },
-        checkpoints: [{ x: 9672, y: 430 }],
+        spawn: { x: 6900, y: 392 },
         enemies: [],
         boss: undefined,
         finalBoss: undefined,
       },
     });
     settle(g);
-    expect(g.hasWindFeather).toBe(false);
-    walk(g, 10260, 430);
-    for (let i = 0; i < 900 && g.deaths === 0; i++)
+    jump(g, 7050, 350);
+    jump(g, 7260, 310);
+    jump(g, 7500, 270);
+    expect(g.activeCheckpointIndex).toBeGreaterThanOrEqual(
+      g.level.checkpoints.findIndex((point) => point.x === 7445),
+    );
+    settle(g, 50);
+    expect(g.portalReady).toBe("beehive");
+    const session = new AdventureSession(g);
+    const hive = session.enterBeehive();
+    completeHive(hive);
+    walk(hive, 2810, 430);
+    settle(hive, 50);
+    expect(hive.portalReady).toBe("return");
+    step(hive, { ...idle, jump: true, jumpPressed: true });
+    expect(session.returnToWorld()).toBe(g);
+    walk(g, 7800, 300);
+    jump(g, 7900, 300);
+    expect(g.activeCheckpointIndex).toBe(
+      g.level.checkpoints.findIndex((point) => point.x === 7900),
+    );
+    walk(g, 7940, 300);
+    for (let i = 0; i < 600; i++) {
+      if (g.platforms.find((p) => p.id === "windmill.sail.sunpetal")!.x >= 8060)
+        break;
+      step(g);
+    }
+    for (let i = 0; i < 120 && g.player.x <= 7970; i++)
       step(g, { ...idle, right: true });
+    for (let i = 0; i < 300 && g.deaths === 0; i++) step(g);
     expect(g.deaths).toBe(1);
     expect(g.hasWindFeather).toBe(false);
+    expect(g.player.x).toBeCloseTo(7900);
+    expect(g.player.y + g.player.h).toBeCloseTo(300);
     settle(g);
-    walk(g, 10240, 430);
-    jump(g, 10280, 390);
-    jump(g, 10400, 390);
-    jump(g, 10530, 430);
+    jump(g, 8090, 360);
+    jump(g, 8370, 430);
     expect(g.deaths).toBe(1);
   });
 
-  it("completes the world, hive detour, all fireflies and guardian using only inputs", () => {
+  it("completes the rebuilt world, finds all fireflies and beehive, and defeats both bosses", () => {
     const g = new Game(3);
     settle(g);
+    walk(g, 680, 430);
+    jump(g, 910, 430);
     walk(g, 1184, 430);
     jump(g, 1184, 430);
     expect(g.hasWindFeather).toBe(true);
-    walk(g, 1250, 430);
-    jump(g, 1600, 310, true);
-    walk(g, 1750, 310);
-    walk(g, 2000, 430);
-    walk(g, 2120, 430);
-    jump(g, 2180, 350);
-    jump(g, 2420, 350);
-    jump(g, 2700, 270, true);
-    jump(g, 3350, 250, true);
-    walk(g, 3390, 250);
+    walk(g, 1270, 430);
+    jump(g, 1390, 380);
+    jump(g, 1570, 430);
+    jump(g, 1870, 430);
+    walk(g, 2100, 430);
+    walk(g, 2250, 430);
+    jump(g, 2410, 350);
+    jump(g, 2660, 310, true);
+    walk(g, 2950, 430);
+    walk(g, 3070, 430);
+    jump(g, 3150, 350);
+    jump(g, 3390, 250, true);
     expect(g.collectedFireflies).toBe(1);
-    walk(g, 3800, 430);
+    jump(g, 3670, 330);
     walk(g, 4000, 430);
-    walk(g, 4180, 490);
-    jump(g, 4470, 330, true);
-    jump(g, 4640, 270);
-    jump(g, 4960, 330, true);
-    jump(g, 5300, 330, true);
-    jump(g, 5570, 350, true);
-    walk(g, 5760, 430);
-    walk(g, 5440, 490);
-    walk(g, 5220, 490);
+    jump(g, 4300, 490);
+    walk(g, 4490, 490);
+    jump(g, 4650, 430);
+    walk(g, 5000, 430);
+    walk(g, 5220, 430);
+    walk(g, 5370, 430);
+    jump(g, 5500, 300);
     expect(g.collectedFireflies).toBe(2);
-    walk(g, 5390, 490);
-    jump(g, 5570, 350, true);
-    walk(g, 5760, 430);
-    walk(g, 5940, 430);
-    jump(g, 6030, 350);
-    jump(g, 6250, 350, true);
-    jump(g, 6550, 270, true);
-    walk(g, 6800, 430);
-    walk(g, 7200, 430);
-    jump(g, 7310, 350);
+    jump(g, 5700, 350);
+    walk(g, 6070, 430);
+    jump(g, 6260, 350);
+    jump(g, 6500, 300);
+    walk(g, 6900, 430);
+    jump(g, 7050, 350);
+    jump(g, 7260, 310);
     jump(g, 7500, 270);
     settle(g, 50);
     expect(g.puzzleState.hiveDiscovered).toBe(true);
@@ -390,36 +515,33 @@ describe("Windmill Garden real-input routes", () => {
     expect(hive.requestedPortal).toBe("return");
     expect(session.returnToWorld()).toBe(g);
     expect(session.inSecret).toBe(false);
-    walk(g, 7900, 430);
-    jump(g, 7920, 350);
-    jump(g, 8150, 270);
-    jump(g, 8560, 230, true);
-    jump(g, 8750, 230, true);
+    walk(g, 7800, 300);
+    jump(g, 7900, 300);
+    expect(g.activeCheckpointIndex).toBeGreaterThanOrEqual(
+      g.level.checkpoints.findIndex((point) => point.x === 7900),
+    );
+    jump(g, 8090, 360);
+    jump(g, 8370, 350, true);
+    jump(g, 8800, 430);
+    jump(g, 9000, 350);
     jump(g, 9140, 250, true);
     expect(g.collectedFireflies).toBe(3);
-    walk(g, 9510, 430);
-    walk(g, 9780, 430);
-    jump(g, 9900, 390);
-    jump(g, 10080, 430, true);
-    // Jump over the late charger and hopper rather than relying on the old
-    // floor diamonds to absorb hits on the way to the Mill Keeper.
-    jump(g, 10300, 390);
-    jump(g, 10400, 390);
-    jump(g, 10530, 430);
-    jump(g, 10820, 430);
+    jump(g, 9500, 320);
+    walk(g, 9950, 430);
+    jump(g, 10080, 430);
+    walk(g, 10140, 430);
+    jump(g, 10245, 380);
+    jump(g, 10470, 430);
+    walk(g, 10680, 430);
+    jump(g, 10950, 430);
     walk(g, 11690, 470);
     defeatMill(g);
-    walk(g, 12460, 470);
-    expect(g.state).toBe("playing");
-    walk(g, 12800, 470);
-    expect(g.activeCheckpointIndex).toBe(g.level.checkpoints.length - 1);
     walk(g, 13040, 470);
     expect(readyForThornKing(g)).toBe(true);
     const arena = createThornKingRun(g.mode, g);
     expect(arena.lives).toBe(g.lives);
     expect(arena.collectedCoins).toBe(g.collectedCoins);
     expect(arena.character).toBe(g.character);
-    expect(arena.activeCheckpointIndex).toBe(0);
     defeatHeartwoodAndFinish(arena);
     expect(arena.deaths).toBe(0);
   });

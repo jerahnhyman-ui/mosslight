@@ -43,7 +43,7 @@ const layouts: Record<string, readonly Placement[]> = {
     ["feather", 11612, 340],
     ["diamond", 12700, 340],
     ["feather", 12860, 340],
-    // Retry feather beside the Vane Court checkpoint, clear of the diamond
+    // Retry feather beside the Sail Run checkpoint, clear of the diamond
     // block to its left and the approach platform to its right.
     ["feather", 2016, 300],
   ],

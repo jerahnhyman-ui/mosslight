@@ -4,11 +4,11 @@ This branch implements the flight expansion described in the [design package](wi
 
 ## Playing the expansion
 
-Defeat the Sunlit Meadow guardian in any adventure mode to unlock Windmill Garden. Existing saves with a current Meadow guardian completion qualify immediately. The world has twelve exploration rooms, two boss arenas, nine checkpoints and three fireflies.
+Defeat the Sunlit Meadow guardian in any adventure mode to unlock Windmill Garden. Existing saves with a current Meadow guardian completion qualify immediately. The rebuilt world has ground and upper routes, sliding sails, three fireflies and checkpoints leading to the Mill Keeper and a separate major boss level.
 
 Jump into a feather-marked power block from below to earn a Wind Feather, then jump, release Jump, and press and hold Jump again to rise. Release to glide. A brief stable landing refills lift. Ordinary held jumps remain ordinary jumps. Shrinking retains the feather; losing a life drops it and resets feather blocks for retry. Windmill Garden remains unlocked by the Meadow guardian, but a feather block is available from the first adventure and in the Home Grove for practice. Diamond-marked blocks release diamonds to collect, while star-marked blocks grant star power when hit.
 
-Ride sliding platforms and use flight to cross the garden. Look for the elevated beehive entrance; stand still on its portal and press Jump when prompted.
+Ride sliding platforms and jump across the garden; optional feather flight opens additional paths. Look for the elevated beehive entrance; stand still on its portal and press Jump when prompted.
 
 Lantern Beehive contains three rooms with traversal challenges. Completion awards the Bee Scarf outfit. Discovery permanently unlocks journal replay. While visiting from Windmill Garden, current lives, powers, coins and elapsed run time carry through the visit and return; leaving the secret never restores an older player state. Its completion bell leaves gameplay active so Pip can use the return portal.
 
