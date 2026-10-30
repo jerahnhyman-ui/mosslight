@@ -536,6 +536,34 @@ h1 {
   background: #ffe2aa;
   border-color: #d98b39;
 }
+.diamond-reserve {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding-left: 7px;
+  border-left: 1px solid #7ea79b80;
+  color: #93aaa0;
+  line-height: 1;
+}
+.diamond-reserve[hidden] {
+  display: none;
+}
+.diamond-reserve .icon {
+  width: 18px;
+  height: 18px;
+  stroke-width: 1.8;
+}
+.diamond-reserve small {
+  font-size: 7px;
+  letter-spacing: 0.3px;
+}
+.diamond-reserve[data-filled="true"] {
+  color: #268fa0;
+}
+.diamond-reserve[data-filled="true"] .icon {
+  fill: #a0f0f5;
+  filter: drop-shadow(0 1px 1px #65bac5);
+}
 #star-power {
   font-size: 13px;
   min-width: 35px;
@@ -1358,6 +1386,18 @@ dialog h2 {
   .checkpoint-toast {
     font-size: 12px;
     padding: 9px 14px;
+  }
+}
+@media (max-width: 800px) and (orientation: landscape) {
+  .diamond-reserve {
+    padding-left: 5px;
+  }
+  .diamond-reserve .icon {
+    width: 16px;
+    height: 16px;
+  }
+  .diamond-reserve small {
+    display: none;
   }
 }
 @media (max-aspect-ratio: 1/1) {

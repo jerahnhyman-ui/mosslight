@@ -42,6 +42,7 @@ function arena(kind: BossKind = "stag"): Level {
 // Uses ordinary movement and jump input, with no edits to physics or boss state.
 function fight(game: Game) {
   const hits: number[] = [];
+  let previousJump = false;
   for (let frame = 0; frame < 120 * 90; frame++) {
     const boss = game.boss!;
     if (boss.state === "defeated" || game.state === "lost") break;
@@ -51,12 +52,14 @@ function fight(game: Game) {
       target += boss.facing * 120;
     const stoppingDistance = (p.vx * Math.abs(p.vx)) / (2 * 1850);
     const dx = target - p.x - stoppingDistance;
+    const jumping = p.grounded || (!p.grounded && p.vy < 0);
     const input: GameInput = {
       left: dx < -2,
       right: dx > 2,
-      jump: true,
-      jumpPressed: p.grounded,
+      jump: jumping,
+      jumpPressed: jumping && !previousJump,
     };
+    previousJump = jumping;
     game.update(1 / 120, input);
     if (game.events.includes("boss-hit")) hits.push(boss.health);
   }
@@ -70,7 +73,7 @@ describe("garden guardian fights", () => {
       const hits = fight(game);
       expect(game.boss!.state).toBe("defeated");
       expect(game.deaths).toBe(0);
-      expect(hits.slice(-3)).toEqual([2, 1, 0]);
+      expect(hits).toEqual([3, 2, 1, 0]);
       expect(game.boss!.phase).toBe(3);
       expect(game.hazards).toEqual([]);
     });
@@ -81,6 +84,7 @@ describe("garden guardian fights", () => {
       const level = arena(kind);
       level.diamonds = [];
       const game = new Game(0, { level });
+      let previousJump = false;
       for (let frame = 0; frame < 120 * 90; frame++) {
         const boss = game.boss!;
         if (game.state !== "playing" || boss.state === "defeated") break;
@@ -94,12 +98,14 @@ describe("garden guardian fights", () => {
         } else if (kind === "stag" && boss.state === "attack")
           target += boss.facing * 120;
         const delta = target - p.x - (p.vx * Math.abs(p.vx)) / (2 * 1850);
+        const heldJump = jump || (!p.grounded && p.vy < 0);
         game.update(1 / 120, {
           left: delta < -2,
           right: delta > 2,
-          jump: true,
-          jumpPressed: jump,
+          jump: heldJump,
+          jumpPressed: heldJump && !previousJump,
         });
+        previousJump = heldJump;
       }
       expect(game.boss!.state).toBe("defeated");
       expect(game.player.form).toBe("small");
@@ -153,7 +159,7 @@ describe("garden guardian fights", () => {
     game.update(1 / 120, idle);
     expect(game.lives).toBe(2);
     expect(game.player.x).toBe(160);
-    expect(game.boss!.health).toBe(3);
+    expect(game.boss!.health).toBe(4);
     expect(game.boss!.phase).toBe(1);
     expect(game.boss!.state).toBe("dormant");
     expect(game.hazards).toEqual([]);
@@ -165,8 +171,8 @@ describe("garden guardian fights", () => {
     game.player.y = 392;
     game.starPowerRemaining = 10;
     game.update(0.1, idle);
-    expect(game.boss!.health).toBe(2);
-    expect(game.boss!.phase).toBe(2);
+    expect(game.boss!.health).toBe(3);
+    expect(game.boss!.phase).toBe(1);
     expect(game.lives).toBe(3);
     expect(game.player.form).toBe("small");
   });
@@ -216,6 +222,27 @@ describe("light, relaxed play and the grove", () => {
     }
     expect(game.deaths).toBe(8);
   });
+
+  it.each(["stag", "spider", "moth"] as const)(
+    "lets relaxed players retry the harder %s without losing a life",
+    (kind) => {
+      const game = new Game(0, { level: arena(kind), mode: "relaxed" });
+      game.activeCheckpointIndex = 0;
+      game.boss!.health = 1;
+      game.boss!.phase = 3;
+      game.boss!.state = "attack";
+      game.player.y = 670;
+      game.update(1 / 120, idle);
+      expect(game.lives).toBe(MAX_LIVES);
+      expect(game.player.x).toBe(160);
+      expect(game.boss).toMatchObject({
+        health: 4,
+        phase: 1,
+        state: "dormant",
+      });
+      expect(game.hazards).toEqual([]);
+    },
+  );
 
   it("timed mode retains the three-life rules", () => {
     const game = new Game(0, { level: arena(), mode: "timed" });

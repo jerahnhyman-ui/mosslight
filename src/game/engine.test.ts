@@ -488,13 +488,18 @@ describe("Mosslight simulation", () => {
     expect(game.events).not.toContain("grow");
   });
 
-  it("leaves a diamond available while big", () => {
+  it("stores a second diamond while big and leaves further diamonds in the world", () => {
     const game = new Game();
     collectDiamond(game);
     collectDiamond(game, 1);
     expect(game.player.form).toBe("big");
-    expect(game.diamonds[1]!.collected).toBe(false);
+    expect(game.reserveDiamond).toBe(true);
+    expect(game.diamonds[1]!.collected).toBe(true);
     expect(game.events).not.toContain("grow");
+    game.diamonds.push({ x: 420, y: 400, collected: false });
+    collectDiamond(game, 2);
+    expect(game.reserveDiamond).toBe(true);
+    expect(game.diamonds[2]!.collected).toBe(false);
   });
 
   it("defers growth beside a solid wall, then grows when there is room", () => {

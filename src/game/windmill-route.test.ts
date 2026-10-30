@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Game, type GameInput } from "./engine";
+import { createThornKingRun, readyForThornKing } from "./boss-level";
 import { beehiveLevel, flowerHoopsLevel } from "./levels";
 import { AdventureSession } from "./session";
 
@@ -367,10 +368,15 @@ describe("Windmill Garden real-input routes", () => {
     expect(g.state).toBe("playing");
     walk(g, 12800, 470);
     expect(g.activeCheckpointIndex).toBe(g.level.checkpoints.length - 1);
-    walk(g, 13410, 470);
-    expect(g.finalBossStarted).toBe(true);
-    defeatHeartwoodAndFinish(g);
-    expect(g.deaths).toBe(0);
+    walk(g, 13040, 470);
+    expect(readyForThornKing(g)).toBe(true);
+    const arena = createThornKingRun(g.mode, g);
+    expect(arena.lives).toBe(g.lives);
+    expect(arena.collectedCoins).toBe(g.collectedCoins);
+    expect(arena.character).toBe(g.character);
+    expect(arena.activeCheckpointIndex).toBe(0);
+    defeatHeartwoodAndFinish(arena);
+    expect(arena.deaths).toBe(0);
   });
   it("lights all three hive flowers and reaches the exit on real inputs", () => {
     const g = new Game(0, { level: beehiveLevel });

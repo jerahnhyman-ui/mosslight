@@ -123,6 +123,28 @@ describe("Briarheart major guardian", () => {
 });
 
 describe("subboss difficulty", () => {
+  it("telegraphs the stag charge, then sends a jumpable wave back from the wall", () => {
+    const boss = createBoss({ ...spec, kind: "stag" });
+    const hazards: BossHazard[] = [],
+      events: string[] = [];
+    stepBoss(boss, 1 / 120, player, hazards, events);
+    expect(boss.state).toBe("warning");
+    for (let i = 0; i < 120; i++)
+      stepBoss(boss, 1 / 120, player, hazards, events);
+    expect(boss.state).toBe("warning");
+    expect(hazards).toHaveLength(0);
+    for (let i = 0; i < 350 && boss.state !== "recover"; i++)
+      stepBoss(boss, 1 / 120, player, hazards, events);
+    expect(boss.state).toBe("recover");
+    expect(hazards).toHaveLength(1);
+    expect(hazards[0]).toMatchObject({
+      kind: "gust",
+      y: boss.groundY - 24,
+      h: 24,
+    });
+    expect(hazards[0]!.vx).toBeGreaterThan(0);
+  });
+
   it.each(["spider", "moth"] as const)(
     "%s warns clearly and sends larger, faster volleys in later phases",
     (kind) => {
@@ -143,8 +165,8 @@ describe("subboss difficulty", () => {
       }
       const first = attack(1),
         last = attack(3);
-      expect(first.hazards).toHaveLength(2);
-      expect(last.hazards).toHaveLength(4);
+      expect(first.hazards).toHaveLength(3);
+      expect(last.hazards).toHaveLength(5);
       expect(Math.abs(last.hazards[0]!.vx)).toBeGreaterThan(
         Math.abs(first.hazards[0]!.vx),
       );

@@ -37,6 +37,8 @@ export type Collectible = {
   y: number;
   collected: boolean;
   fromRewardBlock?: boolean;
+  /** A reserve diamond falls into the scene after Pip takes a hit. */
+  reserveDrop?: { vy: number; pickupDelay: number; needsSeparation: boolean };
 };
 export type PlatformState = Platform & {
   baseX: number;
@@ -113,6 +115,8 @@ export class Game {
   stars!: Collectible[];
   fireflies!: Collectible[];
   diamonds!: Collectible[];
+  /** One extra diamond earned while already grown, carried between areas. */
+  reserveDiamond = false;
   enemies!: Enemy[];
   state: "playing" | "won" | "lost" = "playing";
   lives = MAX_LIVES;
@@ -352,6 +356,7 @@ export class Game {
     this.collectedCoins = source.collectedCoins;
     this.coinsTowardLife = source.coinsTowardLife;
     this.collectedStars = source.collectedStars;
+    this.reserveDiamond = source.reserveDiamond;
     this.starPowerRemaining = source.starPowerRemaining;
     this.hasWindFeather = source.hasWindFeather;
     this.liftTicks = source.liftTicks;
@@ -635,14 +640,35 @@ export class Game {
       }
     }
     for (const diamond of this.diamonds) {
+      if (diamond.collected) continue;
+      if (diamond.reserveDrop) this.updateReserveDrop(diamond);
+      const touching = overlaps(p, {
+        x: diamond.x - 14,
+        y: diamond.y - 16,
+        w: 28,
+        h: 32,
+      });
       if (
-        !diamond.collected &&
-        p.form === "small" &&
-        overlaps(p, { x: diamond.x - 14, y: diamond.y - 16, w: 28, h: 32 }) &&
-        this.grow()
-      ) {
+        diamond.reserveDrop &&
+        diamond.reserveDrop.pickupDelay === 0 &&
+        (!touching || input.jumpPressed || input.jumpEdges?.includes(true))
+      )
+        diamond.reserveDrop.needsSeparation = false;
+      if (
+        (diamond.reserveDrop?.pickupDelay ?? 0) > 0 ||
+        diamond.reserveDrop?.needsSeparation ||
+        !touching
+      )
+        continue;
+      if (p.form === "small") {
+        if (this.grow()) {
+          diamond.collected = true;
+          this.events.push("grow");
+        }
+      } else if (!this.reserveDiamond) {
+        this.reserveDiamond = true;
         diamond.collected = true;
-        this.events.push("grow");
+        this.events.push("diamond-stored");
       }
     }
     // Power pickups resolve before contact; an enemy covering a star cannot steal it.
@@ -957,6 +983,7 @@ export class Game {
       return false;
     if (p.form === "small") return this.loseLife();
     this.resize("small");
+    if (this.reserveDiamond) this.releaseReserveDiamond(source);
     p.invulnerable = 1.5;
     this.events.push("shrink");
     p.vx = p.x + p.w / 2 < source.x + source.w / 2 ? -300 : 300;
@@ -1282,6 +1309,126 @@ export class Game {
     return true;
   }
 
+  /** Release the reserve near a reachable landing, never directly into Pip. */
+  private releaseReserveDiamond(source: Rect) {
+    const p = this.player;
+    this.reserveDiamond = false;
+    const center = p.x + p.w / 2;
+    // Put the pickup opposite the damage knockback, so Pip must go back for it.
+    const direction = center < source.x + source.w / 2 ? 1 : -1;
+    const ideal = center + direction * 90;
+    // Keep the reward on Pip's side of any wall or closed gate. A full-height
+    // gate must never strand it in a place Pip cannot reach.
+    let left = 0,
+      right = this.level.width;
+    for (const wall of this.platforms) {
+      if (
+        !active(wall) ||
+        !solid(wall) ||
+        wall.y >= p.y + p.h ||
+        wall.y + wall.h <= p.y
+      )
+        continue;
+      if (wall.x >= center) right = Math.min(right, wall.x);
+      else if (wall.x + wall.w <= center)
+        left = Math.max(left, wall.x + wall.w);
+    }
+    // Boss arenas can clamp Pip without a visible terrain wall.
+    if (this.boss && this.boss.state !== "defeated") {
+      if (this.boss.kind === "millkeeper") {
+        if (this.boss.state !== "dormant") {
+          left = Math.max(left, this.boss.minX);
+          right = Math.min(right, this.boss.maxX);
+        }
+      } else {
+        right = Math.min(right, this.boss.maxX + this.boss.w + 26);
+      }
+    }
+    const minimum = left + 14,
+      maximum = right - 14;
+    const desired = Math.max(minimum, Math.min(maximum, ideal));
+    let x = center;
+    let distance = Infinity;
+    for (const tile of this.platforms) {
+      if (
+        !active(tile) ||
+        tile.w < 28 ||
+        tile.y < p.y + p.h - 12 ||
+        tile.y > 650
+      )
+        continue;
+      const start = Math.max(tile.x + 14, minimum);
+      const end = Math.min(tile.x + tile.w - 14, maximum);
+      if (start > end) continue;
+      const candidate = Math.max(start, Math.min(end, desired));
+      // Prefer the surface Pip is on over a lower floor across a gap.
+      const d =
+        Math.abs(candidate - desired) + Math.max(0, tile.y - (p.y + p.h)) * 2;
+      if (d < distance && Math.abs(candidate - (p.x + p.w / 2)) <= 200) {
+        distance = d;
+        x = candidate;
+      }
+    }
+    this.diamonds.push({
+      x,
+      // Release beside Pip, below any overhead ceiling. It then drops to
+      // the nearby support instead of getting stranded on the roof.
+      y: p.y + 6,
+      collected: false,
+      reserveDrop: { vy: 0, pickupDelay: 0.8, needsSeparation: true },
+    });
+    this.events.push("diamond-released");
+  }
+
+  private updateReserveDrop(diamond: Collectible) {
+    const drop = diamond.reserveDrop!;
+    drop.pickupDelay = Math.max(0, drop.pickupDelay - STEP);
+    // A gem resting on a moving leaf or cloud rides along with it.
+    const carrier = this.platforms.find(
+      (tile) =>
+        active(tile) &&
+        Math.abs(diamond.y + 16 - tile.previousY) < 1 &&
+        diamond.x + 14 > tile.previousX &&
+        diamond.x - 14 < tile.previousX + tile.w &&
+        (tile.x !== tile.previousX || tile.y !== tile.previousY),
+    );
+    if (carrier) {
+      const carried = {
+        x: diamond.x - 14 + carrier.x - carrier.previousX,
+        y: diamond.y - 16 + carrier.y - carrier.previousY,
+        w: 28,
+        h: 32,
+      };
+      if (
+        !this.platforms.some(
+          (tile) =>
+            tile !== carrier &&
+            active(tile) &&
+            solid(tile) &&
+            overlaps(carried, tile),
+        )
+      ) {
+        diamond.x = carried.x + 14;
+        diamond.y = carried.y + 16;
+      }
+    }
+    const oldBottom = diamond.y + 16;
+    drop.vy = Math.min(500, drop.vy + 900 * STEP);
+    let bottom = oldBottom + drop.vy * STEP;
+    for (const tile of this.platforms) {
+      if (
+        !active(tile) ||
+        diamond.x + 14 <= tile.x ||
+        diamond.x - 14 >= tile.x + tile.w
+      )
+        continue;
+      if (oldBottom <= tile.y && bottom >= tile.y)
+        bottom = Math.min(bottom, tile.y);
+    }
+    if (bottom < oldBottom + drop.vy * STEP) drop.vy = 0;
+    diamond.y = bottom - 16;
+  }
+
   private loseLife() {
     if (this.level.kind === "grove") {
       // The grove returns Pip safely instead of charging a life. Reset
@@ -1321,7 +1468,10 @@ export class Game {
   }
 
   private resetRetryRewards() {
-    this.diamonds = this.diamonds.filter((diamond) => !diamond.fromRewardBlock);
+    this.reserveDiamond = false;
+    this.diamonds = this.diamonds.filter(
+      (diamond) => !diamond.fromRewardBlock && !diamond.reserveDrop,
+    );
     for (const diamond of this.diamonds) diamond.collected = false;
     for (const tile of this.platforms)
       if (tile.rewardPower === "diamond" || tile.rewardPower === "feather")

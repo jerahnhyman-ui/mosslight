@@ -78,19 +78,16 @@ describe("head-knocker power blocks", () => {
     expect(block(game).rewardUsed).toBe(false);
   });
 
-  it("keeps a diamond released by big Pip available after shrinking", () => {
+  it("stores a diamond earned from a head-knocker while Pip is big", () => {
     const game = rewardGame("diamond");
     // Start big, then hit the block through normal jump input.
     Object.assign(game.player, { form: "big", w: 40, h: 56, y: 374 });
     bump(game);
     expect(game.player.form).toBe("big");
     expect(game.diamonds).toHaveLength(1);
-    expect(game.diamonds[0]!.collected).toBe(false);
-    // Simulate a shrink, then jump to recover the still-present diamond.
-    Object.assign(game.player, { form: "small", w: 28, h: 38, y: 392 });
-    bump(game);
-    expect(game.player.form).toBe("big");
     expect(game.diamonds[0]!.collected).toBe(true);
+    expect(game.reserveDiamond).toBe(true);
+    expect(block(game).rewardUsed).toBe(true);
   });
 
   it("awards one star per run and keeps it consumed after a retry", () => {

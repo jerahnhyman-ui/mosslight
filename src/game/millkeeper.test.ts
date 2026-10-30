@@ -49,7 +49,7 @@ describe("Mill Keeper", () => {
       kind: "sweep",
       y: 414,
       h: 56,
-      vx: -260,
+      vx: -290,
     });
     step(2.8);
     expect(boss.millState).toBe("recover");

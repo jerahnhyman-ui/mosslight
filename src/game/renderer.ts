@@ -44,6 +44,25 @@ type Particle = {
 };
 const WIDTH = 960;
 const HEIGHT = 540;
+// The Thorn King's grove is a distinct encounter, with a warmer, deeper
+// palette than the bright Windmill Garden that leads to it.
+const thornGrovePalette: Palette = {
+  sky: "#405d56",
+  horizon: "#d6bd83",
+  sun: "#ffdda0",
+  far: "#7d9980",
+  middle: "#618577",
+  near: "#4e7667",
+  leaf: "#477e58",
+  leafLight: "#97bc72",
+  leafShade: "#345e4c",
+  trunk: "#80604c",
+  grass: "#94b96c",
+  grassLight: "#d6df98",
+  soil: "#ba9068",
+  soilShade: "#84614d",
+  rock: "#ddc297",
+};
 const palettes: Record<Theme, Palette> = {
   grotto: {
     sky: "#123f58",
@@ -276,7 +295,8 @@ export class Renderer {
       0,
       0,
     );
-    const p = palettes[game.level.theme];
+    const thornGrove = game.level.contentId === "boss.thorn-king";
+    const p = thornGrove ? thornGrovePalette : palettes[game.level.theme];
     const dt = Math.max(0, Math.min(time - this.previousTime, 0.05));
     this.previousTime = time;
     const newGame =
@@ -358,7 +378,7 @@ export class Renderer {
     const followFlight =
       game.hasWindFeather &&
       (game.level.kind === "grove" ||
-        (game.finalBossStarted && game.boss?.kind === "heartwood") ||
+        game.boss?.kind === "heartwood" ||
         game.level.theme === "cloud" ||
         game.level.theme === "grotto" ||
         game.level.contentId === "world.sunlit-meadow" ||
@@ -434,7 +454,8 @@ export class Renderer {
       if (
         game.level.theme === "hive" ||
         game.level.theme === "grotto" ||
-        game.level.theme === "cloud"
+        game.level.theme === "cloud" ||
+        thornGrove
       )
         continue;
       if (
@@ -457,7 +478,8 @@ export class Renderer {
       this.homeGrove(game, time);
       this.sectionLandmarks(game, time, p);
       this.treasuryRooms(game, time);
-      this.expansionScenery(game, time);
+      if (thornGrove) this.thornGroveScenery(game, time);
+      else this.expansionScenery(game, time);
       this.skyWayfinding(game, time);
     }
     if (titleMode) this.tree(titleX + 45, titleGround, p, 19, time, 1.2);
@@ -1777,6 +1799,60 @@ export class Renderer {
         37,
         "rgba(255,243,158,.2)",
       );
+  }
+
+  private thornGroveScenery(game: Game, time: number) {
+    const boss = game.boss;
+    if (!boss) return;
+    const c = this.ctx;
+    const center = (boss.minX + boss.maxX) / 2;
+    const ground = boss.groundY;
+
+    // A dim, round opening and two ancient trees frame the arena without
+    // covering the crown, the seed warnings, or the real platforms.
+    this.ellipse(center, ground - 238, 360, 232, "rgba(247,216,153,.16)");
+    this.ellipse(center, ground - 238, 300, 192, "rgba(255,236,176,.1)");
+    c.save();
+    c.lineCap = "round";
+    for (const side of [-1, 1]) {
+      const x = center + side * 560;
+      c.strokeStyle = "rgba(60,85,66,.5)";
+      c.lineWidth = 72;
+      c.beginPath();
+      c.moveTo(x + side * 28, ground + 10);
+      c.bezierCurveTo(
+        x - side * 35,
+        ground - 115,
+        x - side * 25,
+        95,
+        x + side * 8,
+        -35,
+      );
+      c.stroke();
+      c.lineWidth = 34;
+      c.beginPath();
+      c.moveTo(x - side * 5, 160);
+      c.bezierCurveTo(
+        x - side * 100,
+        100,
+        center + side * 210,
+        66,
+        center + side * 65,
+        60,
+      );
+      c.stroke();
+      for (let i = 0; i < 5; i++) {
+        const leafX = center + side * (160 + i * 92);
+        this.ellipse(leafX, 42 + (i % 2) * 16, 70, 38, "rgba(51,92,65,.52)");
+      }
+    }
+    c.restore();
+    for (let i = 0; i < 8; i++) {
+      const x = center - 360 + i * 102;
+      const y =
+        ground - 260 + Math.sin(time * 0.9 + i * 2.1) * 12 + (i % 3) * 32;
+      this.ellipse(x, y, 3, 3, "rgba(255,234,155,.55)");
+    }
   }
 
   private expansionScenery(game: Game, time: number) {

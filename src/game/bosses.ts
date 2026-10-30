@@ -60,8 +60,8 @@ export function createBoss(spec: BossSpec): BossState {
     ...spec,
     ...size,
     y: spec.y - size.h,
-    health: spec.kind === "millkeeper" || spec.kind === "heartwood" ? 6 : 3,
-    maxHealth: spec.kind === "millkeeper" || spec.kind === "heartwood" ? 6 : 3,
+    health: spec.kind === "millkeeper" || spec.kind === "heartwood" ? 6 : 4,
+    maxHealth: spec.kind === "millkeeper" || spec.kind === "heartwood" ? 6 : 4,
     phase: 1,
     state: "dormant",
     stateTime: 0,
@@ -131,7 +131,11 @@ export function hitBoss(
     boss.phase =
       boss.kind === "heartwood"
         ? Math.min(3, 1 + Math.floor((boss.maxHealth - boss.health) / 2))
-        : boss.maxHealth - boss.health + 1;
+        : Math.min(
+            3,
+            1 +
+              Math.floor(((boss.maxHealth - boss.health) * 3) / boss.maxHealth),
+          );
     if (boss.kind === "heartwood")
       boss.phaseCheckpoint = Math.max(boss.phaseCheckpoint ?? 1, boss.phase);
     warnBoss(boss, player, events);
@@ -179,7 +183,7 @@ function spawnSweep(
     w: 48,
     h: high ? 158 : 56,
     // The sweep remains fully telegraphed, but moves faster in later phases.
-    vx: boss.facing * (260 + (boss.phase - 1) * 35),
+    vx: boss.facing * (290 + (boss.phase - 1) * 40),
     vy: 0,
     remaining: 2.8,
   };
@@ -253,11 +257,11 @@ function stepMill(
       setMillState(
         boss,
         boss.phase === 1 ? "recover" : "vaneOpen",
-        boss.phase === 1 ? 3 : 4.5,
+        boss.phase === 1 ? 2.6 : 4,
       );
       break;
     case "vaneWarning":
-      setMillState(boss, "vaneOpen", 4.5);
+      setMillState(boss, "vaneOpen", 4);
       break;
     case "vaneOpen":
       setMillState(boss, "settle", 1);
@@ -338,16 +342,28 @@ export function stepBoss(
   if (boss.state === "attack") {
     boss.attackElapsed += dt;
     if (boss.kind === "stag") {
-      boss.x += boss.facing * (265 + boss.phase * 45) * dt;
+      boss.x += boss.facing * (290 + boss.phase * 55) * dt;
       if (boss.x <= boss.minX || boss.x >= boss.maxX) {
         boss.x = clamp(boss.x, boss.minX, boss.maxX);
+        // The wall impact sends a low wave back into the arena. The charge
+        // and direction make the impact readable; a jump clears the wave.
+        hazards.push({
+          kind: "gust",
+          x: boss.facing > 0 ? boss.x : boss.x + boss.w - 24,
+          y: boss.groundY - 24,
+          w: 24,
+          h: 24,
+          vx: -boss.facing * (170 + boss.phase * 25),
+          vy: 0,
+          remaining: 3.2,
+        });
         recover(boss);
       }
     } else if (boss.kind === "spider") {
       // Web balls travel along the floor; jumping is always a valid counter.
       if (
-        boss.shotsFired < boss.phase + 1 &&
-        boss.attackElapsed >= 0.18 + boss.shotsFired * 0.36
+        boss.shotsFired < boss.phase + 2 &&
+        boss.attackElapsed >= 0.18 + boss.shotsFired * 0.27
       ) {
         hazards.push({
           kind: "web",
@@ -355,7 +371,7 @@ export function stepBoss(
           y: boss.groundY - 28,
           w: 22,
           h: 22,
-          vx: boss.facing * (155 + boss.phase * 25),
+          vx: boss.facing * (170 + boss.phase * 30),
           vy: 0,
           remaining: 4,
         });
@@ -393,8 +409,8 @@ export function stepBoss(
         (boss.attackTargetX - boss.attackOriginX) * fraction;
       boss.y = boss.groundY - boss.h - 90 * (1 - fraction);
       if (
-        boss.shotsFired < boss.phase + 1 &&
-        boss.attackElapsed >= 0.28 + boss.shotsFired * 0.28
+        boss.shotsFired < boss.phase + 2 &&
+        boss.attackElapsed >= 0.2 + boss.shotsFired * 0.25
       ) {
         hazards.push({
           kind: "gust",
@@ -402,7 +418,7 @@ export function stepBoss(
           y: boss.groundY - 30,
           w: 24,
           h: 24,
-          vx: -boss.facing * (140 + boss.phase * 20),
+          vx: -boss.facing * (155 + boss.phase * 25),
           vy: 0,
           remaining: 3.2,
         });
