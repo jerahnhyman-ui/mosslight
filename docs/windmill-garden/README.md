@@ -3,8 +3,9 @@
 > This package records the original expansion design. Its fountain and pickup
 > placement details have been superseded by the power-block system: Pip bumps
 > marked blocks from below for diamonds, feathers, and stars. The Mill Keeper
-> is now a sub-boss, followed by Briarheart's final arena. For current player
-> instructions, see [the Windmill Garden guide](../WINDMILL_GARDEN.md).
+> is now a sub-boss, followed by Briarheart's final arena. Its original vane
+> mechanic and the switch puzzles described below have been removed. For
+> current player instructions, see [the Windmill Garden guide](../WINDMILL_GARDEN.md).
 
 **Astra design package, implemented by Terra in this branch.** See the [implementation and verification guide](../WINDMILL_GARDEN.md). This document records the expansion contracts and original pacing hypotheses. Automated routes now exercise the implementation; physical-device feel and first-time playtime targets remain to be evaluated. TestFlight status is verified separately.
 

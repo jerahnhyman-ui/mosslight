@@ -17,7 +17,6 @@ const spec: BossSpec = {
   maxX: 840,
 };
 const player: Rect = { x: 300, y: 432, w: 28, h: 38 };
-const target: Rect = { x: 466, y: 166, w: 28, h: 38 };
 function setup() {
   const boss = createBoss(spec),
     hazards: BossHazard[] = [],
@@ -55,7 +54,7 @@ describe("Mill Keeper", () => {
     step(3);
     expect(boss.millState).toBe("lowWarning");
   });
-  it("requires deliberate flight at the vane and cannot gain recovery by waiting", () => {
+  it("gives a direct stomp opening in phase two with no feather or hidden target", () => {
     const { boss, hazards, events, step } = setup();
     step(1);
     hitBoss(boss, player, hazards, events);
@@ -64,19 +63,17 @@ describe("Mill Keeper", () => {
     expect(boss.phase).toBe(2);
     expect(boss.millState).toBe("transition");
     step(1.5);
-    expect(boss.millState).toBe("vaneWarning");
-    step(1.5);
-    expect(boss.millState).toBe("vaneOpen");
-    step(0.1, target, false);
-    expect(boss.millState).toBe("vaneOpen");
-    step(0.1, { ...target, x: target.x + 21 }, true);
-    expect(boss.millState).toBe("vaneOpen");
-    step(0.1, target, true);
+    expect(boss.millState).toBe("highWarning");
+    step(2.8, player, false, false);
+    expect(boss.millState).toBe("highSweep");
+    step(2.8, player, false, false);
+    expect(boss.millState).toBe("betweenSweeps");
+    step(1.8, player, false, false);
+    expect(boss.millState).toBe("lowSweep");
+    step(2.8, player, false, false);
     expect(boss.millState).toBe("recover");
-    step(3.2);
-    step(1.5);
-    step(4.5);
-    expect(boss.millState).toBe("settle");
+    expect(boss.state).toBe("recover");
+    expect(hazards).toHaveLength(0);
   });
   it("plays high then low waves and saves only entered phases for Relaxed retries", () => {
     const { boss, hazards, events, step } = setup();
@@ -88,14 +85,14 @@ describe("Mill Keeper", () => {
     expect(boss.phase).toBe(3);
     expect(boss.millState).toBe("highWarning");
     step(2.8);
-    expect(hazards[0]).toMatchObject({ y: 250, h: 158 });
+    expect(hazards[0]).toMatchObject({ y: 240, h: 150 });
     step(2.8);
     expect(boss.millState).toBe("betweenSweeps");
     expect(hazards).toHaveLength(0);
     step(1.8);
     expect(hazards[0]).toMatchObject({ y: 414, h: 56 });
     step(2.8);
-    expect(boss.millState).toBe("vaneOpen");
+    expect(boss.millState).toBe("recover");
     expect(retryBoss(spec, boss, true).health).toBe(2);
     expect(retryBoss(spec, boss, false).health).toBe(6);
   });

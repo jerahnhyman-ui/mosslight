@@ -1493,44 +1493,6 @@ export class Renderer {
   /** A non-interactive sign teaches the block gesture before the first reward. */
   private rewardGuide(game: Game) {
     if (
-      game.level.contentId === "world.windmill-garden" &&
-      game.boss?.kind === "millkeeper" &&
-      !game.hasWindFeather
-    ) {
-      const boss = game.boss;
-      const feather = game.platforms.find(
-        (tile) =>
-          tile.rewardPower === "feather" &&
-          !tile.rewardUsed &&
-          tile.x >= boss.minX - 300 &&
-          tile.x < boss.maxX &&
-          Math.abs(tile.x - game.player.x) < 310,
-      );
-      if (feather && this.visible(feather.x, 70)) {
-        // An upward arrow beneath the real block makes its bump direction
-        // obvious without adding a new control or an interactive object.
-        const x = feather.x + feather.w / 2;
-        const y = feather.y + feather.h + 9;
-        this.line(
-          [
-            [x, y + 16],
-            [x, y],
-            [x - 5, y + 5],
-          ],
-          "#346b50",
-          3,
-        );
-        this.line(
-          [
-            [x, y],
-            [x + 5, y + 5],
-          ],
-          "#346b50",
-          3,
-        );
-      }
-    }
-    if (
       game.level.contentId !== "world.sunlit-meadow" ||
       !this.visible(235, 120)
     )
@@ -2659,40 +2621,45 @@ export class Renderer {
       return;
     }
     const warning =
-      b.millState === "lowWarning" ||
-      b.millState === "highWarning" ||
-      b.millState === "vaneWarning";
-    const open = b.millState === "vaneOpen";
-    const recovering =
-      b.millState === "recover" || b.millState === "transition";
+      b.millState === "lowWarning" || b.millState === "highWarning";
+    const recovering = b.millState === "recover";
     if (warning) {
       const high = b.millState === "highWarning";
-      const yy = high ? 250 : 414;
-      if (b.millState !== "vaneWarning") {
-        c.save();
-        c.setLineDash([12, 8]);
-        this.line(
-          [
-            [b.minX, yy],
-            [b.maxX + b.w, yy],
-          ],
-          "#e28a62",
-          4,
-        );
-        c.restore();
-      }
+      const yy = b.groundY - (high ? 230 : 56);
+      const height = high ? 150 : 56;
+      c.save();
+      c.fillStyle = "rgba(226,138,98,.09)";
+      c.fillRect(b.minX, yy, b.maxX + b.w - b.minX, height);
+      c.setLineDash([12, 8]);
+      this.line(
+        [
+          [b.minX, yy],
+          [b.maxX + b.w, yy],
+        ],
+        "#e28a62",
+        4,
+      );
+      this.line(
+        [
+          [b.minX, yy + height],
+          [b.maxX + b.w, yy + height],
+        ],
+        "#e28a62",
+        4,
+      );
+      c.restore();
       this.rounded(x - 18, b.y - 38, 36, 30, 10, "#fff2bb", "#bd7850");
       c.save();
       c.font = "bold 18px sans-serif";
       c.textAlign = "center";
       c.fillStyle = "#9a573c";
-      c.fillText(
-        high ? "↓" : b.millState === "lowWarning" ? "↑" : "!",
-        x,
-        b.y - 16,
-      );
+      c.fillText(high ? "↓" : "↑", x, b.y - 16);
       c.restore();
     }
+    c.save();
+    c.translate(x, y);
+    c.scale(1, b.h / 115);
+    c.translate(-x, -y);
     this.ellipse(x, y, 56, 8, "rgba(77,65,43,.2)");
     this.rounded(x - 44, y - 115, 88, 112, 27, "#c88c57", "#82583e");
     this.rounded(x - 36, y - 104, 72, 92, 20, "#e7b87b", "#a66f48");
@@ -2735,24 +2702,38 @@ export class Renderer {
       "#80553e",
       2,
     );
-    // The high target matches the actual vane hit region.
-    const vy = 185;
-    this.line(
-      [
-        [x, y - 112],
-        [x, vy + 12],
-      ],
-      "#8b6245",
-      4,
-    );
-    this.ellipse(
-      x,
-      vy,
-      open ? 28 : 20,
-      open ? 28 : 20,
-      open ? "rgba(255,245,147,.48)" : "rgba(255,245,147,.16)",
-    );
-    this.flowerRing(x, vy, 13, open ? "#ffe37b" : "#cdb987", time);
+    c.restore();
+    if (recovering) {
+      // This highlight sits on the boss's actual collision top, so the
+      // visible landing point is exactly where a stomp can connect.
+      this.rounded(x - 37, b.y - 6, 74, 12, 6, "#fff3a8", "#c38750");
+      this.line(
+        [
+          [x, b.y - 31],
+          [x, b.y - 10],
+          [x - 7, b.y - 17],
+        ],
+        "#246747",
+        4,
+      );
+      this.line(
+        [
+          [x, b.y - 10],
+          [x + 7, b.y - 17],
+        ],
+        "#246747",
+        4,
+      );
+      for (let i = 0; i < 3; i++) {
+        this.starPath(
+          x - 25 + i * 25,
+          b.y - 12 + Math.sin(time * 5 + i) * 2,
+          4,
+        );
+        c.fillStyle = "#fff5a6";
+        c.fill();
+      }
+    }
   }
 
   private bossHazards(game: Game, time: number) {

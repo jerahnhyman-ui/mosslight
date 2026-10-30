@@ -222,7 +222,7 @@ export const windmillLevel: Level = withRewardBlocks({
     { x: 9672, text: "Follow the path right to the Mill Keeper." },
     {
       x: 11300,
-      text: "The Mill Keeper awaits. Bump the feather block in the arena to fly.",
+      text: "The Mill Keeper awaits. Dodge the sweeps, then jump on it when it rests.",
     },
     {
       x: 12800,

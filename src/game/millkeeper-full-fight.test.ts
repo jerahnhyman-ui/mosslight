@@ -17,11 +17,11 @@ function arena(big: boolean) {
 
 describe("Mill Keeper full fight", () => {
   it.each([false, true])(
-    "wins from the nest without a star (big=%s)",
+    "wins every phase with ordinary jumps, no feather or star (big=%s)",
     (big) => {
       const game = new Game(0, { level: arena(big) });
-      // Walk from the real checkpoint to the arena's feather block. The
-      // guardian can awaken without a feather, but flight must still be earned.
+      // Start at the real checkpoint with no feather. The fight must remain
+      // fully playable using movement and ordinary jump alone.
       for (let i = 0; i < 30; i++)
         game.update(1 / 120, {
           left: false,
@@ -30,41 +30,11 @@ describe("Mill Keeper full fight", () => {
           jumpPressed: false,
         });
       expect(game.hasWindFeather).toBe(false);
-      for (let i = 0; i < 180 && game.boss!.state === "dormant"; i++)
-        game.update(1 / 120, {
-          left: false,
-          right: true,
-          jump: false,
-          jumpPressed: false,
-        });
-      expect(game.boss!.state).not.toBe("dormant");
-      expect(game.hasWindFeather).toBe(false);
-      for (let i = 0; i < 120 && game.player.x > origin + 150; i++)
-        game.update(1 / 120, {
-          left: true,
-          right: false,
-          jump: false,
-          jumpPressed: false,
-        });
-      for (let i = 0; i < 20; i++)
-        game.update(1 / 120, {
-          left: false,
-          right: false,
-          jump: false,
-          jumpPressed: false,
-        });
-      for (let i = 0; i < 90; i++)
-        game.update(1 / 120, {
-          left: false,
-          right: false,
-          jump: i < 35,
-          jumpPressed: i === 0,
-        });
-      expect(game.hasWindFeather).toBe(true);
       const hits: number[] = [];
       const phases = new Set<number>();
       let feather = false;
       let grew = false;
+      const stompTakeoffs: number[] = [];
       let jumpKind = "",
         air = 0,
         wasGrounded = false,
@@ -88,81 +58,43 @@ describe("Mill Keeper full fight", () => {
           air = 0;
         }
         wasGrounded = p.grounded;
-        const onPad = p.grounded && Math.abs(feet - 390) < 2;
         const onFloor = p.grounded && Math.abs(feet - 470) < 2;
-        const high =
-          b.phase === 3 &&
-          [
-            "transition",
-            "highWarning",
-            "highSweep",
-            "betweenSweeps",
-            "lowSweep",
-          ].includes(b.millState!);
-        let target = 350,
+        let target = 250,
           jump = false;
-        if (high) target = 210;
-        if (onFloor && !high) target = 230;
-        if (b.millState === "recover" && !onFloor) target = 480;
-        if (b.millState === "vaneOpen" && !onFloor) target = 480;
-        if (onFloor && !high && center >= 210 && center < 290 && !jumpKind) {
-          jumpKind = "pad";
-          air = 0;
-        }
-        if (onPad && b.millState === "recover" && !jumpKind) {
-          jumpKind = "stomp";
-          air = 0;
-        }
-        if (onPad && b.millState === "vaneOpen" && !jumpKind) {
-          jumpKind = "vane";
-          air = 0;
+        if (b.state === "recover" && onFloor && !jumpKind) {
+          target = 385;
+          if (Math.abs(center - 385) < 10 && Math.abs(p.vx) < 50) {
+            jumpKind = "stomp";
+            stompTakeoffs.push(feet);
+          }
         }
         if (
           onFloor &&
-          high &&
+          !jumpKind &&
           b.millState === "betweenSweeps" &&
           b.facing > 0 &&
-          b.stateTime <= 0.35 &&
-          !jumpKind
+          b.stateTime <= 0.35
         ) {
-          // A left-origin wave starts near this refuge: use its visible
-          // warning to jump before it arrives, rather than reacting at spawn.
           jumpKind = "dodge";
-          air = 0;
         }
-        if (onFloor && high && b.millState === "lowSweep" && !jumpKind) {
+        if (onFloor && !jumpKind && b.millState === "lowSweep") {
           const wave = game.hazards.find((h) => h.kind === "sweep");
           if (
             wave &&
             Math.abs(wave.x + 24 - origin - center) < 120 &&
             wave.vx * (center - (wave.x + 24 - origin)) > 0
-          ) {
+          )
             jumpKind = "dodge";
-            air = 0;
-          }
         }
         if (jumpKind) {
           air++;
-          if (jumpKind === "pad") {
-            target = 350;
-            jump = air <= 55;
-          }
           if (jumpKind === "stomp") {
-            target = 480;
+            target = air < 26 ? 385 : 480;
+            jump = air <= 55;
+          } else {
+            target = 250;
             jump = air <= 55;
           }
-          if (jumpKind === "dodge") {
-            target = 210;
-            jump = air <= 55;
-          }
-          if (jumpKind === "vane") {
-            target = 480;
-            jump = b.millState === "vaneOpen" && (air <= 30 || air >= 32);
-          }
-        }
-        if (b.millState === "recover" && jumpKind === "vane") {
-          jump = false;
-          target = 480;
         }
         const dx =
           target -
@@ -186,8 +118,9 @@ describe("Mill Keeper full fight", () => {
         `health=${game.boss!.health}, phase=${game.boss!.phase}, mill=${game.boss!.millState}, player=${game.player.x},${game.player.y}, deaths=${game.deaths}, hits=${hits.join(",")}`,
       ).toBe("defeated");
       expect(hits).toEqual([5, 4, 3, 2, 1, 0]);
+      expect(stompTakeoffs).toEqual([470, 470, 470, 470, 470, 470]);
       expect(game.deaths).toBe(0);
-      expect(feather).toBe(true);
+      expect(feather).toBe(false);
       expect(grew).toBe(big);
       expect(game.player.form).toBe(big ? "big" : "small");
       expect([...phases]).toEqual([1, 2, 3]);

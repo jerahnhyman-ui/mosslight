@@ -26,8 +26,6 @@ export type MillState =
   | "settle"
   | "lowWarning"
   | "lowSweep"
-  | "vaneWarning"
-  | "vaneOpen"
   | "highWarning"
   | "highSweep"
   | "betweenSweeps"
@@ -52,7 +50,7 @@ export function createBoss(spec: BossSpec): BossState {
       : spec.kind === "spider"
         ? { w: 78, h: 66 }
         : spec.kind === "millkeeper"
-          ? { w: 104, h: 122 }
+          ? { w: 104, h: 88 }
           : spec.kind === "heartwood"
             ? { w: 156, h: 100 }
             : { w: 92, h: 64 };
@@ -179,9 +177,9 @@ function spawnSweep(
   const wave: BossHazard = {
     kind: "sweep",
     x: boss.facing > 0 ? boss.minX : boss.maxX - 48,
-    y: boss.groundY - (high ? 220 : 56),
+    y: boss.groundY - (high ? 230 : 56),
     w: 48,
-    h: high ? 158 : 56,
+    h: high ? 150 : 56,
     // The sweep remains fully telegraphed, but moves faster in later phases.
     vx: boss.facing * (290 + (boss.phase - 1) * 40),
     vy: 0,
@@ -208,7 +206,6 @@ function stepMill(
   player: Rect,
   hazards: BossHazard[],
   events: string[],
-  options: { hasFeather?: boolean; flightActivated?: boolean },
 ) {
   if (boss.state === "dormant") {
     // The guardian protects the way forward even if Pip missed the feather.
@@ -220,24 +217,12 @@ function stepMill(
     }
     return;
   }
-  if (boss.millState === "vaneOpen" && options.flightActivated) {
-    const dx = player.x + player.w / 2 - (boss.x + boss.w / 2);
-    const dy = player.y + player.h / 2 - (boss.groundY - 285);
-    if (dx * dx + dy * dy <= 20 * 20) {
-      hazards.length = 0;
-      setMillState(boss, "recover", 3.2);
-      return;
-    }
-  }
   boss.stateTime = Math.max(0, boss.stateTime - dt);
   if (boss.stateTime > 1e-9) return;
   switch (boss.millState) {
     case "settle":
     case "transition":
-      if (boss.phase === 2) {
-        setMillState(boss, "vaneWarning", 1.5);
-        events.push("boss-warning");
-      } else millWarning(boss, player, boss.phase === 3, events);
+      millWarning(boss, player, boss.phase >= 2, events);
       break;
     case "lowWarning":
       spawnSweep(boss, player, hazards, false, events);
@@ -257,23 +242,10 @@ function stepMill(
       break;
     case "lowSweep":
       hazards.length = 0;
-      setMillState(
-        boss,
-        boss.phase === 1 ? "recover" : "vaneOpen",
-        boss.phase === 1 ? 2.6 : 4,
-      );
-      break;
-    case "vaneWarning":
-      setMillState(boss, "vaneOpen", 4);
-      break;
-    case "vaneOpen":
-      setMillState(boss, "settle", 1);
+      setMillState(boss, "recover", 3);
       break;
     case "recover":
-      if (boss.phase === 2) {
-        setMillState(boss, "vaneWarning", 1.5);
-        events.push("boss-warning");
-      } else millWarning(boss, player, boss.phase === 3, events);
+      millWarning(boss, player, boss.phase >= 2, events);
       break;
   }
 }
@@ -311,13 +283,13 @@ export function stepBoss(
   player: Rect,
   hazards: BossHazard[],
   events: string[],
-  options: { hasFeather?: boolean; flightActivated?: boolean } = {},
+  _options: { hasFeather?: boolean; flightActivated?: boolean } = {},
 ) {
   boss.invulnerable = Math.max(0, boss.invulnerable - dt);
   if (boss.invulnerable < 1e-9) boss.invulnerable = 0;
   if (boss.state === "defeated") return;
   if (boss.kind === "millkeeper")
-    return stepMill(boss, dt, player, hazards, events, options);
+    return stepMill(boss, dt, player, hazards, events);
   if (boss.state === "dormant") {
     if (player.x + player.w >= boss.minX) {
       events.push("boss-start");

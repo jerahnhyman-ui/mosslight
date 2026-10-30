@@ -69,8 +69,9 @@ function jump(g: Game, x: number, y: number, lift = false, short = false) {
 }
 
 function defeatMill(g: Game) {
-  const base = 11520,
-    hits: number[] = [];
+  const base = 11520;
+  const hits: number[] = [];
+  const stompTakeoffs: number[] = [];
   let kind = "",
     air = 0,
     wasGrounded = false,
@@ -82,87 +83,49 @@ function defeatMill(g: Game) {
   ) {
     const p = g.player,
       b = g.boss!,
-      center = p.x + p.w / 2 - base,
-      feet = p.y + p.h;
+      center = p.x + p.w / 2 - base;
+    const feet = p.y + p.h;
     if (p.grounded && !wasGrounded) {
       kind = "";
       air = 0;
     }
     wasGrounded = p.grounded;
-    const onPad = p.grounded && Math.abs(feet - 390) < 2;
     const onFloor = p.grounded && Math.abs(feet - 470) < 2;
-    const high =
-      b.phase === 3 &&
-      [
-        "transition",
-        "highWarning",
-        "highSweep",
-        "betweenSweeps",
-        "lowSweep",
-      ].includes(b.millState!);
-    const body = b.x + b.w / 2 - base;
-    let target = 350,
+    let target = 250,
       jump = false;
-    if (high) target = 210;
-    if (onFloor && !high) target = 230;
-    if ((b.millState === "recover" || b.millState === "vaneOpen") && !onFloor)
-      target = body;
-    if (onFloor && !high && center >= 210 && center < 290 && !kind) {
-      kind = "pad";
-      air = 0;
-    }
-    if (onPad && b.millState === "recover" && !kind) {
-      kind = "stomp";
-      air = 0;
-    }
-    if (onPad && b.millState === "vaneOpen" && !kind) {
-      kind = "vane";
-      air = 0;
+    if (b.state === "recover" && onFloor && !kind) {
+      target = 385;
+      if (Math.abs(center - 385) < 10 && Math.abs(p.vx) < 50) {
+        kind = "stomp";
+        stompTakeoffs.push(feet);
+      }
     }
     if (
       onFloor &&
-      high &&
+      !kind &&
       b.millState === "betweenSweeps" &&
       b.facing > 0 &&
-      b.stateTime <= 0.35 &&
-      !kind
-    ) {
+      b.stateTime <= 0.35
+    )
       kind = "dodge";
-      air = 0;
-    }
-    if (onFloor && high && b.millState === "lowSweep" && !kind) {
+    if (onFloor && !kind && b.millState === "lowSweep") {
       const wave = g.hazards.find((h) => h.kind === "sweep");
       if (
         wave &&
         Math.abs(wave.x + 24 - base - center) < 120 &&
         wave.vx * (center - (wave.x + 24 - base)) > 0
-      ) {
+      )
         kind = "dodge";
-        air = 0;
-      }
     }
     if (kind) {
       air++;
-      if (kind === "pad") {
-        target = 350;
-        jump = air <= 55;
-      }
       if (kind === "stomp") {
-        target = body;
+        target = air < 26 ? 385 : 480;
+        jump = air <= 55;
+      } else {
+        target = 250;
         jump = air <= 55;
       }
-      if (kind === "dodge") {
-        target = 210;
-        jump = air <= 55;
-      }
-      if (kind === "vane") {
-        target = body;
-        jump = b.millState === "vaneOpen" && (air <= 30 || air >= 32);
-      }
-    }
-    if (b.millState === "recover" && kind === "vane") {
-      jump = false;
-      target = body;
     }
     const dx =
       target -
@@ -182,6 +145,7 @@ function defeatMill(g: Game) {
     }
   }
   expect(hits).toEqual([5, 4, 3, 2, 1, 0]);
+  expect(stompTakeoffs).toEqual([470, 470, 470, 470, 470, 470]);
   expect(g.boss!.state).toBe("defeated");
 }
 
@@ -343,7 +307,7 @@ describe("Windmill Garden real-input routes", () => {
     },
   );
 
-  it("reaches the sub-boss from a fresh start without ever collecting a feather", () => {
+  it("reaches and defeats the sub-boss from a fresh start without a feather", () => {
     const g = new Game(3);
     settle(g);
     walk(g, 680, 430);
@@ -406,9 +370,8 @@ describe("Windmill Garden real-input routes", () => {
     expect(g.level.checkpoints[g.activeCheckpointIndex]!.x).toBeLessThan(
       g.boss!.minX,
     );
-    walk(g, 11684, 470);
-    jump(g, 11684, 470);
-    expect(g.hasWindFeather).toBe(true);
+    defeatMill(g);
+    expect(g.hasWindFeather).toBe(false);
     expect(g.deaths).toBe(0);
   });
 
