@@ -476,6 +476,7 @@ export class Renderer {
     if (!titleMode) {
       this.gardenLandmarks(game, time);
       this.homeGrove(game, time);
+      this.millApproachScenery(game, time);
       this.sectionLandmarks(game, time, p);
       this.treasuryRooms(game, time);
       if (thornGrove) this.thornGroveScenery(game, time);
@@ -1492,6 +1493,44 @@ export class Renderer {
   /** A non-interactive sign teaches the block gesture before the first reward. */
   private rewardGuide(game: Game) {
     if (
+      game.level.contentId === "world.windmill-garden" &&
+      game.boss?.kind === "millkeeper" &&
+      !game.hasWindFeather
+    ) {
+      const boss = game.boss;
+      const feather = game.platforms.find(
+        (tile) =>
+          tile.rewardPower === "feather" &&
+          !tile.rewardUsed &&
+          tile.x >= boss.minX - 300 &&
+          tile.x < boss.maxX &&
+          Math.abs(tile.x - game.player.x) < 310,
+      );
+      if (feather && this.visible(feather.x, 70)) {
+        // An upward arrow beneath the real block makes its bump direction
+        // obvious without adding a new control or an interactive object.
+        const x = feather.x + feather.w / 2;
+        const y = feather.y + feather.h + 9;
+        this.line(
+          [
+            [x, y + 16],
+            [x, y],
+            [x - 5, y + 5],
+          ],
+          "#346b50",
+          3,
+        );
+        this.line(
+          [
+            [x, y],
+            [x + 5, y + 5],
+          ],
+          "#346b50",
+          3,
+        );
+      }
+    }
+    if (
       game.level.contentId !== "world.sunlit-meadow" ||
       !this.visible(235, 120)
     )
@@ -1924,6 +1963,69 @@ export class Renderer {
         c.restore();
       }
     }
+  }
+
+  /** A recognizable destination and a simple arrow lead into the mill. */
+  private millApproachScenery(game: Game, time: number) {
+    if (game.level.contentId !== "world.windmill-garden") return;
+    const c = this.ctx;
+    const millX = 11780;
+    if (this.visible(millX, 260)) {
+      // This is distant scenery, drawn before the solid platforms and boss.
+      c.save();
+      c.globalAlpha = 0.45;
+      this.rounded(millX - 96, 224, 192, 246, 30, "#eed4a1");
+      this.ellipse(millX, 224, 98, 32, "#c99d70");
+      this.rounded(millX - 24, 302, 48, 64, 16, "#b5d9bb");
+      this.rounded(millX - 22, 406, 44, 66, 18, "#b58b66");
+      c.save();
+      c.translate(millX, 205);
+      c.rotate(time * 0.16);
+      for (let i = 0; i < 4; i++) {
+        c.rotate(Math.PI / 2);
+        this.rounded(-13, -140, 26, 120, 10, "#fff0c7", "#c79c6e");
+        this.line(
+          [
+            [0, -127],
+            [0, -29],
+          ],
+          "#d7bb87",
+          3,
+        );
+      }
+      this.ellipse(0, 0, 15, 15, "#b17b54");
+      c.restore();
+      c.restore();
+    }
+    const signX = 11365;
+    if (!this.visible(signX, 100)) return;
+    // The arrow is only a backdrop: it has no collision or interaction.
+    this.line(
+      [
+        [signX, 430],
+        [signX, 338],
+      ],
+      "#a97c50",
+      6,
+    );
+    this.rounded(signX - 28, 337, 70, 35, 8, "#fff0c7", "#a77950");
+    this.line(
+      [
+        [signX - 14, 354],
+        [signX + 23, 354],
+        [signX + 14, 346],
+      ],
+      "#4f8660",
+      4,
+    );
+    this.line(
+      [
+        [signX + 23, 354],
+        [signX + 14, 362],
+      ],
+      "#4f8660",
+      4,
+    );
   }
 
   private expansionObjects(game: Game, time: number) {
@@ -2757,6 +2859,14 @@ export class Renderer {
   private sectionLandmarks(game: Game, time: number, p: Palette) {
     const c = this.ctx;
     game.level.sections.forEach((section, index) => {
+      // The HUD already names the boss arena. Leaving out this ground sign
+      // keeps the checkpoint and feather-block cue clear at the mill entrance.
+      if (
+        game.level.contentId === "world.windmill-garden" &&
+        section.x >= 11520 &&
+        section.x < 12500
+      )
+        return;
       const signX = section.x + (index === 0 ? 245 : 85);
       if (!this.visible(signX, 160)) return;
       const floor = game.platforms.find(

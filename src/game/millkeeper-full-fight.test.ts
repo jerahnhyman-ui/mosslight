@@ -20,9 +20,33 @@ describe("Mill Keeper full fight", () => {
     "wins from the nest without a star (big=%s)",
     (big) => {
       const game = new Game(0, { level: arena(big) });
-      // The actual retry checkpoint puts Pip under the feather block. Bump it
-      // before entering the arena, using the same jump input as the player.
+      // Walk from the real checkpoint to the arena's feather block. The
+      // guardian can awaken without a feather, but flight must still be earned.
       for (let i = 0; i < 30; i++)
+        game.update(1 / 120, {
+          left: false,
+          right: false,
+          jump: false,
+          jumpPressed: false,
+        });
+      expect(game.hasWindFeather).toBe(false);
+      for (let i = 0; i < 180 && game.boss!.state === "dormant"; i++)
+        game.update(1 / 120, {
+          left: false,
+          right: true,
+          jump: false,
+          jumpPressed: false,
+        });
+      expect(game.boss!.state).not.toBe("dormant");
+      expect(game.hasWindFeather).toBe(false);
+      for (let i = 0; i < 120 && game.player.x > origin + 150; i++)
+        game.update(1 / 120, {
+          left: true,
+          right: false,
+          jump: false,
+          jumpPressed: false,
+        });
+      for (let i = 0; i < 20; i++)
         game.update(1 / 120, {
           left: false,
           right: false,
@@ -157,7 +181,10 @@ describe("Mill Keeper full fight", () => {
           air = 0;
         }
       }
-      expect(game.boss!.state).toBe("defeated");
+      expect(
+        game.boss!.state,
+        `health=${game.boss!.health}, phase=${game.boss!.phase}, mill=${game.boss!.millState}, player=${game.player.x},${game.player.y}, deaths=${game.deaths}, hits=${hits.join(",")}`,
+      ).toBe("defeated");
       expect(hits).toEqual([5, 4, 3, 2, 1, 0]);
       expect(game.deaths).toBe(0);
       expect(feather).toBe(true);
@@ -165,6 +192,24 @@ describe("Mill Keeper full fight", () => {
       expect(game.player.form).toBe(big ? "big" : "small");
       expect([...phases]).toEqual([1, 2, 3]);
       expect(game.collectedStars).toBe(0);
+      const nextCheckpoint = game.level.checkpoints.findIndex(
+        (cp) => cp.x === 12800,
+      );
+      expect(nextCheckpoint).toBeGreaterThanOrEqual(0);
+      expect(game.activeCheckpointIndex).toBeLessThan(nextCheckpoint);
+      for (
+        let i = 0;
+        i < 1000 && game.activeCheckpointIndex < nextCheckpoint;
+        i++
+      )
+        game.update(1 / 120, {
+          left: false,
+          right: true,
+          jump: false,
+          jumpPressed: false,
+        });
+      expect(game.activeCheckpointIndex).toBe(nextCheckpoint);
+      expect(game.deaths).toBe(0);
     },
   );
 });

@@ -211,7 +211,10 @@ function stepMill(
   options: { hasFeather?: boolean; flightActivated?: boolean },
 ) {
   if (boss.state === "dormant") {
-    if (options.hasFeather && player.x >= boss.minX + 40) {
+    // The guardian protects the way forward even if Pip missed the feather.
+    // Its recovery block is reachable from inside the arena, so approaching
+    // without a feather cannot bypass the encounter or strand a retry.
+    if (player.x >= boss.minX + 40) {
       events.push("boss-start");
       setMillState(boss, "settle", 1);
     }

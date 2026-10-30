@@ -32,13 +32,11 @@ function setup() {
 }
 
 describe("Mill Keeper", () => {
-  it("waits for feather and entry, then warns before the low wave and recovery", () => {
+  it("waits for entry, even without a feather, then warns before attacking", () => {
     const { boss, hazards, step } = setup();
+    step(1, { ...player, x: 179 }, false, false);
+    expect(boss.state).toBe("dormant");
     step(1, player, false, false);
-    expect(boss.state).toBe("dormant");
-    step(1, { ...player, x: 179 });
-    expect(boss.state).toBe("dormant");
-    step(1);
     expect(boss.millState).toBe("settle");
     step(1);
     expect(boss.millState).toBe("lowWarning");

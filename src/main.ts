@@ -1020,8 +1020,7 @@ function updateHUD() {
       "aria-label",
       `${boss.health} of ${boss.maxHealth} health`,
     );
-    setText(
-      "#boss-instruction",
+    const instruction =
       boss.kind === "heartwood"
         ? boss.state === "recover"
           ? "The crown is glowing — jump on top!"
@@ -1048,7 +1047,12 @@ function updateHUD() {
                 game.hazards.some((hazard) => hazard.kind === "gust")
                 ? "Jump over the wave, then land on the guardian!"
                 : "Now! Jump on the guardian’s back!"
-              : "Stay clear and wait for an opening",
+              : "Stay clear and wait for an opening";
+    setText(
+      "#boss-instruction",
+      boss.kind === "millkeeper" && !game.hasWindFeather
+        ? `${instruction} Bump the feather block to fly.`
+        : instruction,
     );
   }
   setText("#player-form", game.player.form === "big" ? "Big" : "Small");

@@ -128,11 +128,12 @@ export const windmillLevel: Level = withRewardBlocks({
     shelf(9, 220, 350, 160),
     shelf(9, 420, 250, 190),
     shelf(9, 710, 320, 170),
-    // Windward Run: a short final moving bridge before the boss approach.
-    floor(10, 0, 430, 560),
-    floor(10, 820, 430, 140),
+    // The final trail leads directly to the windmill on solid ground. A
+    // higher sliding sail is an optional route, not a required detour.
+    floor(10, 0, 430, 960),
     shelf(10, 280, 350, 150),
-    sail("windward", 10, 570, 380, 150, 55, 4.3),
+    sail("windward", 10, 570, 300, 150, 55, 4.3),
+    shelf(10, 820, 350, 140),
     // Keep the established boss arenas and safe fourth-world finale.
     floor(11, 0, 430, 820),
     floor(11, 820, 470, 140),
@@ -153,7 +154,10 @@ export const windmillLevel: Level = withRewardBlocks({
     ...pts(7, 520, 278, 3),
     ...pts(8, 680, 318, 3),
     ...pts(9, 445, 218, 4),
+    ...pts(10, 100, 398, 3),
     ...pts(10, 300, 318, 3),
+    ...pts(10, 700, 398, 3),
+    ...pts(11, 200, 398, 3),
     ...pts(11, 500, 398, 3),
   ],
   stars: [],
@@ -196,9 +200,9 @@ export const windmillLevel: Level = withRewardBlocks({
     "Honeybloom",
     "Sunpetal Crossing",
     "High Canopy",
-    "Windward Run",
-    "Mill Approach",
-    "Windmill Guardian",
+    "Millkeeper Trail",
+    "Millkeeper Approach",
+    "The Millkeeper",
   ]
     .map((name, i) => ({ x: i * 960, name }))
     .concat([
@@ -215,7 +219,11 @@ export const windmillLevel: Level = withRewardBlocks({
     { x: 3000, text: "Explore the high leaves to find a hidden firefly." },
     { x: 5832, text: "Wait for the sail, then ride it across Millstream." },
     { x: 7200, text: "The high honeybloom path leads to a hidden beehive." },
-    { x: 9672, text: "Ride the last sail toward the windmill." },
+    { x: 9672, text: "Follow the path right to the Mill Keeper." },
+    {
+      x: 11300,
+      text: "The Mill Keeper awaits. Bump the feather block in the arena to fly.",
+    },
     {
       x: 12800,
       text: "Briarheart waits ahead. Prepare for the final guardian.",

@@ -316,16 +316,6 @@ describe("Windmill Garden real-input routes", () => {
         jump(g, 8370, 350);
       },
     },
-    {
-      name: "Windward Run",
-      checkpoint: 9672,
-      edge: 10120,
-      route: (g: Game) => {
-        walk(g, 10120, 430);
-        jump(g, 10245, 380);
-        jump(g, 10470, 430);
-      },
-    },
   ])(
     "retries $name after a fall without a feather",
     ({ checkpoint, edge, route }) => {
@@ -398,15 +388,28 @@ describe("Windmill Garden real-input routes", () => {
     jump(g, 9500, 320);
     walk(g, 9950, 430);
     jump(g, 10080, 430);
-    walk(g, 10140, 430);
-    jump(g, 10245, 380);
-    jump(g, 10470, 430);
     walk(g, 10680, 430);
     jump(g, 10950, 430);
     walk(g, 11560, 470);
     expect(g.hasWindFeather).toBe(false);
     expect(g.deaths).toBe(0);
     expect(g.boss?.kind).toBe("millkeeper");
+    let largestStep = 0;
+    for (let i = 0; i < 240 && g.boss?.state === "dormant"; i++) {
+      const previousX = g.player.x;
+      step(g, { ...idle, right: true });
+      largestStep = Math.max(largestStep, Math.abs(g.player.x - previousX));
+    }
+    expect(g.boss?.state).not.toBe("dormant");
+    expect(largestStep).toBeLessThan(8);
+    expect(g.hasWindFeather).toBe(false);
+    expect(g.level.checkpoints[g.activeCheckpointIndex]!.x).toBeLessThan(
+      g.boss!.minX,
+    );
+    walk(g, 11684, 470);
+    jump(g, 11684, 470);
+    expect(g.hasWindFeather).toBe(true);
+    expect(g.deaths).toBe(0);
   });
 
   it("keeps a usable upper checkpoint when returning from the beehive and falling", () => {
@@ -529,9 +532,6 @@ describe("Windmill Garden real-input routes", () => {
     jump(g, 9500, 320);
     walk(g, 9950, 430);
     jump(g, 10080, 430);
-    walk(g, 10140, 430);
-    jump(g, 10245, 380);
-    jump(g, 10470, 430);
     walk(g, 10680, 430);
     jump(g, 10950, 430);
     walk(g, 11690, 470);

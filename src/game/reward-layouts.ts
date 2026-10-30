@@ -40,7 +40,9 @@ const layouts: Record<string, readonly Placement[]> = {
     ["feather", 5792, 300],
     ["diamond", 7740, 300],
     ["diamond", 11530, 340],
-    ["feather", 11612, 340],
+    // The Mill Keeper seals the arena on entry; keep this block inside the
+    // boundary so a player can still earn the feather during the fight.
+    ["feather", 11660, 340],
     ["diamond", 12700, 340],
     ["feather", 12860, 340],
     // Retry feather beside the Sail Run checkpoint, clear of the diamond
