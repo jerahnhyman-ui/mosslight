@@ -43,7 +43,6 @@ const cp = [
   { x: 8720, y: 430 },
   { x: 9672, y: 430 },
   { x: 11592, y: 470 },
-  { x: 12800, y: 470 },
 ];
 
 /** A broad moving sail, with its visible deck matching the collision surface. */
@@ -128,13 +127,13 @@ export const windmillLevel: Level = withRewardBlocks({
     shelf(9, 220, 350, 160),
     shelf(9, 420, 250, 190),
     shelf(9, 710, 320, 170),
-    // The final trail leads directly to the windmill on solid ground. A
+    // The final trail leads to the Thorn King's grove on solid ground. A
     // higher sliding sail is an optional route, not a required detour.
     floor(10, 0, 430, 960),
     shelf(10, 280, 350, 150),
     sail("windward", 10, 570, 300, 150, 55, 4.3),
     shelf(10, 820, 350, 140),
-    // Keep the established boss arenas and safe fourth-world finale.
+    // A safe approach leads to the separate fourth-world boss encounter.
     floor(11, 0, 430, 820),
     floor(11, 820, 470, 140),
     floor(12, 0, 470, 960),
@@ -200,15 +199,10 @@ export const windmillLevel: Level = withRewardBlocks({
     "Honeybloom",
     "Sunpetal Crossing",
     "High Canopy",
-    "Millkeeper Trail",
-    "Millkeeper Approach",
-    "The Millkeeper",
-  ]
-    .map((name, i) => ({ x: i * 960, name }))
-    .concat([
-      { x: 12700, name: "Heartwood Approach" },
-      { x: 13200, name: "The Thorn King's Grove" },
-    ]),
+    "Garden Trail",
+    "Heartwood Approach",
+    "Thorn King's Gate",
+  ].map((name, i) => ({ x: i * 960, name })),
   tutorials: [
     { x: 120, text: "Bump glowing blocks from below to earn a power." },
     {
@@ -219,33 +213,16 @@ export const windmillLevel: Level = withRewardBlocks({
     { x: 3000, text: "Explore the high leaves to find a hidden firefly." },
     { x: 5832, text: "Wait for the sail, then ride it across Millstream." },
     { x: 7200, text: "The high honeybloom path leads to a hidden beehive." },
-    { x: 9672, text: "Follow the path right to the Mill Keeper." },
+    { x: 9672, text: "Follow the path right to the Thorn King's grove." },
     {
       x: 11300,
-      text: "The Mill Keeper awaits. Dodge the sweeps, then jump on it when it rests.",
-    },
-    {
-      x: 12800,
       text: "Briarheart waits ahead. Prepare for the final guardian.",
     },
   ],
-  boss: {
-    kind: "millkeeper",
-    name: "The Millkeeper",
-    x: 11948,
-    y: 470,
-    minX: 11660,
-    maxX: 12360,
-  },
-  finalBoss: {
-    kind: "heartwood",
-    name: "Briarheart, the Thorn King",
-    x: 13900,
-    y: 470,
-    minX: 13580,
-    maxX: 14600,
-  },
-  goal: { x: 15080, y: 470 },
+  // The app transfers this run to Briarheart before the end of the trail.
+  // Keep the ordinary goal beyond the reachable world so this source run
+  // cannot report victory if the transition is delayed.
+  goal: { x: 15180, y: 470 },
 });
 
 export const beehiveLevel: Level = withRewardBlocks({

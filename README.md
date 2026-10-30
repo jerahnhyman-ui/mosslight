@@ -58,9 +58,9 @@ animated characters, and collectible/landing effects.
   clues suggest optional routes around giant garden landmarks.
 - Charging beetles break marked barriers, and hoppers bounce on mushrooms.
 - The first three worlds end with a stag beetle, spider, or storm moth guardian.
-  In Windmill Garden, the Mill Keeper is a sub-boss before the final encounter
-  with Briarheart, the Thorn King. Watch warnings, avoid attacks, and stomp
-  during recovery. Checkpoints and recovery power blocks precede the arenas.
+  Windmill Garden leads to a separate final encounter with Briarheart, the
+  Thorn King. Watch warnings, avoid attacks, and stomp during recovery. A
+  checkpoint and recovery power blocks precede the final arena.
 
 ## Home grove, rewards, and modes
 
@@ -102,8 +102,8 @@ challenge medals and historical trail records are separate as well.
 See [the living garden guide](docs/LIVING_GARDEN.md) for the content and release
 acceptance criteria, including the physical-device playtest.
 
-The [Windmill Garden guide](docs/WINDMILL_GARDEN.md) explains flight, garden machinery,
-the secret beehive, the Mill Keeper, Briarheart, and Petal Post. Finding a feather
+The [Windmill Garden guide](docs/WINDMILL_GARDEN.md) explains flight, the secret
+beehive, Briarheart, and Petal Post. Finding a feather
 unlocks the flight minigame; discovering the beehive unlocks journal replay.
 Both activities award visual rewards. The [design package](docs/windmill-garden/README.md)
 records their controls, geometry and implementation contracts.

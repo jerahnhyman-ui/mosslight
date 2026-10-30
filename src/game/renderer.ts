@@ -476,7 +476,7 @@ export class Renderer {
     if (!titleMode) {
       this.gardenLandmarks(game, time);
       this.homeGrove(game, time);
-      this.millApproachScenery(game, time);
+      this.groveApproachScenery(game, time);
       this.sectionLandmarks(game, time, p);
       this.treasuryRooms(game, time);
       if (thornGrove) this.thornGroveScenery(game, time);
@@ -1886,6 +1886,10 @@ export class Renderer {
         x < this.cameraX + this.viewportWidth + 400;
         x += 1000
       ) {
+        // The last stretch leads into the grove; keep retired windmills out
+        // of its background as well as out of the playable encounter.
+        if (game.level.contentId === "world.windmill-garden" && x >= 9600)
+          continue;
         const variant = Math.abs(Math.round((x - 650) / 1000)) % 3;
         const width = [68, 80, 56][variant];
         const top = [288, 310, 265][variant];
@@ -1927,37 +1931,48 @@ export class Renderer {
     }
   }
 
-  /** A recognizable destination and a simple arrow lead into the mill. */
-  private millApproachScenery(game: Game, time: number) {
+  /** A leafy backdrop and a simple arrow lead toward the final grove. */
+  private groveApproachScenery(game: Game, time: number) {
     if (game.level.contentId !== "world.windmill-garden") return;
     const c = this.ctx;
-    const millX = 11780;
-    if (this.visible(millX, 260)) {
-      // This is distant scenery, drawn before the solid platforms and boss.
+    const groveX = 11780;
+    if (this.visible(groveX, 300)) {
+      // The branches are backdrop only: they add no gate or collision.
       c.save();
-      c.globalAlpha = 0.45;
-      this.rounded(millX - 96, 224, 192, 246, 30, "#eed4a1");
-      this.ellipse(millX, 224, 98, 32, "#c99d70");
-      this.rounded(millX - 24, 302, 48, 64, 16, "#b5d9bb");
-      this.rounded(millX - 22, 406, 44, 66, 18, "#b58b66");
-      c.save();
-      c.translate(millX, 205);
-      c.rotate(time * 0.16);
-      for (let i = 0; i < 4; i++) {
-        c.rotate(Math.PI / 2);
-        this.rounded(-13, -140, 26, 120, 10, "#fff0c7", "#c79c6e");
-        this.line(
-          [
-            [0, -127],
-            [0, -29],
-          ],
-          "#d7bb87",
-          3,
+      c.globalAlpha = 0.34;
+      c.strokeStyle = "#7c9f70";
+      c.lineWidth = 34;
+      c.lineCap = "round";
+      for (const side of [-1, 1]) {
+        c.beginPath();
+        c.moveTo(groveX + side * 182, 470);
+        c.bezierCurveTo(
+          groveX + side * 160,
+          300,
+          groveX + side * 124,
+          185,
+          groveX,
+          150,
         );
+        c.stroke();
+        for (let i = 0; i < 4; i++)
+          this.ellipse(
+            groveX + side * (42 + i * 50),
+            162 + (i % 2) * 18,
+            45,
+            25,
+            i % 2 ? "#a2c986" : "#b9d694",
+          );
       }
-      this.ellipse(0, 0, 15, 15, "#b17b54");
       c.restore();
-      c.restore();
+      for (let i = 0; i < 5; i++)
+        this.ellipse(
+          groveX - 105 + i * 53,
+          225 + (i % 3) * 28 + Math.sin(time * 1.3 + i) * 5,
+          3,
+          3,
+          "rgba(255,239,176,.65)",
+        );
     }
     const signX = 11365;
     if (!this.visible(signX, 100)) return;
@@ -2188,10 +2203,8 @@ export class Renderer {
     const b = game.boss;
     if (!b || !this.visible(b.x + b.w / 2, b.w + 60)) return;
     const c = this.ctx;
-    if (b.kind === "millkeeper") {
-      this.millKeeper(game, time);
-      return;
-    }
+    // No authored level uses the retired Mill Keeper encounter.
+    if (b.kind === "millkeeper") return;
     if (b.kind === "heartwood") {
       this.heartwoodGuardian(game, time);
       return;
@@ -2604,138 +2617,6 @@ export class Renderer {
     c.restore();
   }
 
-  private millKeeper(game: Game, time: number) {
-    const b = game.boss!;
-    const c = this.ctx;
-    const x = b.x + b.w / 2,
-      y = b.y + b.h;
-    if (b.state === "defeated") {
-      this.ellipse(x, y - 8, 55, 12, "rgba(255,239,152,.5)");
-      for (let i = 0; i < 3; i++)
-        this.firefly(
-          x + Math.sin(time + i * 2) * 28,
-          y - 30 - i * 18,
-          time,
-          0.7,
-        );
-      return;
-    }
-    const warning =
-      b.millState === "lowWarning" || b.millState === "highWarning";
-    const recovering = b.millState === "recover";
-    if (warning) {
-      const high = b.millState === "highWarning";
-      const yy = b.groundY - (high ? 230 : 56);
-      const height = high ? 150 : 56;
-      c.save();
-      c.fillStyle = "rgba(226,138,98,.09)";
-      c.fillRect(b.minX, yy, b.maxX + b.w - b.minX, height);
-      c.setLineDash([12, 8]);
-      this.line(
-        [
-          [b.minX, yy],
-          [b.maxX + b.w, yy],
-        ],
-        "#e28a62",
-        4,
-      );
-      this.line(
-        [
-          [b.minX, yy + height],
-          [b.maxX + b.w, yy + height],
-        ],
-        "#e28a62",
-        4,
-      );
-      c.restore();
-      this.rounded(x - 18, b.y - 38, 36, 30, 10, "#fff2bb", "#bd7850");
-      c.save();
-      c.font = "bold 18px sans-serif";
-      c.textAlign = "center";
-      c.fillStyle = "#9a573c";
-      c.fillText(high ? "↓" : "↑", x, b.y - 16);
-      c.restore();
-    }
-    c.save();
-    c.translate(x, y);
-    c.scale(1, b.h / 115);
-    c.translate(-x, -y);
-    this.ellipse(x, y, 56, 8, "rgba(77,65,43,.2)");
-    this.rounded(x - 44, y - 115, 88, 112, 27, "#c88c57", "#82583e");
-    this.rounded(x - 36, y - 104, 72, 92, 20, "#e7b87b", "#a66f48");
-    for (let i = 0; i < 4; i++)
-      this.line(
-        [
-          [x - 31 + i * 20, y - 93],
-          [x - 31 + i * 20, y - 20],
-        ],
-        "#d19a63",
-        2,
-      );
-    c.save();
-    c.translate(x, y - 78);
-    c.rotate(recovering ? 0.25 : time * (warning ? 2.5 : 0.8));
-    for (let i = 0; i < 4; i++) {
-      c.rotate(Math.PI / 2);
-      this.rounded(-9, -66, 18, 58, 7, "#ffe49a", "#a7784c");
-      this.line(
-        [
-          [0, -58],
-          [0, -15],
-        ],
-        "#e6bb77",
-        2,
-      );
-    }
-    this.ellipse(0, 0, 11, 11, "#a96e48", "#80553e");
-    c.restore();
-    this.ellipse(x - 14, y - 43, 5, 7, "#fff5d5");
-    this.ellipse(x + 14, y - 43, 5, 7, "#fff5d5");
-    this.ellipse(x - 13, y - 42, 2, 3, "#45564b");
-    this.ellipse(x + 15, y - 42, 2, 3, "#45564b");
-    this.line(
-      [
-        [x - 5, y - 28],
-        [x, y - 25],
-        [x + 5, y - 28],
-      ],
-      "#80553e",
-      2,
-    );
-    c.restore();
-    if (recovering) {
-      // This highlight sits on the boss's actual collision top, so the
-      // visible landing point is exactly where a stomp can connect.
-      this.rounded(x - 37, b.y - 6, 74, 12, 6, "#fff3a8", "#c38750");
-      this.line(
-        [
-          [x, b.y - 31],
-          [x, b.y - 10],
-          [x - 7, b.y - 17],
-        ],
-        "#246747",
-        4,
-      );
-      this.line(
-        [
-          [x, b.y - 10],
-          [x + 7, b.y - 17],
-        ],
-        "#246747",
-        4,
-      );
-      for (let i = 0; i < 3; i++) {
-        this.starPath(
-          x - 25 + i * 25,
-          b.y - 12 + Math.sin(time * 5 + i) * 2,
-          4,
-        );
-        c.fillStyle = "#fff5a6";
-        c.fill();
-      }
-    }
-  }
-
   private bossHazards(game: Game, time: number) {
     const c = this.ctx;
     for (const r of game.hazards) {
@@ -2840,14 +2721,6 @@ export class Renderer {
   private sectionLandmarks(game: Game, time: number, p: Palette) {
     const c = this.ctx;
     game.level.sections.forEach((section, index) => {
-      // The HUD already names the boss arena. Leaving out this ground sign
-      // keeps the checkpoint and feather-block cue clear at the mill entrance.
-      if (
-        game.level.contentId === "world.windmill-garden" &&
-        section.x >= 11520 &&
-        section.x < 12500
-      )
-        return;
       const signX = section.x + (index === 0 ? 245 : 85);
       if (!this.visible(signX, 160)) return;
       const floor = game.platforms.find(
@@ -2953,23 +2826,25 @@ export class Renderer {
         c.closePath();
         c.fillStyle = ["#ed9e76", "#f6d482", "#9ad4bd"][index % 3];
         c.fill();
-        this.ellipse(poleX, y - 95, 13, 13, "#fff0bd", "#aa8056");
-        this.line(
-          [
-            [poleX - 7, y - 95],
-            [poleX + 7, y - 95],
-          ],
-          "#d9a75e",
-          2,
-        );
-        this.line(
-          [
-            [poleX, y - 102],
-            [poleX, y - 88],
-          ],
-          "#d9a75e",
-          2,
-        );
+        if (section.x < 9600) {
+          this.ellipse(poleX, y - 95, 13, 13, "#fff0bd", "#aa8056");
+          this.line(
+            [
+              [poleX - 7, y - 95],
+              [poleX + 7, y - 95],
+            ],
+            "#d9a75e",
+            2,
+          );
+          this.line(
+            [
+              [poleX, y - 102],
+              [poleX, y - 88],
+            ],
+            "#d9a75e",
+            2,
+          );
+        }
       } else {
         this.line(
           [

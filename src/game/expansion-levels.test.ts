@@ -5,6 +5,7 @@ import {
   levels,
   windmillLevel,
 } from "./levels";
+import { thornKingLevel } from "./boss-level";
 
 describe("windmill expansion level definitions", () => {
   it("keeps content identities, world order, and collectible economy stable", () => {
@@ -37,7 +38,7 @@ describe("windmill expansion level definitions", () => {
       expect(level.diamonds).toHaveLength(0);
       expect(level.stars).toHaveLength(0);
     }
-    for (const checkpoint of windmillLevel.checkpoints.slice(-2))
+    for (const checkpoint of windmillLevel.checkpoints.slice(-1))
       expect(
         windmillLevel.platforms.some(
           (p) =>
@@ -82,17 +83,12 @@ describe("windmill expansion level definitions", () => {
     }
   });
 
-  it("keeps the Mill Keeper and the separate major boss encounter", () => {
-    expect(windmillLevel.boss).toMatchObject({
-      kind: "millkeeper",
-      x: 11948,
-      y: 470,
-      minX: 11660,
-      maxX: 12360,
-    });
-    expect(windmillLevel.finalBoss).toMatchObject({
+  it("leads directly to the separate Thorn King encounter", () => {
+    expect(windmillLevel.boss).toBeUndefined();
+    expect(windmillLevel.finalBoss).toBeUndefined();
+    expect(thornKingLevel.boss).toMatchObject({
       kind: "heartwood",
-      x: 13900,
+      x: 1300,
       y: 470,
     });
   });

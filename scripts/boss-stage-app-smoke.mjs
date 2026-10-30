@@ -55,14 +55,15 @@ try {
   await page.locator("#start-button").click();
   await page.clock.runFor(100);
   await expect(page.locator("#world-label")).toHaveText("Windmill Garden");
-  // Simulate the already-defeated Mill Keeper and stand at the boss approach.
+  // Start near the end of the real trail; no intermediate encounter is needed.
   await page.evaluate(() => {
     const { game } = globalThis.__bossStageProbe();
     if (game.level.contentId !== "world.windmill-garden")
       throw new Error("Expected Windmill Garden");
-    game.boss.state = "defeated";
+    if (game.boss !== null)
+      throw new Error("The removed encounter must not exist on the trail");
     Object.assign(game.player, {
-      x: 12998,
+      x: 11830,
       y: 432,
       vx: 0,
       vy: 0,

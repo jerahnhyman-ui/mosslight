@@ -61,9 +61,7 @@ export function readyForThornKing(game: Game): boolean {
   return (
     game.level.contentId === "world.windmill-garden" &&
     game.state === "playing" &&
-    game.boss?.kind === "millkeeper" &&
-    game.boss.state === "defeated" &&
-    game.player.x >= 13000
+    game.player.x >= 11860
   );
 }
 

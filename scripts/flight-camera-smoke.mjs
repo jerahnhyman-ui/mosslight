@@ -18,7 +18,7 @@ export async function checkFlightCamera(browser) {
   const code = `
     import { Game } from ${source("engine")};
     import { Renderer } from ${source("renderer")};
-    import { createBoss } from ${source("bosses")};
+    import { thornKingLevel } from ${source("boss-level")};
     import { levels, groveLevel, challengeLevels } from ${source("levels")};
     import { cloudGardenLevel } from ${source("cloud-garden")};
     import { moonpoolLevel } from ${source("moonpool-level")};
@@ -92,19 +92,9 @@ export async function checkFlightCamera(browser) {
         draw(game);
         assert(Math.abs(renderer.cameraY - baseline) < 0.001, level.name + ": authored fixed framing preserved");
       }
-      // The fourth world extends beyond the Mill Keeper to another arena.
-      // During the sub-boss fight the camera must still frame the Mill Keeper,
-      // rather than anchoring to the new end of the world.
-      const mill = new Game(3);
-      mill.boss.state = "warning";
-      mill.player.x = mill.boss.x - 80;
-      draw(mill);
-      assert(mill.boss.x >= renderer.cameraX &&
-        mill.boss.x + mill.boss.w <= renderer.cameraX + renderer.viewportWidth,
-        "Mill Keeper is off-screen after the world extension");
-      const finale = new Game(3);
-      finale.finalBossStarted = true;
-      finale.boss = createBoss(finale.level.finalBoss);
+      // The fourth world's guardian lives in its own separate arena. Its
+      // warning and high-flight framing must stay visible on every viewport.
+      const finale = new Game(3, { level: thornKingLevel });
       finale.boss.state = "warning";
       finale.player.x = finale.boss.minX;
       finale.hasWindFeather = true;

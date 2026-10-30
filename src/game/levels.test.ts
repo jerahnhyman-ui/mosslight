@@ -517,12 +517,12 @@ describe("Long authored adventures", () => {
 });
 
 describe("Living garden level safety", () => {
-  it("gives each world a distinct boss and a safe recovery point", () => {
+  it("gives the first three worlds distinct guardians and safe recovery points", () => {
     expect(levels.map((level) => level.boss?.kind)).toEqual([
       "stag",
       "spider",
       "moth",
-      "millkeeper",
+      undefined,
     ]);
     for (const level of levels.slice(0, 3)) {
       const boss = level.boss!;

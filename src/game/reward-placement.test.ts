@@ -4,6 +4,7 @@ import { levels, groveLevel, challengeLevels } from "./levels";
 import { beehiveLevel } from "./expansion-levels";
 import { cloudGardenLevel } from "./cloud-garden";
 import { moonpoolLevel } from "./moonpool-level";
+import { thornKingLevel } from "./boss-level";
 
 const idle: GameInput = {
   left: false,
@@ -80,15 +81,46 @@ describe("Authored reward blocks", () => {
     }
   });
 
-  it.each(levels)("keeps $name guardian recovery available at its final checkpoint", (level) => {
-    const cp = level.checkpoints.at(-1)!;
+  it.each(levels.slice(0, 3))(
+    "keeps $name guardian recovery available at its final checkpoint",
+    (level) => {
+      const cp = level.checkpoints.at(-1)!;
+      for (const power of ["diamond", "feather"] as const) {
+        const block = level.platforms.find(
+          (p) =>
+            p.rewardPower === power && Math.abs(p.x + p.w / 2 - cp.x) <= 300,
+        );
+        expect(
+          block,
+          `${level.name}: ${power} near guardian checkpoint`,
+        ).toBeDefined();
+        const arena = level.finalBoss ?? level.boss;
+        expect(
+          block!.x + block!.w,
+          `${level.name}: ${power} before the guardian`,
+        ).toBeLessThan(arena!.minX - (level.finalBoss ? 200 : 0));
+      }
+    },
+  );
+
+  it("provides earned recovery blocks before the Thorn King and in its arena", () => {
+    const trail = levels[3]!;
+    const checkpoint = trail.checkpoints.at(-1)!;
     for (const power of ["diamond", "feather"] as const) {
-      const block = level.platforms.find(
-        (p) => p.rewardPower === power && Math.abs(p.x + p.w / 2 - cp.x) <= 300,
-      );
-      expect(block, `${level.name}: ${power} near guardian checkpoint`).toBeDefined();
-      const arena = level.finalBoss ?? level.boss;
-      expect(block!.x + block!.w, `${level.name}: ${power} before the guardian`).toBeLessThan(arena!.minX - (level.finalBoss ? 200 : 0));
+      expect(
+        trail.platforms.some(
+          (p) =>
+            p.rewardPower === power &&
+            Math.abs(p.x + p.w / 2 - checkpoint.x) <= 300,
+        ),
+        `${power} near the final trail checkpoint`,
+      ).toBe(true);
+      expect(
+        thornKingLevel.platforms.some(
+          (p) => p.rewardPower === power && p.x < thornKingLevel.boss!.minX,
+        ),
+        `${power} in the separate arena`,
+      ).toBe(true);
     }
   });
 });

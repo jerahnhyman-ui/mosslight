@@ -221,9 +221,10 @@ try {
   );
   await page.evaluate(() => {
     const { game } = globalThis.__reserveSmokeProbe();
-    game.boss.state = "defeated";
+    if (game.boss !== null)
+      throw new Error("The removed encounter must not exist on the trail");
     Object.assign(game.player, {
-      x: 12998,
+      x: 11830,
       y: 470 - game.player.h,
       vx: 0,
       vy: 0,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Game, type GameInput } from "./engine";
-import { windmillLevel } from "./expansion-levels";
+import { thornKingLevel } from "./boss-level";
 import { moonpoolLevel } from "./moonpool-level";
 import { cloudGardenLevel } from "./cloud-garden";
 
@@ -14,25 +14,17 @@ const tick = (game: Game, input: GameInput = idle) =>
   game.update(1 / 120, input);
 
 describe("rebalanced encounters", () => {
-  it("lets Pip choose the Windmill recovery diamond after a checkpoint retry before the boss starts", () => {
-    const checkpointIndex = windmillLevel.checkpoints.reduce(
-      (last, item, index) => (item.x < windmillLevel.boss!.minX ? index : last),
-      -1,
-    );
-    const checkpoint = windmillLevel.checkpoints[checkpointIndex]!;
-    const game = new Game(3, {
-      level: {
-        ...windmillLevel,
-        spawn: { x: checkpoint.x, y: checkpoint.y - 38 },
-      },
-    });
+  it("lets Pip earn the Thorn King recovery diamond after a checkpoint retry", () => {
+    const checkpointIndex = 0;
+    const checkpoint = thornKingLevel.checkpoints[checkpointIndex]!;
+    const game = new Game(3, { level: thornKingLevel });
     for (let i = 0; i < 8; i++) tick(game);
     expect(game.activeCheckpointIndex).toBe(checkpointIndex);
     expect(game.player.form).toBe("small");
     game.player.y = 700;
     tick(game);
     expect(game.deaths).toBe(1);
-    const reward = windmillLevel.platforms.find(
+    const reward = thornKingLevel.platforms.find(
       (tile) =>
         tile.rewardPower === "diamond" &&
         tile.x < checkpoint.x &&
@@ -46,6 +38,7 @@ describe("rebalanced encounters", () => {
     for (let i = 0; i < 180 && game.player.form !== "big"; i++)
       tick(game, { ...idle, jump: i < 50 });
     expect(game.player.form).toBe("big");
+    expect(game.boss?.kind).toBe("heartwood");
     expect(game.boss?.state).toBe("dormant");
     expect(game.player.x).toBeLessThan(checkpoint.x);
   });

@@ -68,91 +68,11 @@ function jump(g: Game, x: number, y: number, lift = false, short = false) {
   );
 }
 
-function defeatMill(g: Game) {
-  const base = 11520;
-  const hits: number[] = [];
-  const stompTakeoffs: number[] = [];
-  let kind = "",
-    air = 0,
-    wasGrounded = false,
-    prevJump = false;
-  for (
-    let frame = 0;
-    frame < 120 * 150 && g.state === "playing" && g.boss!.state !== "defeated";
-    frame++
-  ) {
-    const p = g.player,
-      b = g.boss!,
-      center = p.x + p.w / 2 - base;
-    const feet = p.y + p.h;
-    if (p.grounded && !wasGrounded) {
-      kind = "";
-      air = 0;
-    }
-    wasGrounded = p.grounded;
-    const onFloor = p.grounded && Math.abs(feet - 470) < 2;
-    let target = 250,
-      jump = false;
-    if (b.state === "recover" && onFloor && !kind) {
-      target = 385;
-      if (Math.abs(center - 385) < 10 && Math.abs(p.vx) < 50) {
-        kind = "stomp";
-        stompTakeoffs.push(feet);
-      }
-    }
-    if (
-      onFloor &&
-      !kind &&
-      b.millState === "betweenSweeps" &&
-      b.facing > 0 &&
-      b.stateTime <= 0.35
-    )
-      kind = "dodge";
-    if (onFloor && !kind && b.millState === "lowSweep") {
-      const wave = g.hazards.find((h) => h.kind === "sweep");
-      if (
-        wave &&
-        Math.abs(wave.x + 24 - base - center) < 120 &&
-        wave.vx * (center - (wave.x + 24 - base)) > 0
-      )
-        kind = "dodge";
-    }
-    if (kind) {
-      air++;
-      if (kind === "stomp") {
-        target = air < 26 ? 385 : 480;
-        jump = air <= 55;
-      } else {
-        target = 250;
-        jump = air <= 55;
-      }
-    }
-    const dx =
-      target -
-      center -
-      (p.vx * Math.abs(p.vx)) / (2 * (p.grounded ? 4200 : 1800));
-    g.update(1 / 120, {
-      left: dx < -3,
-      right: dx > 3,
-      jump,
-      jumpPressed: jump && !prevJump,
-    });
-    prevJump = jump;
-    if (g.events.includes("boss-hit")) {
-      hits.push(g.boss!.health);
-      kind = "";
-      air = 0;
-    }
-  }
-  expect(hits).toEqual([5, 4, 3, 2, 1, 0]);
-  expect(stompTakeoffs).toEqual([470, 470, 470, 470, 470, 470]);
-  expect(g.boss!.state).toBe("defeated");
-}
-
 /** Read Briarheart's warnings and dodge incoming seeds using player inputs. */
 function defeatHeartwoodAndFinish(g: Game) {
   const hits: number[] = [];
   const phases = new Set<number>();
+  let previousJump = false;
   for (let frame = 0; frame < 120 * 150 && g.state === "playing"; frame++) {
     const b = g.boss!,
       p = g.player;
@@ -168,13 +88,18 @@ function defeatHeartwoodAndFinish(g: Game) {
     const incoming = g.hazards.some(
       (h) => h.vx < 0 && h.x > p.x && h.x - (p.x + p.w) < 25,
     );
-    const jump = b.state === "recover" || incoming || !p.grounded;
+    // A held button cannot create a fresh jump edge after landing. Release
+    // once on the ground before jumping again, as the real controls require.
+    const jump: boolean =
+      (b.state === "recover" || incoming || !p.grounded) &&
+      !(p.grounded && previousJump);
     step(g, {
       left: dx < -2,
       right: dx > 2,
       jump,
-      jumpPressed: jump && p.grounded,
+      jumpPressed: jump && !previousJump,
     });
+    previousJump = jump;
     if (g.events.includes("boss-hit")) hits.push(g.boss!.health);
   }
   expect(g.state, `Briarheart fight hits: ${hits.join(", ")}`).toBe("won");
@@ -307,7 +232,7 @@ describe("Windmill Garden real-input routes", () => {
     },
   );
 
-  it("reaches and defeats the sub-boss from a fresh start without a feather", () => {
+  it("reaches the major boss from a fresh start without a feather", () => {
     const g = new Game(3);
     settle(g);
     walk(g, 680, 430);
@@ -357,22 +282,18 @@ describe("Windmill Garden real-input routes", () => {
     walk(g, 11560, 470);
     expect(g.hasWindFeather).toBe(false);
     expect(g.deaths).toBe(0);
-    expect(g.boss?.kind).toBe("millkeeper");
-    let largestStep = 0;
-    for (let i = 0; i < 240 && g.boss?.state === "dormant"; i++) {
-      const previousX = g.player.x;
-      step(g, { ...idle, right: true });
-      largestStep = Math.max(largestStep, Math.abs(g.player.x - previousX));
-    }
-    expect(g.boss?.state).not.toBe("dormant");
-    expect(largestStep).toBeLessThan(8);
-    expect(g.hasWindFeather).toBe(false);
-    expect(g.level.checkpoints[g.activeCheckpointIndex]!.x).toBeLessThan(
-      g.boss!.minX,
-    );
-    defeatMill(g);
-    expect(g.hasWindFeather).toBe(false);
-    expect(g.deaths).toBe(0);
+    expect(g.boss).toBeNull();
+    expect(readyForThornKing(g)).toBe(false);
+    walk(g, 11890, 470);
+    expect(readyForThornKing(g)).toBe(true);
+    expect(g.state).toBe("playing");
+    expect(g.level.checkpoints[g.activeCheckpointIndex]!.x).toBe(11592);
+    const arena = createThornKingRun(g.mode, g);
+    expect(arena.hasWindFeather).toBe(false);
+    expect(arena.lives).toBe(g.lives);
+    expect(arena.boss?.kind).toBe("heartwood");
+    defeatHeartwoodAndFinish(arena);
+    expect(arena.deaths).toBe(0);
   });
 
   it("keeps a usable upper checkpoint when returning from the beehive and falling", () => {
@@ -426,7 +347,7 @@ describe("Windmill Garden real-input routes", () => {
     expect(g.deaths).toBe(1);
   });
 
-  it("completes the rebuilt world, finds all fireflies and beehive, and defeats both bosses", () => {
+  it("completes the rebuilt world, finds all fireflies and beehive, and defeats the major boss", () => {
     const g = new Game(3);
     settle(g);
     walk(g, 680, 430);
@@ -497,9 +418,9 @@ describe("Windmill Garden real-input routes", () => {
     jump(g, 10080, 430);
     walk(g, 10680, 430);
     jump(g, 10950, 430);
-    walk(g, 11690, 470);
-    defeatMill(g);
-    walk(g, 13040, 470);
+    walk(g, 11890, 470);
+    expect(g.boss).toBeNull();
+    expect(g.state).toBe("playing");
     expect(readyForThornKing(g)).toBe(true);
     const arena = createThornKingRun(g.mode, g);
     expect(arena.lives).toBe(g.lives);
