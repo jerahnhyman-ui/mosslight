@@ -82,6 +82,37 @@ function flyTo(g: Game, target: number, feetY: number) {
   expect(g.liftRemaining).toBeCloseTo(1.2);
 }
 
+function flyToBridge(g: Game) {
+  const bridge = g.platforms.find((p) => p.id === "cloud.cove.bridge")!;
+  const steer = () => {
+    const p = g.player;
+    const target = bridge.x + bridge.w / 2 - p.w / 2;
+    const delta = target - p.x - (p.vx * Math.abs(p.vx)) / 3700;
+    return { ...idle, left: delta < -3, right: delta > 3 };
+  };
+  tick(g, idle, 3);
+  tick(g, { ...steer(), jump: true, jumpPressed: true });
+  tick(g, { ...steer(), jump: true }, 24);
+  tick(g, steer());
+  for (let i = 0; i < 900; i++) {
+    tick(g, { ...steer(), jump: true });
+    if (
+      g.player.grounded &&
+      Math.abs(g.player.y + g.player.h - bridge.y) < 1 &&
+      g.player.x + g.player.w > bridge.x &&
+      g.player.x < bridge.x + bridge.w
+    ) {
+      tick(g, idle, 100);
+      expect(g.player.grounded).toBe(true);
+      expect(g.liftRemaining).toBeCloseTo(1.2);
+      return bridge;
+    }
+  }
+  throw new Error(
+    `Cannot reach drifting bridge: ${g.player.x}, ${g.player.y + g.player.h}`,
+  );
+}
+
 describe("Cloudbloom Sanctuary", () => {
   it("requires feather flight to ascend from the grove and reaches the high portal with landing recharges", () => {
     const without = onGroveFlower(false);
@@ -99,45 +130,7 @@ describe("Cloudbloom Sanctuary", () => {
     expect(g.portalReady).toBe("cloud");
   });
 
-  it("keeps the sanctuary gate closed until all three sky flowers are activated", () => {
-    const g = new Game(0, { level: cloudGardenLevel });
-    const gate = () => g.platforms.find((p) => p.id === "gate.cloud")!;
-    tick(g);
-    expect(gate().broken).toBe(false);
-    Object.assign(g.player, {
-      x: 2040,
-      y: 430 - g.player.h,
-      vx: 0,
-      vy: 0,
-      grounded: true,
-    });
-    tick(g, { ...idle, right: true }, 120);
-    expect(g.player.x + g.player.w).toBeLessThanOrEqual(2110.01);
-    for (const [index, flower] of cloudGardenLevel.mechanisms!.entries()) {
-      Object.assign(g.player, {
-        x: flower.x - g.player.w / 2,
-        y: flower.y - g.player.h - 35,
-        vx: 0,
-        vy: 80,
-        grounded: false,
-      });
-      tick(g, idle, 60);
-      if (index < 2) expect(gate().broken).toBe(false);
-    }
-    expect(g.puzzleState.flowers).toEqual({ A: true, B: true, C: true });
-    expect(gate().broken).toBe(true);
-    Object.assign(g.player, {
-      x: 2040,
-      y: 430 - g.player.h,
-      vx: 0,
-      vy: 0,
-      grounded: true,
-    });
-    tick(g, { ...idle, right: true }, 120);
-    expect(g.player.x).toBeGreaterThan(2110);
-  });
-
-  it("can reach and activate the flowers by flying and landing on the cloud route", () => {
+  it("rides the sliding bridge to the cloudbird cove and returns", () => {
     const g = new Game(0, { level: cloudGardenLevel });
     tick(g, idle, 5);
     earnFeather(g);
@@ -145,13 +138,40 @@ describe("Cloudbloom Sanctuary", () => {
     tick(g, idle, 50);
     flyTo(g, 310, 340);
     flyTo(g, 550, 255);
-    expect(g.puzzleState.flowers.A).toBe(true);
     flyTo(g, 800, 340);
     flyTo(g, 1040, 255);
-    expect(g.puzzleState.flowers.B).toBe(true);
     flyTo(g, 1290, 340);
     flyTo(g, 1530, 255);
-    expect(g.puzzleState.flowers.C).toBe(true);
-    expect(g.platforms.find((p) => p.id === "gate.cloud")!.broken).toBe(true);
+    const bridge = flyToBridge(g);
+    for (let i = 0; i < 700 && bridge.x < 1900; i++) tick(g, idle);
+    expect(bridge.x).toBeGreaterThanOrEqual(1900);
+    flyTo(g, 2165, 35);
+    expect(g.player.x + g.player.w).toBeGreaterThan(2160);
+    expect(g.player.y).toBeLessThan(10);
+    const returning = flyToBridge(g);
+    for (let i = 0; i < 700 && returning.x > 1770; i++) tick(g, idle);
+    expect(returning.x).toBeLessThanOrEqual(1770);
+    flyTo(g, 1636, 430);
+    expect(g.deaths).toBe(0);
+  });
+
+  it("has moving clouds rather than switch gates and a feather recovery before the crossing", () => {
+    expect(cloudGardenLevel.mechanisms ?? []).toEqual([]);
+    expect(cloudGardenLevel.gates ?? []).toEqual([]);
+    expect(
+      cloudGardenLevel.platforms.some(
+        (p) => p.id === "cloud.cove.bridge" && p.motion,
+      ),
+    ).toBe(true);
+    expect(
+      cloudGardenLevel.platforms.some(
+        (p) => p.kind === "ground" && p.x < 1900 && p.x + p.w > 1900,
+      ),
+    ).toBe(false);
+    expect(
+      cloudGardenLevel.platforms.some(
+        (p) => p.rewardPower === "feather" && Math.abs(p.x - 1190) < 100,
+      ),
+    ).toBe(true);
   });
 });

@@ -116,6 +116,39 @@ function flyTo(game: Game, target: number, feetY: number) {
   expect(game.liftRemaining).toBeCloseTo(1.2);
 }
 
+/** Follow and land on a drifting cloud with ordinary jump/flight inputs. */
+function flyToDrift(game: Game, target: SkySecretTarget, suffix: string) {
+  const tile = game.platforms.find(
+    (p) => p.id === `cloud.${target}.drift.${suffix}`,
+  )!;
+  expect(tile.motion).toBeDefined();
+  const destination = () => tile.x + tile.w / 2 - game.player.w / 2;
+  tick(game, { ...steer(game, destination()), jump: true, jumpPressed: true });
+  for (let i = 0; i < 24; i++)
+    tick(game, { ...steer(game, destination()), jump: true });
+  tick(game, steer(game, destination()));
+  let landed = false;
+  for (let i = 0; i < 600; i++) {
+    tick(game, { ...steer(game, destination()), jump: true });
+    if (
+      game.player.grounded &&
+      Math.abs(game.player.y + game.player.h - tile.y) < 1 &&
+      game.player.x + game.player.w > tile.x &&
+      game.player.x < tile.x + tile.w
+    ) {
+      landed = true;
+      break;
+    }
+  }
+  expect(
+    landed,
+    `land on ${target} drifting cloud ${suffix}: ${game.player.x}, ${game.player.y}`,
+  ).toBe(true);
+  tick(game, idle, 100);
+  expect(game.player.grounded).toBe(true);
+  expect(game.liftRemaining).toBeCloseTo(1.2);
+}
+
 describe("Hidden sky routes", () => {
   it.each([
     [0, 3940, 205, 50],
@@ -191,14 +224,13 @@ describe("Hidden sky routes", () => {
     const secret = session.enter("sky-meadow");
     expect(secret.level.contentId).toBe("secret.sky-meadow");
     expect(secret.hasWindFeather).toBe(true);
-    flyTo(secret, 340, 340);
-    flyTo(secret, 535, 255);
-    flyTo(secret, 800, 340);
-    flyTo(secret, 1085, 255);
-    flyTo(secret, 1330, 340);
-    flyTo(secret, 1585, 255);
-    expect(secret.puzzleState.flowers).toEqual({ A: true, B: true, C: true });
-    flyTo(secret, 1770, 430);
+    walkTo(secret, 580, 430);
+    jumpTo(secret, 580, 800, 430);
+    walkTo(secret, 1000, 430);
+    expect(secret.activeCheckpointIndex).toBe(1);
+    for (const suffix of ["a", "b", "c"])
+      flyToDrift(secret, "sky-meadow", suffix);
+    flyTo(secret, 1930, 430);
     walkTo(secret, 2050, 430);
     expect(secret.secretCompleted).toBe(true);
     walkTo(secret, 2190, 430);
@@ -286,28 +318,26 @@ describe("Hidden sky routes", () => {
     },
   );
 
-  it.each(
-    Object.entries(skySecretLevels).filter(
-      ([target]) => target !== "sky-cloudtop",
-    ) as [SkySecretTarget, (typeof skySecretLevels)[SkySecretTarget]][],
-  )(
-    "keeps %s gate shut until its own sky puzzle is solved",
-    (target, level) => {
-      const game = new Game(0, { level });
+  it.each(["sky-meadow", "sky-hollow"] as const)(
+    "crosses %s on moving clouds instead of switch gates",
+    (target) => {
+      const game = new Game(0, { level: skySecretLevels[target] });
       game.enemies = [];
+      expect(game.level.mechanisms ?? []).toEqual([]);
+      expect(game.level.gates ?? []).toEqual([]);
+      expect(
+        game.platforms.some(
+          (p) => p.kind === "ground" && p.x < 1400 && p.x + p.w > 1400,
+        ),
+      ).toBe(false);
       earnFeather(game);
-      const gate = () => game.platforms.find((p) => p.id === `gate.${target}`)!;
-      expect(gate().broken).toBe(false);
-      flyTo(game, 340, 340);
-      flyTo(game, 535, 255);
-      flyTo(game, 800, 340);
-      flyTo(game, 1085, 255);
-      if (target === "sky-meadow") {
-        expect(gate().broken).toBe(false);
-        flyTo(game, 1330, 340);
-        flyTo(game, 1585, 255);
-      }
-      expect(gate().broken).toBe(true);
+      walkTo(game, 1000, 430);
+      expect(game.activeCheckpointIndex).toBe(1);
+      for (const suffix of ["a", "b", "c"]) flyToDrift(game, target, suffix);
+      flyTo(game, 1930, 430);
+      walkTo(game, 2050, 430);
+      expect(game.secretCompleted).toBe(true);
+      expect(game.deaths).toBe(0);
     },
   );
 

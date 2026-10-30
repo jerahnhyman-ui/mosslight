@@ -53,7 +53,10 @@ describe("windmill expansion level definitions", () => {
             p.rewardPower === "feather" && Math.abs(p.x - checkpoint.x) < 100,
         ),
       ).toBe(true);
-    expect(windmillLevel.gates?.map((g) => g.x)).toEqual([5700, 6660, 10500]);
+    expect(windmillLevel.gates ?? []).toEqual([]);
+    expect(windmillLevel.mechanisms ?? []).toEqual([]);
+    expect(beehiveLevel.mechanisms ?? []).toEqual([]);
+    expect(beehiveLevel.gates ?? []).toEqual([]);
     expect(
       windmillLevel.platforms.some(
         (p) => p.id === "windmill.vane-sail" && p.motion,

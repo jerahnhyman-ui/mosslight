@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { Game, type GameInput } from "./engine";
 import { groveLevel } from "./levels";
 import { AdventureSession } from "./session";
-import { cloudGardenLevel } from "./cloud-garden";
 
 const idle: GameInput = {
   left: false,
@@ -45,61 +44,7 @@ function enterPortal(g: Game, target: string) {
 }
 
 describe("new secret area playthrough", () => {
-  it("flies to all three cloud flowers, opens the sanctuary and returns", () => {
-    const g = new Game(0, { level: cloudGardenLevel });
-    for (let n = 0; n < 10; n++) tick(g);
-    earnFeather(g);
-    for (const flower of g.level.mechanisms!.filter(
-      (m) => m.kind === "flower",
-    )) {
-      approach(g, flower.x - 25);
-      for (let n = 0; n < 300 && !g.player.grounded; n++) tick(g);
-      for (let n = 0; n < 30; n++) tick(g);
-      tick(g, { ...idle, jump: true, jumpPressed: true });
-      for (let n = 0; n < 20; n++) tick(g, { ...idle, jump: true });
-      tick(g);
-      tick(g, { ...idle, jump: true, jumpPressed: true });
-      for (let n = 0; n < 140 && g.player.y + g.player.h > flower.y - 8; n++)
-        tick(g, { ...idle, jump: true });
-      expect(g.player.y + g.player.h, flower.id).toBeLessThan(flower.y);
-      for (let n = 0; n < 500 && !g.puzzleState.flowers[flower.flower!]; n++) {
-        const delta = flower.x - center(g);
-        tick(g, { ...idle, right: delta > 8, left: delta < -8 });
-      }
-      expect(g.puzzleState.flowers[flower.flower!], flower.id).toBe(true);
-    }
-    approach(g, 2420);
-    expect(g.secretCompleted).toBe(true);
-    enterPortal(g, "return");
-  });
-
-  it("does not let feather flight bypass the closed Moonpool gate", () => {
-    const grove = new Game(0, { level: groveLevel });
-    const session = new AdventureSession(grove);
-    earnFeather(grove);
-    approach(grove, 830);
-    enterPortal(grove, "moonpool");
-    const g = session.enter("moonpool");
-    // Swim above the rocks, then take the lower route under the optional
-    // closed cove without touching either of its puzzle switches.
-    for (let n = 0; n < 2500 && center(g) < 2190; n++)
-      tick(g, { ...idle, jump: true, right: true });
-    expect(center(g)).toBeGreaterThanOrEqual(2190);
-    for (let n = 0; n < 500 && g.player.y < 325; n++) tick(g);
-    expect(g.player.y).toBeGreaterThanOrEqual(325);
-    for (let n = 0; n < 1000 && center(g) < 2550; n++)
-      tick(g, { ...idle, right: true });
-    expect(center(g)).toBeGreaterThanOrEqual(2550);
-    for (let n = 0; n < 500 && g.player.y + g.player.h > 185; n++)
-      tick(g, { ...idle, jump: true });
-    tick(g);
-    tick(g, { ...idle, jump: true, jumpPressed: true });
-    for (let n = 0; n < 150; n++) tick(g, { ...idle, jump: true, right: true });
-    expect(g.puzzleState.sluiceGateOpen).toBe(false);
-    expect(g.player.x + g.player.w).toBeLessThanOrEqual(2600.001);
-  });
-
-  it("enters Moonpool, tries the latch before its valve, solves the water puzzle and returns", () => {
+  it("enters Moonpool from the grove, swims the reef, retries, and returns", () => {
     const grove = new Game(0, { level: groveLevel });
     const session = new AdventureSession(grove);
     earnFeather(grove);
@@ -108,50 +53,48 @@ describe("new secret area playthrough", () => {
     enterPortal(grove, "moonpool");
     const g = session.enter("moonpool");
     expect(g.level.contentId).toBe("secret.moonpool");
+    expect(g.hasWindFeather).toBe(true);
 
-    const valve = g.level.mechanisms!.find((m) => m.kind === "water")!;
-    const latch = g.level.mechanisms!.find((m) => m.kind === "sluice")!;
-    for (const mechanism of [latch, valve, latch]) {
-      // Ascend in water before steering over each shelf; release to land.
-      for (
-        let n = 0;
-        n < 800 && g.player.y + g.player.h >= mechanism.y - 5;
-        n++
-      )
-        tick(g, { ...idle, jump: true });
-      expect(g.player.y + g.player.h).toBeLessThan(mechanism.y);
-      for (let n = 0; n < 2500 && Math.abs(center(g) - mechanism.x) > 8; n++) {
-        const delta = mechanism.x - center(g);
-        tick(g, { ...idle, jump: true, right: delta > 8, left: delta < -8 });
+    function swimTo(x: number, y: number) {
+      for (let n = 0; n < 5000; n++) {
+        const p = g.player;
+        const dx = x - (p.x + p.w / 2) - (p.vx * Math.abs(p.vx)) / 6400;
+        if (Math.abs(x - center(g)) < 16 && Math.abs(y - p.y) < 22) return;
+        tick(g, { ...idle, left: dx < -4, right: dx > 4, jump: p.y > y });
       }
-      for (
-        let n = 0;
-        n < 600 &&
-        !(
-          g.player.grounded &&
-          Math.abs(g.player.y + g.player.h - mechanism.y) < 2
-        );
-        n++
-      ) {
-        const delta = mechanism.x - center(g);
-        tick(g, { ...idle, right: delta > 8, left: delta < -8 });
-      }
-      expect(g.player.y + g.player.h, mechanism.id).toBeCloseTo(mechanism.y);
-      if (mechanism === valve) {
-        expect(g.puzzleState.water).toBe("HIGH");
-        // Exercise a checkpoint retry after the valve is set. The reset must
-        // retain puzzle progress so the latch can still be reached and opened.
-        g.player.y = 800;
-        tick(g);
-        expect(g.deaths).toBe(1);
-        expect(g.puzzleState.water).toBe("HIGH");
-      } else
-        expect(g.puzzleState.sluiceGateOpen).toBe(
-          g.puzzleState.water === "HIGH",
-        );
+      throw new Error(
+        `Could not swim to ${x}, ${y}: ${g.player.x}, ${g.player.y}`,
+      );
     }
-    approach(g, 2790);
+    // Above the first rock and below the hanging reef, then hit the second checkpoint.
+    for (const [x, y] of [
+      [900, 250],
+      [1200, 260],
+      [1290, 330],
+      [1530, 330],
+    ])
+      swimTo(x!, y!);
+    for (let n = 0; n < 400 && g.activeCheckpointIndex !== 1; n++) tick(g);
+    expect(g.activeCheckpointIndex).toBe(1);
+    g.player.y = 800;
+    tick(g);
+    expect(g.deaths).toBe(1);
+    // A retry starts at the checkpoint and the cove is reachable without a switch.
+    for (const [x, y] of [
+      [1750, 230],
+      [2050, 230],
+      [2190, 230],
+      [2350, 240],
+      [2190, 230],
+      [2180, 330],
+      [2560, 330],
+      [2700, 280],
+    ])
+      swimTo(x!, y!);
+    for (let n = 0; n < 1000 && !g.secretCompleted; n++)
+      tick(g, { ...idle, right: true });
     expect(g.secretCompleted).toBe(true);
+    approach(g, 2790);
     enterPortal(g, "return");
     expect(session.returnToWorld()).toBe(grove);
     expect(grove.deaths).toBe(1);

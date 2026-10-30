@@ -994,14 +994,9 @@ export class Renderer {
           const x = zone.x + i * 90 + Math.sin(time * 1.3 + i) * 5;
           this.ellipse(x, zone.y + 5, 23, 2, "rgba(231,255,248,.45)");
         }
-      } else if (game.puzzleState.water === "HIGH") {
-        // The selector reverses which current rises, so bubbles show the
-        // same direction as the force Pip experiences.
-        const rises =
-          game.level.contentId !== "secret.moonpool" ||
-          (zone.x < 1200
-            ? game.puzzleState.shutter === "HIVE"
-            : game.puzzleState.shutter === "BRIDGE");
+      } else {
+        // The bubble currents rise continuously, just like the water force.
+        const rises = zone.currentY < 0;
         for (let i = 0; i < Math.max(5, Math.floor(zone.w / 15)); i++) {
           const x = zone.x + 6 + hash(i + zone.x) * Math.max(1, zone.w - 12);
           const phase = (time * 38 + hash(i + 57) * zone.h) % zone.h;
@@ -1883,7 +1878,7 @@ export class Renderer {
         }
       c.restore();
     } else {
-      // Distant mill silhouettes move independently of the active mechanisms.
+      // Distant mill silhouettes turn behind the trail.
       for (
         let x = Math.floor(this.cameraX / 1000) * 1000 + 650;
         x < this.cameraX + this.viewportWidth + 400;
@@ -1907,39 +1902,6 @@ export class Renderer {
   private expansionObjects(game: Game, time: number) {
     const c = this.ctx;
     const state = game.puzzleState;
-    // A readable status above the artwork makes the switch and its result
-    // visible even when the gate it controls is off screen.
-    const switchStatus = (
-      id: string,
-      x: number,
-      y: number,
-      label: string,
-      actionable = true,
-    ) => {
-      this.rounded(x + 32, y - 112, 126, 28, 8, "#fff9e6", "#825f43");
-      c.save();
-      c.font = "bold 15px sans-serif";
-      c.textAlign = "center";
-      c.fillStyle = "#523b2d";
-      c.fillText(label, x + 95, y - 93, 116);
-      const p = game.player;
-      if (
-        actionable &&
-        Math.abs(p.x + p.w / 2 - x) < 90 &&
-        Math.abs(p.y + p.h - y) < 85
-      ) {
-        this.rounded(x + 32, y - 142, 126, 24, 8, "#fff3be", "#825f43");
-        c.font = "bold 14px sans-serif";
-        c.fillStyle = "#523b2d";
-        c.fillText(
-          game.isActuatorLatched(id) ? "STEP OFF FIRST" : "STOP + JUMP",
-          x + 95,
-          y - 125,
-          116,
-        );
-      }
-      c.restore();
-    };
     for (const fountain of game.level.featherFountains ?? []) {
       if (!this.visible(fountain.x, 60)) continue;
       const { x, y } = fountain;
@@ -1968,153 +1930,6 @@ export class Renderer {
       );
       c.restore();
       this.ellipse(x, y - 66, 25, 25, "rgba(227,255,241,.22)");
-    }
-    for (const m of game.level.mechanisms ?? []) {
-      if (!this.visible(m.x, 110)) continue;
-      const x = m.x,
-        y = m.y;
-      this.ellipse(x, y, 27, 5, "rgba(75,78,45,.17)");
-      if (m.kind === "flower") {
-        const on = !!(m.flower && state.flowers[m.flower]);
-        this.line(
-          [
-            [x, y],
-            [x, y - 34],
-          ],
-          "#57945c",
-          5,
-        );
-        for (let i = 0; i < 5; i++) {
-          const a = (i * Math.PI * 2) / 5;
-          this.ellipse(
-            x + Math.cos(a) * 12,
-            y - 43 + Math.sin(a) * 12,
-            9,
-            9,
-            on ? "#ffdf72" : "#f1aabe",
-            "#c17c78",
-            1,
-          );
-        }
-        this.ellipse(x, y - 43, 9, 9, on ? "#fff2ac" : "#d79a58");
-        c.save();
-        c.font = "bold 12px sans-serif";
-        c.textAlign = "center";
-        c.fillStyle = "#76533d";
-        c.fillText(m.flower ?? "", x, y - 39);
-        c.restore();
-        switchStatus(m.id, x, y, on ? "FLOWER AWAKE" : "WAKE FLOWER", !on);
-        continue;
-      }
-      this.rounded(x - 25, y - 24, 50, 24, 8, "#b37b4d", "#80583d");
-      this.rounded(x - 21, y - 29, 42, 12, 5, "#f5d188", "#9a7047");
-      const label =
-        game.level.theme === "grotto" && m.kind === "water"
-          ? state.water === "HIGH"
-            ? "BUBBLES ON"
-            : "BUBBLES OFF"
-          : m.kind === "sluice"
-            ? state.sluiceGateOpen
-              ? "GATE OPEN"
-              : "GATE LOCKED"
-            : m.id === "moonpool.current-selector"
-              ? state.shutter === "HIVE"
-                ? "LEFT UP"
-                : "RIGHT UP"
-              : m.kind === "receiver"
-                ? state.lightGateOpen
-                  ? "GATE OPEN"
-                  : "GATE LOCKED"
-                : m.id === "cloud.wind-switch"
-                  ? state.wind === "WEST"
-                    ? "← BRIDGE"
-                    : "BRIDGE →"
-                  : m.kind === "wind"
-                    ? `WIND ${state.wind}`
-                    : m.kind === "brake"
-                      ? `BRAKE ${state.brake}`
-                      : m.kind === "water"
-                        ? `WATER ${state.water}`
-                        : m.kind === "shutter"
-                          ? `LIGHT ${state.shutter}`
-                          : "";
-      if (m.kind === "wind") {
-        this.line(
-          [
-            [x, y - 28],
-            [x, y - 72],
-          ],
-          "#80583d",
-          4,
-        );
-        c.save();
-        c.translate(x, y - 69);
-        c.rotate(
-          (state.brake === "RELEASED" ? time * 2 : 0) *
-            (state.wind === "EAST" ? 1 : -1),
-        );
-        for (let i = 0; i < 4; i++) {
-          c.rotate(Math.PI / 2);
-          this.rounded(-4, -26, 8, 21, 3, "#fff1ac", "#ad8054");
-        }
-        this.ellipse(0, 0, 5, 5, "#b77d4b");
-        c.restore();
-      } else if (m.kind === "water" || m.kind === "sluice") {
-        this.ellipse(x, y - 40, 20, 12, "#8fd8dd", "#528f9c");
-        this.line(
-          [
-            [x - 12, y - 40],
-            [x - 5, y - 43],
-            [x + 4, y - 40],
-            [x + 12, y - 43],
-          ],
-          "#efffff",
-          2,
-        );
-      } else if (m.kind === "shutter" || m.kind === "receiver") {
-        this.rounded(
-          x - 17,
-          y - 63,
-          34,
-          34,
-          6,
-          state.shutter === "HIVE" ? "#ffe399" : "#b7e8ed",
-          "#a57a51",
-        );
-        this.line(
-          [
-            [x - 12, y - 46],
-            [x + 12, y - 46],
-          ],
-          "#fff8d3",
-          4,
-        );
-      } else {
-        this.line(
-          [
-            [x, y - 26],
-            [x + (state.brake === "HELD" ? -15 : 15), y - 55],
-          ],
-          "#80583d",
-          5,
-        );
-        this.ellipse(
-          x + (state.brake === "HELD" ? -15 : 15),
-          y - 55,
-          7,
-          7,
-          "#edaf6b",
-          "#80583d",
-        );
-      }
-      switchStatus(
-        m.id,
-        x,
-        y,
-        label,
-        !(m.kind === "sluice" && state.sluiceGateOpen) &&
-          !(m.kind === "receiver" && state.lightGateOpen),
-      );
     }
     const open: Record<string, boolean> = {
       vane: state.vaneGateOpen,
@@ -3116,7 +2931,11 @@ export class Renderer {
   private platform(r: Game["platforms"][number], p: Palette, time: number) {
     const c = this.ctx;
     const { x, y, w, h } = r;
-    if (r.id?.startsWith("windmill.vane-sail")) {
+    if (
+      r.id?.startsWith("windmill.vane-sail") ||
+      r.id?.startsWith("windmill.house-sail") ||
+      r.id?.startsWith("windmill.workshop-sail")
+    ) {
       // A canvas sail rides the wind. Its straight upper rim and ends match
       // the collision box, so Pip can see exactly where it is safe to land.
       this.rounded(x, y, w, h, 5, "#f7e7bb", "#a97648");
@@ -3162,6 +2981,16 @@ export class Renderer {
           2,
         );
       }
+      return;
+    }
+    if (
+      r.id?.startsWith("windmill.drifting-lily") ||
+      r.id?.startsWith("moonpool.drifting-ledge") ||
+      r.id?.startsWith("beehive.drifting-ledge")
+    ) {
+      // Distinguish rideable surfaces from fixed terrain. The leaf's flat
+      // top follows the moving collision box on every frame.
+      this.movingLeaf(r, time);
       return;
     }
     if (r.id?.startsWith("moonpool.rock.")) {

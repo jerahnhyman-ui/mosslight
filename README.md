@@ -39,11 +39,11 @@ animated characters, and collectible/landing effects.
 - **Firefly Hollow** adds moving leaf platforms and climbing routes.
 - **Cloudtop Crossing** features cloud bridges that warn before crumbling and
   return after a short delay.
-- **Windmill Garden** opens after beating the Meadow guardian. Put feather flight to work, change wind/water/light mechanisms, follow three firefly branches, and discover a separate beehive level.
+- **Windmill Garden** opens after beating the Meadow guardian. Put feather flight to work, follow three firefly branches, and discover a separate beehive level.
 - **Hidden sky gardens** sit above Sunlit Meadow, Firefly Hollow, and Cloudtop
   Crossing. Look for drifting petals, earn a Wind Feather, and land on the
   cloud ledges to recharge. Stand still at a glowing SKY portal, then press
-  Jump when prompted. Each garden has its own switch puzzle and a return portal.
+  Jump when prompted. Each garden has its own cloud route and a return portal.
 - Walking beetles, hopping grasshoppers, and charging beetles each have distinct
   movement. Charging beetles signal before rushing. Every bug can be squashed
   by landing on it; star power also squashes bugs on contact.
@@ -72,13 +72,11 @@ purchases never change movement or combat strength. Rescue all three fireflies
 in each of the original three worlds to unlock its separate challenge room and earn time medals.
 
 The Home Grove also leads to two optional places. Enter Moonpool Grotto from
-the grove floor and hold Jump to swim upward; release it to sink. Its valves
-and bubble currents open a route through the water. Above the grove, a Wind
-Feather can reach a hidden stairway of clouds. Land on each cloud to recharge
-and discover Cloudbloom Sanctuary and its sky-flower puzzle. Moonpool's current
-selector and receiver open an optional underwater cove; Cloudbloom's wind
-switch moves a cloud bridge toward an optional perch. Stand still at a
-portal and press Jump when prompted; each area has a way back to the grove.
+the grove floor and hold Jump to swim upward; release it to sink. Bubble
+currents help you explore the water and find an optional cove. Above the grove,
+a Wind Feather can reach a hidden stairway of clouds. Land on each cloud to
+recharge and discover Cloudbloom Sanctuary and its optional perch. Stand still
+at a portal and press Jump when prompted; each area has a way back to the grove.
 
 The **Discovery journal** in the game menu gives hints for undiscovered places.
 Discovering a place saves it to the journal; once found, select it there to

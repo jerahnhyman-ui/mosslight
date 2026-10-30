@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Game, type GameInput } from "./engine";
 import { createThornKingRun, readyForThornKing } from "./boss-level";
-import { beehiveLevel, flowerHoopsLevel } from "./levels";
+import { beehiveLevel, flowerHoopsLevel, windmillLevel } from "./levels";
 import { AdventureSession } from "./session";
 
 // These routes use only the public directional/jump input. They never set the
@@ -227,19 +227,14 @@ function completeHive(g: Game) {
   }
   jump(g, 270, 350);
   jump(g, 520, 270);
-  jump(g, 520, 270, false, true);
-  expect(g.puzzleState.flowers.A).toBe(true);
   jump(g, 830, 330, true);
   jump(g, 1440, 330, true);
-  jump(g, 1440, 330, false, true);
-  expect(g.puzzleState.flowers.B).toBe(true);
   jump(g, 1800, 350, true);
   walk(g, 2040, 430);
   jump(g, 2180, 350);
   jump(g, 2440, 270);
-  jump(g, 2440, 270, false, true);
-  expect(g.puzzleState.flowers.C).toBe(true);
-  walk(g, 2750, 430);
+  jump(g, 2680, 350, true);
+  jump(g, 2770, 430, true);
   expect(g.secretCompleted).toBe(true);
 }
 
@@ -270,6 +265,75 @@ describe("Windmill Garden real-input routes", () => {
     expect(g.deaths).toBe(1);
   });
 
+  it("retries the house sliding-sail crossing from its checkpoint", () => {
+    const g = new Game(3);
+    settle(g);
+    walk(g, 1184, 430);
+    jump(g, 1184, 430);
+    jump(g, 1600, 310, true);
+    walk(g, 1750, 310);
+    walk(g, 2000, 430);
+    walk(g, 2120, 430);
+    jump(g, 2180, 350);
+    jump(g, 2420, 350);
+    jump(g, 2700, 270, true);
+    jump(g, 3350, 250, true);
+    walk(g, 3390, 250);
+    walk(g, 3860, 430);
+    walk(g, 3800, 430);
+    walk(g, 4180, 490);
+    jump(g, 4470, 330, true);
+    jump(g, 4640, 270);
+    jump(g, 4960, 330, true);
+    jump(g, 5300, 330, true);
+    jump(g, 5570, 350, true);
+    walk(g, 5840, 430);
+    expect(g.activeCheckpointIndex).toBe(3);
+
+    // Walking straight into the break must not bypass the sliding platform.
+    for (let i = 0; i < 900 && g.deaths === 0; i++)
+      step(g, { ...idle, right: true });
+    expect(g.deaths).toBe(1);
+    expect(g.hasWindFeather).toBe(false);
+    settle(g);
+    walk(g, 5816, 430);
+    jump(g, 5816, 430);
+    expect(g.hasWindFeather).toBe(true);
+    walk(g, 5940, 430);
+    jump(g, 6030, 350);
+    jump(g, 6250, 350, true);
+    jump(g, 6550, 270, true);
+    expect(g.deaths).toBe(1);
+  });
+
+  it("retries the workshop sail from its checkpoint without a feather", () => {
+    // Begin at the existing workshop checkpoint to isolate its recovery route;
+    // platforms and all movement use the authored level and real inputs.
+    const g = new Game(3, {
+      level: {
+        ...windmillLevel,
+        spawn: { x: 9672, y: 392 },
+        checkpoints: [{ x: 9672, y: 430 }],
+        enemies: [],
+        boss: undefined,
+        finalBoss: undefined,
+      },
+    });
+    settle(g);
+    expect(g.hasWindFeather).toBe(false);
+    walk(g, 10260, 430);
+    for (let i = 0; i < 900 && g.deaths === 0; i++)
+      step(g, { ...idle, right: true });
+    expect(g.deaths).toBe(1);
+    expect(g.hasWindFeather).toBe(false);
+    settle(g);
+    walk(g, 10240, 430);
+    jump(g, 10280, 390);
+    jump(g, 10400, 390);
+    jump(g, 10530, 430);
+    expect(g.deaths).toBe(1);
+  });
+
   it("completes the world, hive detour, all fireflies and guardian using only inputs", () => {
     const g = new Game(3);
     settle(g);
@@ -289,51 +353,29 @@ describe("Windmill Garden real-input routes", () => {
     expect(g.collectedFireflies).toBe(1);
     walk(g, 3800, 430);
     walk(g, 4000, 430);
-    jump(g, 4000, 430, false, true);
-    expect(g.puzzleState.water).toBe("HIGH");
     walk(g, 4180, 490);
     jump(g, 4470, 330, true);
     jump(g, 4640, 270);
-    jump(g, 4640, 270, false, true);
-    expect(g.puzzleState.sluiceGateOpen).toBe(true);
     jump(g, 4960, 330, true);
     jump(g, 5300, 330, true);
     jump(g, 5570, 350, true);
     walk(g, 5760, 430);
     walk(g, 5440, 490);
-    expect(g.puzzleState.water).toBe("LOW");
     walk(g, 5220, 490);
     expect(g.collectedFireflies).toBe(2);
     walk(g, 5390, 490);
     jump(g, 5570, 350, true);
     walk(g, 5760, 430);
     walk(g, 5940, 430);
-    jump(g, 5940, 430, false, true);
-    expect(g.puzzleState.water).toBe("HIGH");
-    walk(g, 6100, 430);
-    jump(g, 6100, 430, false, true);
-    expect(g.puzzleState.shutter).toBe("BRIDGE");
-    jump(g, 5980, 350);
-    jump(g, 6260, 270, true);
-    jump(g, 6260, 270, false, true);
-    expect(g.puzzleState.lightGateOpen).toBe(true);
+    jump(g, 6030, 350);
+    jump(g, 6250, 350, true);
+    jump(g, 6550, 270, true);
     walk(g, 6800, 430);
-    walk(g, 6880, 430);
-    jump(g, 6880, 430, false, true);
-    // Step off and return to make a second deliberate switch activation.
-    walk(g, 6800, 430);
-    walk(g, 6880, 430);
-    jump(g, 6880, 430, false, true);
-    expect(g.puzzleState.wind).toBe("WEST");
-    walk(g, 7040, 430);
-    jump(g, 7040, 430, false, true);
     walk(g, 7200, 430);
-    jump(g, 7200, 430, false, true);
-    settle(g, 150);
-    expect(g.puzzleState.hiveDiscovered).toBe(true);
     jump(g, 7310, 350);
     jump(g, 7500, 270);
     settle(g, 50);
+    expect(g.puzzleState.hiveDiscovered).toBe(true);
     expect(g.portalReady).toBe("beehive");
     step(g, { ...idle, jump: true, jumpPressed: true });
     expect(g.requestedPortal).toBe("beehive");
@@ -359,11 +401,11 @@ describe("Windmill Garden real-input routes", () => {
     walk(g, 9780, 430);
     jump(g, 9900, 390);
     jump(g, 10080, 430, true);
-    expect(g.puzzleState.workshopGateOpen).toBe(true);
     // Jump over the late charger and hopper rather than relying on the old
     // floor diamonds to absorb hits on the way to the Mill Keeper.
     jump(g, 10300, 390);
-    walk(g, 10530, 430);
+    jump(g, 10400, 390);
+    jump(g, 10530, 430);
     jump(g, 10820, 430);
     walk(g, 11690, 470);
     defeatMill(g);
@@ -381,7 +423,7 @@ describe("Windmill Garden real-input routes", () => {
     defeatHeartwoodAndFinish(arena);
     expect(arena.deaths).toBe(0);
   });
-  it("lights all three hive flowers and reaches the exit on real inputs", () => {
+  it("crosses the beehive ledges and reaches the exit on real inputs", () => {
     const g = new Game(0, { level: beehiveLevel });
     settle(g);
     completeHive(g);

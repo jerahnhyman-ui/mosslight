@@ -19,19 +19,20 @@ export const cloudAscentPlatforms: Platform[] = [
   cloud("ascent.portal", 1530, -110, 200),
 ];
 
-/** A gentle secret garden above the grove, with a three-flower sky puzzle. */
+/** A secret garden above the grove, reached by riding its drifting clouds. */
 export const cloudGardenLevel: Level = withRewardBlocks({
   id: 23,
   contentId: "secret.cloud-garden",
   name: "Cloudbloom Sanctuary",
-  subtitle: "Wake the three sky flowers and open the sanctuary.",
+  subtitle: "Ride the cloud paths into the sanctuary.",
   kind: "secret",
   theme: "cloud",
   width: 2500,
   spawn: { x: 70, y: 392 },
   platforms: [
-    // A forgiving lower path catches missed flights and keeps the puzzle fair.
-    { x: 0, y: 430, w: 2500, h: 230, kind: "ground" },
+    // A checkpointed approach leads to a short flight across the open sky.
+    { x: 0, y: 430, w: 1800, h: 230, kind: "ground" },
+    { x: 2050, y: 430, w: 450, h: 230, kind: "ground" },
     cloud("path.1", 270, 340, 170),
     cloud("flower.a", 480, 255, 170),
     {
@@ -45,8 +46,11 @@ export const cloudGardenLevel: Level = withRewardBlocks({
     },
     cloud("flower.c", 1460, 255, 170),
     cloud("path.4", 1730, 340, 170),
-    // The wind switch carries this bridge toward the optional high cove.
-    cloud("wind.bridge", 1680, 120, 180),
+    // The bridge drifts on its own toward the optional high cove.
+    {
+      ...cloud("cove.bridge", 1800, 120, 180),
+      motion: { axis: "x", range: 120, period: 5 },
+    },
     cloud("wind.cove", 2110, 35, 160),
   ],
   coins: [
@@ -70,7 +74,7 @@ export const cloudGardenLevel: Level = withRewardBlocks({
   enemies: [
     { kind: "beetle", x: 650, y: 402, minX: 610, maxX: 710 },
     { kind: "hopper", x: 1380, y: 402, minX: 1330, maxX: 1440 },
-    { kind: "charger", x: 1880, y: 402, minX: 1800, maxX: 1970 },
+    { kind: "charger", x: 2150, y: 402, minX: 2080, maxX: 2190 },
   ],
   fireflies: [],
   checkpoints: [
@@ -80,17 +84,6 @@ export const cloudGardenLevel: Level = withRewardBlocks({
   featherFountains: [
     { x: 90, y: 430 },
     { x: 1190, y: 430 },
-  ],
-  mechanisms: [
-    { id: "cloud.flower.a", kind: "flower", flower: "A", x: 565, y: 255 },
-    { id: "cloud.flower.b", kind: "flower", flower: "B", x: 1055, y: 255 },
-    { id: "cloud.flower.c", kind: "flower", flower: "C", x: 1545, y: 255 },
-    { id: "cloud.wind-switch", kind: "wind", x: 1650, y: 430 },
-  ],
-  // Extend well above the flight ceiling and below the safety floor so the
-  // sanctuary cannot be reached by going around the closed gate.
-  gates: [
-    { id: "gate.cloud", condition: "hive", x: 2110, y: -800, w: 24, h: 1460 },
   ],
   portals: [
     { id: "cloud.return.entrance", x: 110, y: 430, w: 80, target: "return" },
@@ -111,7 +104,7 @@ export const cloudGardenLevel: Level = withRewardBlocks({
   tutorials: [
     {
       x: 200,
-      text: "Wake all three sky flowers to open the sanctuary. Land on each or tap Jump on its pad.",
+      text: "Follow the cloud steps into the sanctuary. Land to refill your feather.",
     },
     {
       x: 740,
@@ -119,7 +112,7 @@ export const cloudGardenLevel: Level = withRewardBlocks({
     },
     {
       x: 1610,
-      text: "Tap Jump on the wind pad to move a cloud bridge toward the high cove.",
+      text: "Ride the drifting bridge to the high cove, or fly across to the sanctuary.",
     },
   ],
   goal: { x: 2250, y: 430 },

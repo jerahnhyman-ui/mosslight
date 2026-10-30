@@ -77,28 +77,33 @@ export const windmillLevel: Level = withRewardBlocks({
     shelf(4, 300, 410, 160),
     shelf(4, 560, 330, 180),
     shelf(4, 760, 270, 160),
-    { id: "windmill.lily", ...shelf(4, 340, 450, 180) },
+    {
+      id: "windmill.drifting-lily",
+      ...shelf(4, 490, 430, 150),
+      motion: { axis: "y", range: 55, period: 4.5 },
+    },
+    // Low garden walls make the route a movement challenge, with a safe
+    // floor underneath the raised paths for players who miss a jump.
+    { x: 4490, y: 425, w: 48, h: 65, kind: "ground" },
     floor(5, 0, 490, 700),
     floor(5, 700, 430, 260),
     shelf(5, 0, 330, 180),
     shelf(5, 360, 330, 180),
     shelf(5, 680, 350, 180),
-    // Leave a clear opening above the reed valve so the switch remains
-    // visible and a jump can return to its floor instead of landing on a roof.
+    // An opening in the upper ledge provides access to the firefly below.
     shelf(5, 540, 410, 60),
     shelf(5, 680, 410, 60),
-    {
-      id: "windmill.reed-screen",
-      x: 5160,
-      y: 410,
-      w: 160,
-      h: 80,
-      kind: "ground",
-    },
-    floor(6, 0, 430, 960),
+    // A moving platform crosses the break in the house floor. The checkpoint
+    // and recoverable feather sit on the approach side.
+    floor(6, 0, 430, 350),
+    floor(6, 740, 430, 220),
     shelf(6, 180, 350, 180),
-    shelf(6, 440, 270, 180),
     shelf(6, 740, 270, 160),
+    {
+      id: "windmill.house-sail",
+      ...shelf(6, 430, 350, 140),
+      motion: { axis: "x", range: 75, period: 4.5 },
+    },
     floor(7, 0, 430, 960),
     shelf(7, 480, 350, 180),
     shelf(7, 720, 270, 200),
@@ -111,9 +116,15 @@ export const windmillLevel: Level = withRewardBlocks({
     shelf(9, 400, 250, 200),
     shelf(9, 780, 310, 180),
     shelf(9, 640, 390, 160),
-    floor(10, 0, 430, 960),
+    floor(10, 0, 430, 700),
+    floor(10, 900, 430, 60),
     shelf(10, 200, 390, 160),
     shelf(10, 600, 390, 180),
+    {
+      id: "windmill.workshop-sail",
+      ...shelf(10, 730, 390, 150),
+      motion: { axis: "x", range: 55, period: 4.5 },
+    },
     floor(11, 0, 430, 820),
     floor(11, 820, 470, 140),
     floor(12, 0, 470, 960),
@@ -168,29 +179,6 @@ export const windmillLevel: Level = withRewardBlocks({
     { x: 10820, y: 430 },
     { x: 11632, y: 470 },
   ],
-  mechanisms: [
-    { id: "water.court", kind: "water", x: 4000, y: 430 },
-    { id: "sluice.court", kind: "sluice", x: 4640, y: 270 },
-    { id: "water.reeds", kind: "water", x: 5440, y: 490 },
-    { id: "water.house", kind: "water", x: 5940, y: 430 },
-    { id: "shutter.house", kind: "shutter", x: 6100, y: 430 },
-    { id: "receiver.house", kind: "receiver", x: 6260, y: 270 },
-    { id: "wind.porch", kind: "wind", x: 6880, y: 430 },
-    { id: "water.porch", kind: "water", x: 7040, y: 430 },
-    { id: "shutter.porch", kind: "shutter", x: 7200, y: 430 },
-  ],
-  gates: [
-    { id: "gate.sluice", condition: "sluice", x: 5700, y: 0, w: 24, h: 660 },
-    { id: "gate.light", condition: "light", x: 6660, y: 0, w: 24, h: 660 },
-    {
-      id: "gate.workshop",
-      condition: "workshop",
-      x: 10500,
-      y: 0,
-      w: 24,
-      h: 660,
-    },
-  ],
   portals: [
     {
       id: "portal.beehive",
@@ -201,13 +189,12 @@ export const windmillLevel: Level = withRewardBlocks({
       requires: "discovery",
     },
   ],
-  flightTarget: { x: 10080, y: 185, radius: 24 },
   sections: [
     "Feather Porch",
     "Catcher Crossing",
     "Vane Court",
     "Mill Rafters",
-    "Sluice Court",
+    "Lily Crossing",
     "Reed Channels",
     "Sunshutter House",
     "Pollen Porch",
@@ -234,22 +221,14 @@ export const windmillLevel: Level = withRewardBlocks({
     { x: 2040, text: "Ride the moving sail, then jump to the far ledge." },
     {
       x: 3880,
-      text: "Stand on the water pad and tap Jump to set the water HIGH.",
+      text: "Time your jump onto the drifting lily to cross the garden.",
     },
+    { x: 5840, text: "Ride the sliding sail across the break in the floor." },
+    { x: 7280, text: "Follow the high ledges to discover a hidden beehive." },
     {
-      x: 4530,
-      text: "With water HIGH, tap Jump on the latch to open the sluice gate.",
+      x: 9700,
+      text: "Ride the sliding sail over the gap, then land beyond it.",
     },
-    {
-      x: 5850,
-      text: "Set water HIGH and the light pad to BRIDGE for the house gate.",
-    },
-    {
-      x: 6200,
-      text: "With water HIGH and light on BRIDGE, tap Jump on the receiver.",
-    },
-    { x: 7280, text: "West wind. Low water. Light toward the hive." },
-    { x: 9700, text: "Lift to the flower. Let go to land." },
     {
       x: 12800,
       text: "Briarheart waits ahead. Gather yourself before the final guardian.",
@@ -278,7 +257,7 @@ export const beehiveLevel: Level = withRewardBlocks({
   id: 20,
   contentId: "secret.beehive",
   name: "Lantern Beehive",
-  subtitle: "Light the honeycomb lanterns.",
+  subtitle: "Fly through the honeycomb and discover the hidden nursery.",
   kind: "secret",
   theme: "hive",
   width: 2880,
@@ -288,15 +267,22 @@ export const beehiveLevel: Level = withRewardBlocks({
     shelf(0, 200, 350, 180),
     shelf(0, 460, 270, 180),
     shelf(0, 760, 330, 200),
-    floor(1, 0, 490, 960),
+    floor(1, 0, 490, 300),
+    floor(1, 500, 490, 460),
     shelf(1, 0, 330, 180),
     shelf(1, 400, 330, 200),
     shelf(1, 780, 350, 180),
     shelf(1, 600, 410, 180),
     shelf(1, 180, 430, 180),
-    floor(2, 0, 430, 960),
+    floor(2, 0, 430, 680),
+    floor(2, 820, 430, 140),
     shelf(2, 180, 350, 180),
     shelf(2, 440, 270, 200),
+    {
+      id: "beehive.drifting-ledge",
+      ...shelf(2, 680, 350, 140),
+      motion: { axis: "x", range: 50, period: 4.5 },
+    },
     ...Array.from({ length: 3 }, (_, i) => roof(i)),
   ],
   coins: [
@@ -318,12 +304,6 @@ export const beehiveLevel: Level = withRewardBlocks({
     { x: 1420, y: 490 },
     { x: 1992, y: 430 },
   ],
-  mechanisms: [
-    { id: "flower.A", kind: "flower", flower: "A", x: 520, y: 270 },
-    { id: "flower.B", kind: "flower", flower: "B", x: 1440, y: 330 },
-    { id: "flower.C", kind: "flower", flower: "C", x: 2440, y: 270 },
-  ],
-  gates: [{ id: "gate.hive", condition: "hive", x: 2640, y: 0, w: 24, h: 660 }],
   portals: [
     { id: "portal.return.entrance", x: 120, y: 430, w: 80, target: "return" },
     {
@@ -343,7 +323,7 @@ export const beehiveLevel: Level = withRewardBlocks({
   tutorials: [
     {
       x: 200,
-      text: "Land on each flower, or stand on its pad and tap Jump, to light its honey cell.",
+      text: "Follow the high honeycomb ledges; land to refill your feather.",
     },
   ],
   goal: { x: 2750, y: 430 },

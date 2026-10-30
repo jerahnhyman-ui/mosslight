@@ -74,7 +74,6 @@ try {
         grounded: p.grounded,
         contentId: g.level.contentId,
         portalReady: g.portalReady,
-        puzzle: { ...g.puzzleState },
         complete: g.secretCompleted,
         deaths: g.deaths,
       };
@@ -133,41 +132,35 @@ try {
   expect(save.secrets["secret.moonpool"].discovered).toBe(true);
   expect(save.secrets["secret.moonpool"].completed).toBe(false);
 
-  async function activate(x, y, predicate, label) {
-    let descending = false;
+  async function swimTo(targetX, targetY) {
     for (let n = 0; n < 2500; n++) {
       const p = await observed();
-      if (predicate(p.puzzle)) {
-        await input();
-        return;
-      }
-      const dx = x - (p.x + p.w / 2) - (p.vx * Math.abs(p.vx)) / 6400;
-      if (p.y + p.h < y - 30) descending = true;
-      if (p.y + p.h > y + 10 || p.grounded) descending = false;
-      await input({ left: dx < -4, right: dx > 4, jump: !descending });
-    }
-    throw new Error(
-      `Could not activate ${label}: ${JSON.stringify(await observed())}`,
-    );
-  }
-  await activate(530, 390, (q) => q.water === "HIGH", "valve");
-  await activate(1290, 370, (q) => q.shutter === "BRIDGE", "current selector");
-  await activate(1730, 280, (q) => q.lightGateOpen, "cove receiver");
-  async function swimTo(targetX) {
-    for (let n = 0; n < 1600; n++) {
-      const p = await observed();
       const dx = targetX - (p.x + p.w / 2) - (p.vx * Math.abs(p.vx)) / 6400;
-      if (Math.abs(dx) < 5 && Math.abs(p.vx) < 30 && p.y > 190 && p.y < 260) {
+      if (
+        Math.abs(targetX - (p.x + p.w / 2)) < 16 &&
+        Math.abs(targetY - p.y) < 22
+      ) {
         await input();
         return;
       }
-      await input({ left: dx < -4, right: dx > 4, jump: p.y > 220 });
+      await input({ left: dx < -4, right: dx > 4, jump: p.y > targetY });
     }
     throw new Error(
-      `Could not swim to ${targetX}: ${JSON.stringify(await observed())}`,
+      `Could not swim to ${targetX}, ${targetY}: ${JSON.stringify(await observed())}`,
     );
   }
-  await swimTo(2350);
+  // Follow the first rising rock, sink beneath the hanging reef, and swim to the open cove.
+  for (const [x, y] of [
+    [900, 250],
+    [1200, 260],
+    [1290, 330],
+    [1530, 330],
+    [1750, 230],
+    [2050, 230],
+    [2190, 230],
+    [2350, 240],
+  ])
+    await swimTo(x, y);
   save = await stored();
   expect(save.rescuedCreatures).toContain("frog");
   expect(save.rescuedCreatures.filter((id) => id === "frog")).toHaveLength(1);
@@ -175,9 +168,16 @@ try {
   expect(
     (await stored()).rescuedCreatures.filter((id) => id === "frog"),
   ).toHaveLength(1);
-  await swimTo(2210);
-  await activate(2160, 370, (q) => q.sluiceGateOpen, "sluice");
-  for (let n = 0; n < 300 && (await observed()).y < 325; n++) await input();
+  for (const [x, y] of [
+    [2190, 230],
+    [2180, 330],
+    [2560, 330],
+    [2700, 280],
+  ])
+    await swimTo(x, y);
+  for (let n = 0; n < 600 && !(await observed()).complete; n++)
+    await input({ right: true });
+  expect((await observed()).complete).toBe(true);
   await approach(2790);
   save = await stored();
   expect(save.secrets["secret.moonpool"].completed).toBe(true);
@@ -203,7 +203,7 @@ try {
   expect(save.rescuedCreatures).toContain("frog");
   expect(errors).toEqual([]);
   console.log(
-    "PASS Poppy selection and rendering, Grove→Moonpool discovery, cove puzzle, creature rescue, completion, reload and journal replay",
+    "PASS Poppy selection and rendering, Grove→Moonpool discovery, reef traversal, creature rescue, completion, reload and journal replay",
   );
 } finally {
   await browser?.close();

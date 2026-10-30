@@ -134,7 +134,6 @@ export class Game {
   portalReady: string | null = null;
   requestedPortal: string | null = null;
   minigame = this.newMinigame();
-  private hiveTicks = 0;
   private airborneMin = Infinity;
   /** A jump launched from a pad must not toggle it again on landing. */
   private takeoffActuators = new Set<string>();
@@ -220,7 +219,6 @@ export class Game {
     this.minigame = this.newMinigame();
     this.countdown = this.level.kind === "minigame" ? 3 : 0;
     this.portalTicks = 0;
-    this.hiveTicks = 0;
     this.airborneMin = Infinity;
     this.takeoffActuators.clear();
     this.landedActuators.clear();
@@ -506,27 +504,12 @@ export class Game {
     }
     if (p.vy >= 0) this.jumpCanShorten = false;
     if (swimming) {
-      // Holding jump is a swim stroke. Releasing it lets Pip sink gently,
-      // including onto puzzle handles. Bubbles add an upward current.
+      // Holding jump is a swim stroke. Releasing it lets Pip sink gently.
+      // Bubble streams add a natural upward current in every water area.
       this.liftActive = false;
       this.glideArmed = false;
       this.jumpCanShorten = false;
-      const current =
-        this.level.contentId === "secret.moonpool"
-          ? this.puzzleState.water === "LOW"
-            ? 0
-            : water.reduce((total, zone) => {
-                const flow = zone.currentY ?? 0;
-                if (!flow) return total;
-                // The selector sends the bubbles up on one side and down on
-                // the other, so its effect can be read and used immediately.
-                const reversed =
-                  this.puzzleState.shutter === "BRIDGE"
-                    ? zone.x < 1200
-                    : zone.x >= 1200;
-                return total + (reversed ? -flow : flow);
-              }, 0)
-          : Math.min(0, ...water.map((zone) => zone.currentY ?? 0));
+      const current = Math.min(0, ...water.map((zone) => zone.currentY ?? 0));
       const target = (input.jump && this.hurtLock === 0 ? -160 : 115) + current;
       p.vy = approach(p.vy, target, 440 * STEP);
     } else if (
@@ -895,19 +878,19 @@ export class Game {
       )
         this.equipFeather();
     }
+    const hive = this.level.portals?.find(
+      (portal) => portal.target === "beehive",
+    );
     if (
-      q.wind === "WEST" &&
-      q.water === "LOW" &&
-      q.shutter === "HIVE" &&
-      this.level.contentId === "world.windmill-garden" &&
-      cx >= 6720 &&
-      cx < 7680
+      hive &&
+      !q.hiveDiscovered &&
+      cx >= hive.x - 154 &&
+      cx <= hive.x + hive.w + 10 &&
+      Math.abs(p.y + p.h - hive.y) <= 100
     ) {
-      if (++this.hiveTicks >= 120 && !q.hiveDiscovered) {
-        q.hiveDiscovered = true;
-        this.events.push("hive-discovered");
-      }
-    } else this.hiveTicks = 0;
+      q.hiveDiscovered = true;
+      this.events.push("hive-discovered");
+    }
     const target = this.level.flightTarget;
     if (
       target &&
@@ -929,9 +912,6 @@ export class Game {
                 ? q.workshopGateOpen
                 : q.flowers.A && q.flowers.B && q.flowers.C;
     }
-    const reed = this.platforms.find((t) => t.id === "windmill.reed-screen");
-    if (reed)
-      reed.broken = q.water === "LOW" || (reed.broken && overlaps(p, reed));
     const portals = this.level.portals ?? [];
     const near = portals.find(
       (portal) =>
@@ -1153,19 +1133,7 @@ export class Game {
         rider = tile;
       tile.previousX = tile.x;
       tile.previousY = tile.y;
-      if (tile.id === "cloud.wind.bridge") {
-        tile.x = approach(
-          tile.x,
-          tile.baseX + (this.puzzleState.wind === "EAST" ? 240 : 0),
-          140 * STEP,
-        );
-      } else if (tile.id === "windmill.lily") {
-        tile.y = approach(
-          tile.y,
-          this.puzzleState.water === "HIGH" ? 330 : 450,
-          150 * STEP,
-        );
-      } else if (tile.motion) {
+      if (tile.motion) {
         const offset =
           Math.sin(
             (this.elapsed / Math.max(0.1, tile.motion.period)) * Math.PI * 2 +
@@ -1537,8 +1505,6 @@ export class Game {
     // Clouds must be available on retry. Broken coin caches stay broken so rewards
     // cannot be farmed, just as ordinary collected coins stay collected after death.
     for (const platform of this.platforms) {
-      if (platform.id === "windmill.lily")
-        platform.y = this.puzzleState.water === "HIGH" ? 330 : 450;
       if (platform.kind === "crumble") {
         platform.crumbleRemaining = -1;
         platform.respawnRemaining = 0;

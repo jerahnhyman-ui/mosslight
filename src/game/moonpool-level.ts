@@ -1,6 +1,6 @@
 import type { Level } from "./levels";
 
-/** A quiet swimming route: start the bubbles, then open the sluice. */
+/** Swim between rising rocks and hanging reefs to reach the Moonpool clearing. */
 export const moonpoolLevel: Level = {
   id: 22,
   contentId: "secret.moonpool",
@@ -15,9 +15,19 @@ export const moonpoolLevel: Level = {
     // Rising rock walls require Pip to swim above them. The surrounding
     // shelves and bubble streams give the player a clear route around each.
     { id: "moonpool.rock.1", x: 1050, y: 350, w: 58, h: 140, kind: "ground" },
+    // The hanging reef changes the route: rise over the first rock, then
+    // release the swim stroke and pass underneath this one.
+    {
+      id: "moonpool.rock.overhang",
+      x: 1370,
+      y: 185,
+      w: 80,
+      h: 110,
+      kind: "ground",
+    },
     { id: "moonpool.rock.2", x: 1850, y: 320, w: 58, h: 170, kind: "ground" },
-    // A small optional cove: the receiver opens the left-hand door while the
-    // original route continues underneath the enclosure.
+    { id: "moonpool.rock.3", x: 2600, y: 345, w: 58, h: 145, kind: "ground" },
+    // The cove opens to the left; the main route continues underneath it.
     {
       id: "moonpool.rock.cove-roof",
       x: 2260,
@@ -43,8 +53,24 @@ export const moonpoolLevel: Level = {
       kind: "ground",
     },
     { x: 440, y: 390, w: 180, h: 20, kind: "platform" },
-    { x: 800, y: 315, w: 180, h: 20, kind: "platform" },
-    { x: 1200, y: 370, w: 180, h: 20, kind: "platform" },
+    {
+      id: "moonpool.drifting-ledge.1",
+      x: 800,
+      y: 315,
+      w: 180,
+      h: 20,
+      kind: "platform",
+      motion: { axis: "x", range: 55, period: 4.5 },
+    },
+    {
+      id: "moonpool.drifting-ledge.2",
+      x: 1200,
+      y: 370,
+      w: 180,
+      h: 20,
+      kind: "platform",
+      motion: { axis: "x", range: 45, period: 5, phase: Math.PI },
+    },
     { x: 1650, y: 280, w: 190, h: 20, kind: "platform" },
     { x: 2070, y: 370, w: 180, h: 20, kind: "platform" },
     { x: 2370, y: 300, w: 170, h: 20, kind: "platform" },
@@ -76,30 +102,6 @@ export const moonpoolLevel: Level = {
     { x: 80, y: 490 },
     { x: 1480, y: 490 },
   ],
-  mechanisms: [
-    { id: "moonpool.valve", kind: "water", x: 530, y: 390 },
-    { id: "moonpool.current-selector", kind: "shutter", x: 1290, y: 370 },
-    { id: "moonpool.receiver", kind: "receiver", x: 1730, y: 280 },
-    { id: "moonpool.sluice", kind: "sluice", x: 2160, y: 370 },
-  ],
-  gates: [
-    {
-      id: "moonpool.cove-door",
-      condition: "light",
-      x: 2260,
-      y: 180,
-      w: 22,
-      h: 120,
-    },
-    {
-      id: "moonpool.gate",
-      condition: "sluice",
-      x: 2600,
-      y: -2000,
-      w: 24,
-      h: 2660,
-    },
-  ],
   portals: [
     { id: "moonpool.return.entry", x: 100, y: 490, w: 80, target: "return" },
     {
@@ -118,24 +120,9 @@ export const moonpoolLevel: Level = {
   ],
   tutorials: [
     { x: 230, text: "Hold Jump to swim up. Release to sink gently." },
-    {
-      x: 390,
-      text: "Land on the valve, or stand on its pad and tap Jump, to start the bubbles.",
-    },
-    { x: 760, text: "Bubble currents carry you upward." },
-    { x: 950, text: "Swim above the rocks to find a way through." },
-    {
-      x: 1180,
-      text: "Tap Jump on the current selector to send the bubbles up on the other side.",
-    },
-    {
-      x: 1570,
-      text: "With the right bubbles rising, tap Jump on the receiver to open the hidden cove.",
-    },
-    {
-      x: 1920,
-      text: "With bubbles flowing, tap Jump on the sluice latch to open the gate.",
-    },
+    { x: 760, text: "Follow the bubbles up and swim over the rocks." },
+    { x: 1190, text: "Release Jump to sink beneath the hanging reef." },
+    { x: 2020, text: "A little friend is hiding in the high cove." },
   ],
   goal: { x: 2740, y: 490 },
 };
