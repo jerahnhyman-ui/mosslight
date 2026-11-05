@@ -18,6 +18,7 @@ npm run dev
 ```
 
 Open the local URL Vite prints. In landscape, the game fills the display edge to edge and shows more of the world on wider screens, with proportional artwork and controls inside the safe areas. A trail picker sits on the title screen; worlds, sound, and instructions are in the game menu.
+For parallel work with Claude Code and Codex, see the [collaboration guide](docs/CLAUDE_COLLABORATION.md).
 Move with **← / →** or **A / D**; jump with **Space**, **W**, or **↑**.
 Tap jump for a short hop, or hold it for a higher leap. **P / Esc** pauses.
 On touch screens, slide your left thumb across the direction pad without lifting,
