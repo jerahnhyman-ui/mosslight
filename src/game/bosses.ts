@@ -308,9 +308,24 @@ export function stepBoss(
   }
   boss.stateTime = Math.max(0, boss.stateTime - dt);
   if (boss.stateTime < 1e-9) boss.stateTime = 0;
+  const towardPlayer = player.x + player.w / 2 < boss.x + boss.w / 2 ? -1 : 1;
   if (boss.state === "warning") {
     if (boss.kind === "moth")
       boss.y = approach(boss.y, boss.groundY - boss.h - 90, 180 * dt);
+    // Guardians keep moving while they telegraph. Each attack still starts
+    // from wherever the guardian is when the warning ends.
+    // The stag paws the ground, rocking in place, so its charge still reaches the wall.
+    if (boss.kind === "stag")
+      roam(boss, dt, Math.sin(boss.stateTime * 14) * 60);
+    else if (boss.kind === "spider")
+      roam(boss, dt, Math.sin(boss.stateTime * 9) * 70);
+    else if (boss.kind === "heartwood") roam(boss, dt, towardPlayer * 30);
+    else if (boss.kind === "toad") {
+      // The toad bobs side to side while crouched; its leap starts from
+      // wherever it is. (The moth already rises to hover as it warns.)
+      roam(boss, dt, Math.sin(boss.stateTime * 6) * 45);
+      boss.attackOriginX = boss.x;
+    }
     if (boss.stateTime > 0) return;
     boss.state = "attack";
     boss.stateTime =
@@ -346,7 +361,9 @@ export function stepBoss(
         recover(boss);
       }
     } else if (boss.kind === "spider") {
-      // Web balls travel along the floor; jumping is always a valid counter.
+      // It backs away while spitting web balls along the floor; jumping is
+      // always a valid counter.
+      roam(boss, dt, -boss.facing * (45 + boss.phase * 10));
       if (
         boss.shotsFired < boss.phase + 2 &&
         boss.attackElapsed >= 0.18 + boss.shotsFired * 0.27
@@ -364,6 +381,8 @@ export function stepBoss(
         boss.shotsFired++;
       }
     } else if (boss.kind === "heartwood") {
+      // It lumbers forward a little while it fires.
+      roam(boss, dt, boss.facing * 18);
       // After the visible warning, the rooted guardian sends a volley of
       // ground-level thorn seeds. Later phases also send alternating seeds
       // toward the other side, so standing behind it is not a safe shortcut.
@@ -422,8 +441,12 @@ export function stepBoss(
       if (boss.kind === "toad") toadSplash(boss, hazards);
       recover(boss);
     }
-  } else if (boss.state === "recover" && boss.stateTime === 0) {
-    warnBoss(boss, player, events);
+  } else if (boss.state === "recover") {
+    // A dazed guardian staggers slowly away from Pip, so the stomp has to
+    // be chased and aimed, but the opening stays generous and the next
+    // attack never starts on top of Pip.
+    roam(boss, dt, -towardPlayer * (22 + boss.phase * 8));
+    if (boss.stateTime === 0) warnBoss(boss, player, events);
   }
 }
 
@@ -444,4 +467,9 @@ function toadSplash(boss: BossState, hazards: BossHazard[]) {
         vy: 0,
         remaining: 4,
       });
+}
+
+/** Move a guardian sideways, staying inside its arena. */
+function roam(boss: BossState, dt: number, speed: number) {
+  boss.x = clamp(boss.x + speed * dt, boss.minX, boss.maxX);
 }

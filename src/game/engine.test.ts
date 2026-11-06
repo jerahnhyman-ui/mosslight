@@ -4,6 +4,7 @@ import {
   COINS_PER_LIFE,
   MAX_LIVES,
   STAR_POWER_DURATION,
+  STAR_SPEED_BOOST,
   type GameInput,
 } from "./engine";
 import { levels, type Level, type Platform, type EnemyKind } from "./levels";
@@ -1233,7 +1234,7 @@ describe("Long-adventure mechanics", () => {
     expect(hopper.stateTime).toBeGreaterThan(0);
   });
 
-  it("gives a charger a stationary warning before its fast run and recovery", () => {
+  it("warns with a backward wind-up before a charger's fast run and short recovery", () => {
     const game = arena({
       enemies: [{ ...enemySpawn("charger", 350), minX: 250, maxX: 700 }],
     });
@@ -1242,18 +1243,21 @@ describe("Long-adventure mechanics", () => {
     const charger = game.enemies[0]!;
     expect(charger.state).toBe("windup");
     expect(game.events).toContain("charge");
-    expect(charger.vx).toBe(0);
+    // It faces Pip and paws backward, so it is never a static target.
+    expect(charger.facing).toBe(-1);
+    expect(charger.vx).toBeGreaterThan(0);
     const x = charger.x;
     advance(game, 0.4);
-    expect(charger.x).toBe(x);
-    advance(game, 0.25);
+    expect(charger.x).toBeGreaterThan(x);
+    expect(charger.state).toBe("windup");
+    advance(game, 0.15);
     expect(charger.state).toBe("charge");
-    expect(charger.vx).toBe(-240);
-    expect(charger.x).toBeLessThan(x);
-    advance(game, 0.5);
+    expect(charger.vx).toBe(-250);
+    advance(game, 0.7);
     expect(charger.x).toBeGreaterThanOrEqual(charger.minX);
     expect(charger.state).toBe("recover");
-    expect(charger.vx).toBe(0);
+    // It staggers slowly during recovery instead of freezing in place.
+    expect(Math.abs(charger.vx)).toBeLessThanOrEqual(30);
     expect(game.deaths).toBe(0);
   });
 
@@ -1329,5 +1333,23 @@ describe("Long-adventure mechanics", () => {
     expect(a.platforms[1]!.x).toBeCloseTo(b.platforms[1]!.x, 8);
     expect(a.enemies[0]!.x).toBeCloseTo(b.enemies[0]!.x, 8);
     expect(a.enemies[0]!.y).toBeCloseTo(b.enemies[0]!.y, 8);
+  });
+});
+
+describe("star power speed", () => {
+  it("runs faster while star power lasts, then returns to normal", () => {
+    const run = (starred: boolean) => {
+      const game = arena({});
+      if (starred) game.starPowerRemaining = 5;
+      for (let i = 0; i < 120; i++)
+        game.update(1 / 120, { ...idle, right: true });
+      return game.player.vx;
+    };
+    expect(run(true)).toBeCloseTo(run(false) * STAR_SPEED_BOOST, 0);
+    const game = arena({});
+    game.starPowerRemaining = 0.2;
+    for (let i = 0; i < 240; i++)
+      game.update(1 / 120, { ...idle, right: true });
+    expect(game.player.vx).toBeCloseTo(300, 0);
   });
 });

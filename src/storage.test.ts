@@ -648,15 +648,15 @@ describe("comfort settings from player feedback", () => {
     });
   });
 
-  it("remembers the tip-card setting and which tips were shown", () => {
+  it("starts with messages off, and remembers the setting and shown tips", () => {
     const save = readSave();
-    expect(save.tipCards).toBe(true);
+    expect(save.messages).toBe(false);
     expect(save.tipsSeen).toEqual([]);
-    save.tipCards = false;
+    save.messages = true;
     save.tipsSeen.push("world.sunlit-meadow:0");
     writeSave(save);
     const loaded = readSave();
-    expect(loaded.tipCards).toBe(false);
+    expect(loaded.messages).toBe(true);
     expect(loaded.tipsSeen).toEqual(["world.sunlit-meadow:0"]);
   });
 });

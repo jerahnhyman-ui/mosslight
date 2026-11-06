@@ -3578,7 +3578,7 @@ export class Renderer {
     const c = this.ctx;
     const { x, y, w, h, rewardPower, rewardUsed } = r;
     const colors = {
-      diamond: { face: "#69dbe4", edge: "#287d91", glyph: "#eaffff" },
+      diamond: { face: "#f0a463", edge: "#9a5a34", glyph: "#fff1c9" },
       feather: { face: "#a6d786", edge: "#568457", glyph: "#fff8d6" },
       star: { face: "#f9cf68", edge: "#a6793e", glyph: "#fff8ce" },
     } as const;
@@ -3606,31 +3606,19 @@ export class Renderer {
       c.fill();
       c.stroke();
     } else if (rewardPower === "diamond") {
+      // A Sunseed glyph: a seed with a small leaf.
       c.beginPath();
-      c.moveTo(-9, -4);
-      c.lineTo(-5, -9);
-      c.lineTo(5, -9);
-      c.lineTo(9, -4);
-      c.lineTo(0, 9);
-      c.closePath();
+      c.moveTo(0, -7);
+      c.bezierCurveTo(7, -4, 8, 4, 0, 10);
+      c.bezierCurveTo(-8, 4, -7, -4, 0, -7);
       c.fill();
       c.stroke();
-      this.line(
-        [
-          [-8, -4],
-          [8, -4],
-        ],
-        edge,
-        1,
-      );
-      this.line(
-        [
-          [0, -8],
-          [0, 8],
-        ],
-        edge,
-        1,
-      );
+      c.beginPath();
+      c.moveTo(0, -7);
+      c.quadraticCurveTo(6, -12, 9, -9);
+      c.quadraticCurveTo(5, -6, 0, -7);
+      c.fillStyle = rewardUsed ? "#8b8980" : "#bfe58f";
+      c.fill();
     } else {
       c.rotate(0.65);
       c.beginPath();
@@ -3832,130 +3820,55 @@ export class Renderer {
     }
   }
 
+  /** The Sunseed: a glowing golden seed with a fresh leaf. Collecting one
+   * makes Pip grow. (Code and saves still call it a "diamond".) */
   private diamond(x: number, y: number, time: number, index: number) {
     const c = this.ctx;
     c.save();
     c.translate(x, y + Math.sin(time * 2.1 + index) * 3);
-    this.ellipse(0, 1, 23, 24, "rgba(132,248,255,.16)");
-    this.ellipse(0, 1, 18, 19, "rgba(226,255,253,.22)");
-    const facet = (points: number[][], color: string) => {
-      c.beginPath();
-      c.moveTo(points[0][0], points[0][1]);
-      for (const point of points.slice(1)) c.lineTo(point[0], point[1]);
-      c.closePath();
-      c.fillStyle = color;
-      c.fill();
-    };
-    facet(
-      [
-        [-10, -11],
-        [10, -11],
-        [16, -3],
-        [0, 17],
-        [-16, -3],
-      ],
-      "#1d9fbf",
-    );
-    facet(
-      [
-        [-10, -11],
-        [0, -11],
-        [-6, -3],
-        [-16, -3],
-      ],
-      "#b2fbff",
-    );
-    facet(
-      [
-        [0, -11],
-        [10, -11],
-        [16, -3],
-        [6, -3],
-      ],
-      "#65e5f3",
-    );
-    facet(
-      [
-        [0, -11],
-        [6, -3],
-        [-6, -3],
-      ],
-      "#e5ffff",
-    );
-    facet(
-      [
-        [-16, -3],
-        [-6, -3],
-        [0, 17],
-      ],
-      "#18b7db",
-    );
-    facet(
-      [
-        [-6, -3],
-        [6, -3],
-        [0, 17],
-      ],
-      "#7af3fa",
-    );
-    facet(
-      [
-        [6, -3],
-        [16, -3],
-        [0, 17],
-      ],
-      "#29d0e6",
-    );
+    const pulse = 0.5 + 0.5 * Math.sin(time * 3 + index);
+    this.ellipse(0, 2, 24, 25, `rgba(255,214,110,${0.14 + pulse * 0.08})`);
+    this.ellipse(0, 2, 18, 19, "rgba(255,240,190,.22)");
+    // Seed body: a plump teardrop, darker toward the base.
+    c.beginPath();
+    c.moveTo(0, -12);
+    c.bezierCurveTo(11, -8, 14, 6, 0, 16);
+    c.bezierCurveTo(-14, 6, -11, -8, 0, -12);
+    const body = c.createLinearGradient(0, -12, 0, 16);
+    // Warm amber, so a Sunseed never reads as one of the gold coins.
+    body.addColorStop(0, "#ffd48a");
+    body.addColorStop(0.5, "#f0913f");
+    body.addColorStop(1, "#c2602a");
+    c.fillStyle = body;
+    c.fill();
+    c.lineWidth = 1.6;
+    c.strokeStyle = "#a9652f";
+    c.stroke();
+    // A soft highlight and a seam make it read as a seed, not a coin.
+    this.ellipse(-4, -3, 3, 6, "rgba(255,255,235,.7)");
     this.line(
       [
-        [-10, -11],
-        [10, -11],
-        [16, -3],
-        [0, 17],
-        [-16, -3],
-        [-10, -11],
+        [0, -10],
+        [1.5, 3],
+        [0, 14],
       ],
-      "#168baf",
-      1.4,
+      "rgba(169,101,47,.55)",
+      1.3,
     );
+    // The sprout on top echoes Pip's own leaf.
+    const sway = Math.sin(time * 2.6 + index) * 0.15;
     this.line(
       [
-        [-14, -3],
-        [14, -3],
+        [0, -11],
+        [1, -16],
       ],
-      "rgba(239,255,255,.75)",
-      1.2,
-    );
-    this.line(
-      [
-        [-9, -8],
-        [-12, -4],
-      ],
-      "#ffffff",
+      "#4f9a4c",
       2,
     );
-    // A quiet glint keeps the facets legible without flashing the whole pickup.
-    const glint = 0.5 + (Math.sin(time * 2.2 + index) + 1) * 0.25;
-    c.globalAlpha = glint;
-    this.line(
-      [
-        [17, -17],
-        [17, -9],
-      ],
-      "#f5ffff",
-      1.7,
-    );
-    this.line(
-      [
-        [13, -13],
-        [21, -13],
-      ],
-      "#f5ffff",
-      1.7,
-    );
+    this.leaf(1, -16, 9, -0.9 + sway, "#7fd06a");
+    this.leaf(1, -16, 7, 0.9 + sway, "#5fb85a");
     c.restore();
   }
-
   private starAura(
     x: number,
     feet: number,
@@ -5019,7 +4932,7 @@ export class Renderer {
       ) {
         const color =
           platform.rewardPower === "diamond"
-            ? "#80eaf3"
+            ? "#ffc46b"
             : platform.rewardPower === "star"
               ? "#ffe58a"
               : "#c9edac";
