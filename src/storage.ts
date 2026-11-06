@@ -231,6 +231,7 @@ export const WORLD_IDS = [
   "world.reedwater-marsh",
   "world.glimmerdeep-caverns",
   "world.tidewell-depths",
+  "world.nightglow-woods",
 ] as const;
 /** Worlds every v3 save already contains; later worlds may be missing. */
 const ORIGINAL_WORLD_COUNT = 4;
@@ -241,6 +242,8 @@ export const CHALLENGE_IDS = [
   "challenge.windmill-garden",
   "challenge.reedwater-marsh",
   "challenge.glimmerdeep-caverns",
+  "challenge.tidewell-depths",
+  "challenge.nightglow-woods",
 ] as const;
 const emptyHoops = (): HoopRecord => ({
   revision: 1,
@@ -712,6 +715,7 @@ export function worldUnlocked(save: Save, index: number): boolean {
   if (index === 4) return gardenCompleted(save, 3);
   if (index === 5) return gardenCompleted(save, 4);
   if (index === 6) return gardenCompleted(save, 5);
+  if (index === 7) return gardenCompleted(save, 6);
   return true;
 }
 export function discoverFeather(save: Save): boolean {

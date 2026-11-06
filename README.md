@@ -1,7 +1,7 @@
 # Mosslight
 
 An original side-scrolling platformer for iPhone, iPad, and the browser.
-Guide Pip or Poppy through Sunlit Meadow, Firefly Hollow, Cloudtop Crossing, Windmill Garden, Reedwater Marsh, Glimmerdeep Caverns, and Tidewell Depths:
+Guide Pip or Poppy through Sunlit Meadow, Firefly Hollow, Cloudtop Crossing, Windmill Garden, Reedwater Marsh, Glimmerdeep Caverns, Tidewell Depths, and Nightglow Woods:
 collect golden coins, grow with Sunseeds, power up with stars, rescue hidden
 fireflies, and bring light back to the forest. Four extended trails include
 multiple checkpoints, optional routes, light-activated plants, and three-phase
@@ -62,6 +62,15 @@ animated characters, and collectible/landing effects.
   Pip, a current channel pushes back, a sunken tunnel pulls down, and fish
   weave through the water. Pinch, the Hermit Crab, scuttles and puffs
   bubbles; swim clear, then sink onto its shell when it flips over.
+- **Nightglow Woods** opens after Tidewell Depths. It is night: Pip's glow
+  lights a circle around them, and lanterns along the trail stay lit once
+  passed. The trail ends at Gloomwing's Roost, a separate major-boss arena
+  with a checkpoint and recovery blocks. Gloomwing, the Night Owl, circles
+  above Pip, locks a mark and dives; step clear, jump its landing shards and
+  falling feathers, and stomp it six times over three phases.
+- **Special stages** join the challenge rooms: Floodgate Dash (outrun a flood
+  rolling in behind you) for Tidewell Depths, and Leafboat River (ride leaf
+  boats downstream and hop the rocks) for Nightglow Woods.
 - **Gulp the tree frog** waits near the start of Reedwater Marsh and
   Glimmerdeep Caverns. Walk into it to ride. Press the pink **Tongue** button
   (X, J or Shift on a keyboard; B or X on a gamepad) to snatch a bug ahead for

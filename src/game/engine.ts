@@ -63,6 +63,8 @@ export type PlatformState = Platform & {
   awakened: boolean;
   crumbleRemaining: number;
   respawnRemaining: number;
+  /** A boat that has started cruising. */
+  cruising?: boolean;
 };
 export type Enemy = Rect & {
   kind: EnemyKind;
@@ -156,6 +158,11 @@ export class Game {
   /** A ghost of a previous best run to race (drawn only; never collides). */
   ghost: { step: number; time: number; xs: number[]; ys: number[] } | null =
     null;
+  /** The chasing flood's front edge, and seconds since it was set. */
+  chaseX = -Infinity;
+  private chaseClock = 0;
+  /** Lanterns in a night level, and whether each has been lit. */
+  lanterns: { x: number; y: number; lit: boolean }[] = [];
   /** Hidden acorns in this run (sitting on top of high coins). */
   acorns: { x: number; y: number; collected: boolean }[] = [];
   /** Stomps in the current chain without touching the ground. */
@@ -363,6 +370,11 @@ export class Game {
       collected: false,
     }));
     this.combo = 0;
+    this.lanterns = (this.level.lanterns ?? []).map((l) => ({
+      x: l.x,
+      y: l.y,
+      lit: !!l.lit,
+    }));
     this.stars = this.level.stars.map((c) => ({ ...c, collected: false }));
     this.fireflies = this.level.fireflies.map((c) => ({
       ...c,
@@ -412,6 +424,10 @@ export class Game {
     this.landedActuators.clear();
     this.jumpCanShorten = false;
     this.hurtLock = 0;
+    // The flood restarts a fair distance behind wherever Pip begins.
+    const chase = this.level.chase;
+    this.chaseX = chase ? point.x - chase.lead : -Infinity;
+    this.chaseClock = 0;
     this.blockedCarriers.clear();
     this.hasWindFeather = false;
     this.liftTicks = 0;
@@ -860,6 +876,27 @@ export class Game {
       ) {
         acorn.collected = true;
         this.events.push("acorn");
+      }
+    }
+    // The flood rolls in; being caught costs a life.
+    const chase = this.level.chase;
+    if (chase && this.state === "playing") {
+      this.chaseClock += STEP;
+      if (this.chaseClock > chase.delay) this.chaseX += chase.speed * STEP;
+      if (p.x + p.w * 0.5 < this.chaseX) {
+        this.events.push("caught");
+        return this.loseLife();
+      }
+    }
+    // A lantern lights for good as Pip passes it.
+    for (const lantern of this.lanterns) {
+      if (
+        !lantern.lit &&
+        Math.abs(lantern.x - (p.x + p.w / 2)) < 90 &&
+        Math.abs(lantern.y - (p.y + p.h)) < 140
+      ) {
+        lantern.lit = true;
+        this.events.push("lantern");
       }
     }
     // A stomp chain lasts until Pip touches the ground.
@@ -1319,6 +1356,8 @@ export class Game {
       boss.state !== "dormant" &&
       boss.state !== "defeated" &&
       boss.millState !== "transition" &&
+      // Circling overhead, the owl is out of reach: Pip passes beneath it.
+      !(boss.kind === "owl" && boss.state === "warning") &&
       overlaps(p, boss)
     ) {
       const stomp = p.vy > 0 && oldBottom <= previousY + 12;
@@ -1380,6 +1419,11 @@ export class Game {
         rider = tile;
       tile.previousX = tile.x;
       tile.previousY = tile.y;
+      if (tile.cruise && (tile.cruising || rider === tile)) {
+        // A boat sets off once Pip is aboard and runs to its far dock.
+        tile.cruising = true;
+        tile.x = Math.min(tile.cruise.until, tile.x + tile.cruise.speed * STEP);
+      }
       if (tile.motion) {
         const offset =
           Math.sin(
@@ -1923,6 +1967,11 @@ export class Game {
       if (platform.kind === "crumble") {
         platform.crumbleRemaining = -1;
         platform.respawnRemaining = 0;
+      }
+      // Boats go back to their docks.
+      if (platform.cruise) {
+        platform.x = platform.previousX = platform.baseX;
+        platform.cruising = false;
       }
     }
     if (this.lives <= 0) {

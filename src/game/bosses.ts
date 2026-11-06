@@ -32,12 +32,20 @@ export type MillState =
   | "recover"
   | "transition";
 export type BossHazard = Rect & {
-  kind: "web" | "gust" | "sweep" | "bubble";
+  kind: "web" | "gust" | "sweep" | "bubble" | "feather";
   vx: number;
   vy: number;
   remaining: number;
 };
 
+/** Gloomwing, the night owl (world 8's major boss): seconds it circles
+ * before diving, how long its mark stays locked, and the dive itself. */
+export const OWL_HOVER = 2;
+export const OWL_LOCK = 0.6;
+export const OWL_DIVE = 0.55;
+/** Major guardians take six hits over three phases. */
+export const majorKind = (kind: BossSpec["kind"]) =>
+  kind === "millkeeper" || kind === "heartwood" || kind === "owl";
 /** Longest a hermit crab scuttles before stopping to rest. */
 export const CRAB_SCUTTLE = 1.4;
 /** Seconds the crystal mole spends tunnelling, and how long its mark is
@@ -70,13 +78,15 @@ export function createBoss(spec: BossSpec): BossState {
                 ? { w: 100, h: 64 }
                 : spec.kind === "crab"
                   ? { w: 104, h: 56 }
-                  : { w: 92, h: 64 };
+                  : spec.kind === "owl"
+                    ? { w: 120, h: 90 }
+                    : { w: 92, h: 64 };
   return {
     ...spec,
     ...size,
     y: spec.y - size.h,
-    health: spec.kind === "millkeeper" || spec.kind === "heartwood" ? 6 : 4,
-    maxHealth: spec.kind === "millkeeper" || spec.kind === "heartwood" ? 6 : 4,
+    health: majorKind(spec.kind) ? 6 : 4,
+    maxHealth: majorKind(spec.kind) ? 6 : 4,
     phase: 1,
     state: "dormant",
     stateTime: 0,
@@ -94,7 +104,9 @@ export function createBoss(spec: BossSpec): BossState {
           millNextDirection: 0,
         }
       : {}),
-    ...(spec.kind === "heartwood" ? { phaseCheckpoint: 1 } : {}),
+    ...(spec.kind === "heartwood" || spec.kind === "owl"
+      ? { phaseCheckpoint: 1 }
+      : {}),
   };
 }
 
@@ -105,7 +117,7 @@ export function retryBoss(
   relaxed: boolean,
 ): BossState {
   const boss = createBoss(spec);
-  if ((boss.kind === "millkeeper" || boss.kind === "heartwood") && relaxed) {
+  if (majorKind(boss.kind) && relaxed) {
     boss.phaseCheckpoint = previous.phaseCheckpoint ?? previous.phase;
     boss.phase = boss.phaseCheckpoint;
     boss.health = 8 - 2 * boss.phase;
@@ -144,14 +156,14 @@ export function hitBoss(
     setMillState(boss, crossed ? "transition" : "settle", crossed ? 1.5 : 1);
   } else {
     boss.phase =
-      boss.kind === "heartwood"
+      boss.kind === "heartwood" || boss.kind === "owl"
         ? Math.min(3, 1 + Math.floor((boss.maxHealth - boss.health) / 2))
         : Math.min(
             3,
             1 +
               Math.floor(((boss.maxHealth - boss.health) * 3) / boss.maxHealth),
           );
-    if (boss.kind === "heartwood")
+    if (boss.kind === "heartwood" || boss.kind === "owl")
       boss.phaseCheckpoint = Math.max(boss.phaseCheckpoint ?? 1, boss.phase);
     warnBoss(boss, player, events);
   }
@@ -273,15 +285,17 @@ export function warnBoss(boss: BossState, player: Rect, events: string[]) {
   boss.stateTime =
     boss.kind === "heartwood"
       ? 1.4
-      : boss.kind === "mole"
-        ? MOLE_BURROW - (boss.phase - 1) * 0.1
-        : 1.15 - (boss.phase - 1) * 0.1;
+      : boss.kind === "owl"
+        ? OWL_HOVER - (boss.phase - 1) * 0.1
+        : boss.kind === "mole"
+          ? MOLE_BURROW - (boss.phase - 1) * 0.1
+          : 1.15 - (boss.phase - 1) * 0.1;
   boss.facing = player.x + player.w / 2 < boss.x + boss.w / 2 ? -1 : 1;
   boss.attackOriginX = boss.x;
   // The toad marks the spot where Pip stands; the others charge a set
   // distance. Either way the target is shown for the whole warning.
   boss.attackTargetX = clamp(
-    boss.kind === "toad" || boss.kind === "mole"
+    boss.kind === "toad" || boss.kind === "mole" || boss.kind === "owl"
       ? player.x + player.w / 2 - boss.w / 2
       : boss.x + boss.facing * (320 + boss.phase * 30),
     boss.minX,
@@ -297,7 +311,7 @@ function recover(boss: BossState) {
   // Later phases leave a shorter, still readable opportunity to stomp.
   // Swimming is slower than running, so the underwater crab rests longer.
   boss.stateTime =
-    boss.kind === "heartwood"
+    boss.kind === "heartwood" || boss.kind === "owl"
       ? 2.4 - (boss.phase - 1) * 0.2
       : boss.kind === "crab"
         ? 3.2 - (boss.phase - 1) * 0.2
@@ -339,7 +353,41 @@ export function stepBoss(
     else if (boss.kind === "spider")
       roam(boss, dt, Math.sin(boss.stateTime * 9) * 70);
     else if (boss.kind === "heartwood") roam(boss, dt, towardPlayer * 30);
-    else if (boss.kind === "crab")
+    else if (boss.kind === "owl") {
+      // It rises and circles above Pip; its mark follows, then locks.
+      boss.y = approach(boss.y, boss.groundY - boss.h - 210, 260 * dt);
+      if (boss.stateTime > OWL_LOCK) {
+        boss.attackTargetX = approach(
+          boss.attackTargetX,
+          clamp(player.x + player.w / 2 - boss.w / 2, boss.minX, boss.maxX),
+          190 * dt,
+        );
+        roam(boss, dt, Math.sign(boss.attackTargetX - boss.x) * 160);
+      }
+      boss.attackOriginX = boss.x;
+      // From phase two, the moment its mark locks it shakes loose feathers
+      // that fall beside the mark with the dive: both say "stay clear".
+      if (
+        boss.phase >= 2 &&
+        boss.shotsFired === 0 &&
+        boss.stateTime <= OWL_LOCK
+      ) {
+        const mark = boss.attackTargetX + boss.w / 2;
+        const spread = boss.phase >= 3 ? [-130, -70, 70, 130] : [-80, 80];
+        for (const dx of spread)
+          hazards.push({
+            kind: "feather",
+            x: clamp(mark + dx - 10, boss.minX, boss.maxX + boss.w),
+            y: boss.groundY - 200,
+            w: 20,
+            h: 30,
+            vx: 0,
+            vy: 300,
+            remaining: 1.2,
+          });
+        boss.shotsFired++;
+      }
+    } else if (boss.kind === "crab")
       // It clacks its claws and sidles on the spot before scuttling.
       roam(boss, dt, Math.sin(boss.stateTime * 16) * 50);
     else if (boss.kind === "toad") {
@@ -371,11 +419,13 @@ export function stepBoss(
             ? 2.05
             : boss.kind === "toad"
               ? TOAD_LEAP
-              : boss.kind === "mole"
-                ? MOLE_EMERGE
-                : boss.kind === "crab"
-                  ? CRAB_SCUTTLE
-                  : 1.3;
+              : boss.kind === "owl"
+                ? OWL_DIVE
+                : boss.kind === "mole"
+                  ? MOLE_EMERGE
+                  : boss.kind === "crab"
+                    ? CRAB_SCUTTLE
+                    : 1.3;
     boss.attackElapsed = 0;
   }
   if (boss.state === "attack") {
@@ -444,6 +494,13 @@ export function stepBoss(
         });
         boss.shotsFired++;
       }
+    } else if (boss.kind === "owl") {
+      // A steep dive onto the locked mark.
+      const fraction = clamp(boss.attackElapsed / OWL_DIVE, 0, 1);
+      boss.x =
+        boss.attackOriginX +
+        (boss.attackTargetX - boss.attackOriginX) * fraction;
+      boss.y = boss.groundY - boss.h - 210 * (1 - fraction * fraction);
     } else if (boss.kind === "crab") {
       // It scuttles sideways along the seabed, puffing bubbles that drift
       // up through the water. Swim around them; it tires at the wall.
@@ -505,7 +562,7 @@ export function stepBoss(
       }
     }
     if (boss.stateTime === 0) {
-      if (boss.kind === "toad" || boss.kind === "mole")
+      if (boss.kind === "toad" || boss.kind === "mole" || boss.kind === "owl")
         toadSplash(boss, hazards);
       recover(boss);
     }
