@@ -262,7 +262,7 @@ describe("adventure progress", () => {
     });
     expect(save.progress[0].fireflies).toEqual([0, 2]);
     expect(save.progress[0].adventureBestTime).toBeNull();
-    expect(save.progress).toHaveLength(5);
+    expect(save.progress).toHaveLength(6);
   });
 
   it("continues with session-only progress when storage is unavailable", () => {
@@ -524,10 +524,10 @@ describe("windmill save migration and rewards", () => {
     writeSave(save);
     expect(readSave()).toEqual(save);
   });
-  it("persists discoveries, fifteen rescues, and idempotent bee and hoop rewards", () => {
+  it("persists discoveries, eighteen rescues, and idempotent bee and hoop rewards", () => {
     const save = readSave();
     for (const world of save.progress) recordFireflies(world, [0, 1, 2]);
-    expect(rescuedTotal(save)).toBe(15);
+    expect(rescuedTotal(save)).toBe(18);
     expect(challengeUnlocked(save, 3)).toBe(false);
     expect(purchaseItem(save, "cosmetic.bee_scarf")).toBe("locked");
     expect(purchaseItem(save, "cosmetic.pinwheel_garland")).toBe("locked");
@@ -600,7 +600,7 @@ describe("Reedwater Marsh progress", () => {
     delete stored.worlds["world.reedwater-marsh"];
     items.set(SAVE_KEY, JSON.stringify(stored));
     const loaded = readSave();
-    expect(loaded.progress).toHaveLength(5);
+    expect(loaded.progress).toHaveLength(6);
     expect(loaded.progress[3]!.fireflies).toEqual([0, 2]);
     expect(loaded.progress[3]!.garden.classic.completed).toBe(true);
     expect(loaded.progress[4]!.fireflies).toEqual([]);

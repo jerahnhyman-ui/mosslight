@@ -524,6 +524,7 @@ describe("Living garden level safety", () => {
       "moth",
       undefined,
       "toad",
+      "mole",
     ]);
     for (const level of levels.slice(0, 3)) {
       const boss = level.boss!;

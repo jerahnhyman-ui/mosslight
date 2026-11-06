@@ -3294,3 +3294,7 @@ select:focus-visible {
     padding: 7px 12px;
   }
 }
+
+.game-app[data-theme="cavern"] {
+  background: linear-gradient(#232646, #4a4479 65%, #443b58);
+}
