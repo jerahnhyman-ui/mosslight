@@ -1,5 +1,11 @@
 export type PlayMode = "classic" | "relaxed" | "timed";
-export type Outfit = "leaf" | "berry" | "moon" | "cosmetic.bee_scarf";
+export type Outfit =
+  | "leaf"
+  | "berry"
+  | "moon"
+  | "cosmetic.bee_scarf"
+  | "cosmetic.acorn_cap"
+  | "cosmetic.golden_leaf";
 export type Decoration =
   | "lanterns"
   | "flowers"
@@ -80,6 +86,24 @@ export const SHOP_ITEMS: ShopItem[] = [
     reward: true,
   },
   {
+    id: "cosmetic.acorn_cap",
+    kind: "outfit",
+    name: "Acorn Cap",
+    description: "A cosy brown cap for finding 10 hidden acorns.",
+    coins: 0,
+    fireflies: 0,
+    reward: true,
+  },
+  {
+    id: "cosmetic.golden_leaf",
+    kind: "outfit",
+    name: "Golden Leaf",
+    description: "A shining coat for finding every hidden acorn.",
+    coins: 0,
+    fireflies: 0,
+    reward: true,
+  },
+  {
     id: "cosmetic.pinwheel_garland",
     kind: "decoration",
     name: "Pinwheel Garland",
@@ -104,6 +128,8 @@ export interface Progress {
   adventureCompleted: boolean;
   adventureBestTime: number | null;
   fireflies: number[];
+  /** Hidden acorns found in this world (indices 0–4). */
+  acorns: number[];
   garden: Record<PlayMode, RunRecord>;
 }
 export interface TouchSettings {
@@ -262,6 +288,7 @@ const blank = (): Save => ({
     adventureCompleted: false,
     adventureBestTime: null,
     fireflies: [],
+    acorns: [],
     garden: emptyGarden(),
   })),
 });
@@ -286,6 +313,19 @@ const distance = (value: unknown) =>
   typeof value === "number" && Number.isFinite(value)
     ? Math.round(Math.max(0, Math.min(80, value)))
     : 0;
+const ACORNS_PER_WORLD = 5;
+function acornIndices(value: unknown): number[] {
+  return Array.isArray(value)
+    ? [
+        ...new Set(
+          value.filter(
+            (i): i is number =>
+              Number.isInteger(i) && i >= 0 && i < ACORNS_PER_WORLD,
+          ),
+        ),
+      ].sort((a, b) => a - b)
+    : [];
+}
 export function rescuedIndices(value: unknown): number[] {
   return Array.isArray(value)
     ? [
@@ -377,9 +417,15 @@ export function readSave(): Save {
     defaults.wallet = Math.min(integer(raw.wallet), defaults.lifetimeCoins);
     defaults.outfits = [
       "leaf",
-      ...(["berry", "moon", "cosmetic.bee_scarf"] as Outfit[]).filter(
-        (id) => Array.isArray(raw.outfits) && raw.outfits.includes(id),
-      ),
+      ...(
+        [
+          "berry",
+          "moon",
+          "cosmetic.bee_scarf",
+          "cosmetic.acorn_cap",
+          "cosmetic.golden_leaf",
+        ] as Outfit[]
+      ).filter((id) => Array.isArray(raw.outfits) && raw.outfits.includes(id)),
     ];
     defaults.outfit = defaults.outfits.includes(raw.outfit)
       ? raw.outfit
@@ -467,6 +513,8 @@ export function readSave(): Save {
       defaults.claimedRewards = [
         "cosmetic.bee_scarf",
         "cosmetic.pinwheel_garland",
+        "cosmetic.acorn_cap",
+        "cosmetic.golden_leaf",
       ].filter(
         (id) =>
           Array.isArray(raw.claimedRewards) && raw.claimedRewards.includes(id),
@@ -509,6 +557,7 @@ export function readSave(): Save {
         adventureCompleted: p.adventureCompleted === true,
         adventureBestTime: validTime(p.adventureBestTime),
         fireflies: rescuedIndices(p.fireflies),
+        acorns: acornIndices(p.acorns),
         garden: {
           classic: readRecord(p.garden?.classic),
           relaxed: readRecord(p.garden?.relaxed),
@@ -738,6 +787,37 @@ export function recordGardenActivity(
   return scoreBetter || linesBetter;
 }
 
+/** Acorns unlock outfits: 10 for the Acorn Cap, every one for Golden Leaf. */
+export const ACORN_REWARDS: { id: Outfit; acorns: number | "all" }[] = [
+  { id: "cosmetic.acorn_cap", acorns: 10 },
+  { id: "cosmetic.golden_leaf", acorns: "all" },
+];
+export function acornTotal(save: Save) {
+  return save.progress.reduce((sum, p) => sum + p.acorns.length, 0);
+}
+/** Record found acorns; returns any outfits newly earned. */
+export function recordAcorns(
+  save: Save,
+  world: number,
+  indices: number[],
+): Outfit[] {
+  const progress = save.progress[world];
+  if (!progress) return [];
+  progress.acorns = acornIndices([...progress.acorns, ...indices]);
+  const total = acornTotal(save);
+  const all = save.progress.length * ACORNS_PER_WORLD;
+  const earned: Outfit[] = [];
+  for (const reward of ACORN_REWARDS) {
+    const needed = reward.acorns === "all" ? all : reward.acorns;
+    if (total >= needed && !save.outfits.includes(reward.id)) {
+      save.outfits.push(reward.id);
+      if (!save.claimedRewards.includes(reward.id))
+        save.claimedRewards.push(reward.id);
+      earned.push(reward.id);
+    }
+  }
+  return earned;
+}
 export function completeBeehive(save: Save): boolean {
   const first = !save.secrets.beehive.completed;
   save.secrets.beehive.discovered = true;

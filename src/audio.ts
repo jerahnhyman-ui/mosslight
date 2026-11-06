@@ -268,6 +268,16 @@ const effects: Record<string, number[]> = {
   "star-end": [660, 440, 330],
   hurt: [200, 150, 95],
   stomp: [180, 400],
+  // A found acorn, a rising stomp chain, and the soft firefly chime.
+  acorn: [660, 880, 1175],
+  "combo-2": [523, 659],
+  "combo-3": [587, 740],
+  "combo-4": [659, 831],
+  "combo-5": [784, 988, 1319],
+  "firefly-near": [1568],
+  "swim-stroke": [300, 380],
+  flutter: [440, 494, 440],
+  tongue: [400, 260],
   // Gulp the frog: a happy croak, a quick tongue snap, and a startled hop.
   mount: [262, 196, 330],
   gulp: [520, 260, 780],
