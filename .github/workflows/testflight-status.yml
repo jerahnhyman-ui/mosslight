@@ -1,0 +1,38 @@
+name: TestFlight status
+
+# Follows the Xcode Cloud archive started by a push to main through Apple's
+# processing, makes sure the build is in the internal Beta group, and reports
+# its version and TestFlight state. Credentials live only in Actions secrets.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: "Full commit SHA to follow (defaults to the selected ref)"
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: testflight-status-${{ github.event.inputs.commit || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  status:
+    runs-on: ubuntu-latest
+    timeout-minutes: 100
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Follow Xcode Cloud and TestFlight
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+          COMMIT_SHA: ${{ github.event.inputs.commit || github.sha }}
+          BETA_GROUP: Beta
+        run: node scripts/testflight-status.mjs

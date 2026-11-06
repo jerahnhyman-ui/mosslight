@@ -148,3 +148,17 @@ results; neither substitutes for touch feel on an actual phone.
   settings; this workspace's Git credentials do not authorize Apple's service.
 - **Upload succeeded but testers see no build:** wait for processing, resolve
   compliance prompts, and assign the build to the intended TestFlight group.
+
+## Automatic TestFlight status
+
+`.github/workflows/testflight-status.yml` runs on every push to `main` (and can
+be run manually with a commit SHA). It follows that commit's Xcode Cloud run,
+waits for Apple's processing, adds the build to the internal **Beta** group if
+it is missing, and passes only when the build shows **Testing**. The job summary
+reports the version, build number and state; a failure names the blocker (for
+example a failed archive or a missing export-compliance answer).
+
+It uses an App Store Connect API key with the App Manager role, stored only as
+GitHub Actions secrets: `ASC_KEY_ID`, `ASC_ISSUER_ID` and `ASC_PRIVATE_KEY`
+(the full contents of the `.p8` file). Never commit the key or paste it in chat.
+Xcode Cloud signing itself still needs no API key.
