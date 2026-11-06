@@ -6,6 +6,8 @@ import { nightglowLevel } from "./nightglow-level";
 import { snowLevel } from "./snow-level";
 import { iceLevel } from "./ice-level";
 import { volcanoLevel } from "./volcano-level";
+import { stormLevel } from "./storm-level";
+import { frontierChallenges } from "./frontier-challenges";
 import { expansionChallenges } from "./challenge-expansion";
 import { floodgateDash, leafboatRiver } from "./special-stages";
 import { cloudAscentPlatforms } from "./cloud-garden";
@@ -73,6 +75,7 @@ export type BossKind =
   | "bear"
   | "tortoise"
   | "salamander"
+  | "ram"
   | "millkeeper"
   | "heartwood";
 export type BossSpec = {
@@ -113,7 +116,8 @@ export interface Level {
     | "cavern"
     | "snow"
     | "ice"
-    | "volcano";
+    | "volcano"
+    | "storm";
   spawn: { x: number; y: number };
   platforms: Platform[];
   coins: {
@@ -121,6 +125,17 @@ export interface Level {
     y: number;
     /** A coin that bobs back and forth along one axis. */
     move?: { axis: "x" | "y"; range: number; period: number; phase?: number };
+  }[];
+  /** Gusts of wind that blow across a stretch of the trail on a steady
+   * beat: `speed` px/s (negative pushes Pip back), blowing for `duration`
+   * seconds out of every `period`. Streaks warn before each gust. */
+  windZones?: {
+    x: number;
+    w: number;
+    speed: number;
+    period: number;
+    duration: number;
+    phase?: number;
   }[];
   /** Touch a ring to release a trail of blue coins; catch them all in time
    * for a bonus. */
@@ -1166,6 +1181,7 @@ export const levels: Level[] = [
   snowLevel,
   iceLevel,
   volcanoLevel,
+  stormLevel,
 ];
 
 /** A real, safe platforming space: all residents and purchased furnishings are
@@ -1455,4 +1471,5 @@ export const challengeLevels: Level[] = [
   ...expansionChallenges,
   floodgateDash,
   leafboatRiver,
+  ...frontierChallenges.map(withRewardBlocks),
 ];

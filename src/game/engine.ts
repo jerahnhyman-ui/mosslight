@@ -811,9 +811,10 @@ export class Game {
     )
       p.vy = WALL_SLIDE;
     // A sideways current carries Pip along while swimming.
-    const drift = swimming
-      ? water.reduce((sum, zone) => sum + (zone.currentX ?? 0), 0)
-      : 0;
+    const drift =
+      (swimming
+        ? water.reduce((sum, zone) => sum + (zone.currentX ?? 0), 0)
+        : 0) + this.windAt(p.x + p.w / 2);
     p.x += (p.vx + drift) * STEP;
     this.resolveHorizontal(p.vx + drift);
     p.x = Math.max(0, Math.min(this.level.width - p.w, p.x));
@@ -1560,8 +1561,9 @@ export class Game {
         hazard.remaining = 0;
         continue;
       }
-      if (overlaps(p, hazard)) {
-        hazard.remaining = 0;
+      if (hazard.kind !== "mark" && overlaps(p, hazard)) {
+        // A bolt keeps flashing; anything else is used up by the hit.
+        if (hazard.kind !== "bolt") hazard.remaining = 0;
         if (this.hurt(hazard)) return true;
       }
     }
@@ -2188,6 +2190,27 @@ export class Game {
       this.events.push("lose");
     } else this.spawn();
     return true;
+  }
+
+  /** Seconds into a wind zone's cycle; it blows while this is below its
+   * duration. */
+  windCycle(zone: NonNullable<Level["windZones"]>[number]) {
+    return (
+      (((this.elapsed + (zone.phase ?? 0)) % zone.period) + zone.period) %
+      zone.period
+    );
+  }
+  /** The wind pushing at this x right now, in px/s. */
+  windAt(x: number) {
+    let push = 0;
+    for (const zone of this.level.windZones ?? [])
+      if (
+        x >= zone.x &&
+        x <= zone.x + zone.w &&
+        this.windCycle(zone) < zone.duration
+      )
+        push += zone.speed;
+    return push;
   }
 
   /** Timed coin rings: touching one releases its blue coins for a while. */

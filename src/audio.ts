@@ -11,7 +11,8 @@ type Theme =
   | "cavern"
   | "snow"
   | "ice"
-  | "volcano";
+  | "volcano"
+  | "storm";
 type MusicScene = "trail" | "boss" | "grove";
 type ScoreName = Theme | "star" | "boss" | "grove";
 type Score = {
@@ -143,6 +144,31 @@ const scores: Record<ScoreName, Score> = {
       [48, 52, 55],
       [38, 42, 45],
       [43, 47, 50],
+    ],
+  },
+  // Driving and restless, like gusting wind, for the storm ridge.
+  storm: {
+    bpm: 132,
+    voice: "square",
+    melody: [
+      [67, null, 70, 74, null, 72, 70, null],
+      [69, null, 65, null, 67, null, null, null],
+      [67, 70, 74, null, 77, null, 75, 74],
+      [72, null, 70, 69, 67, null, null, null],
+      [74, null, 77, 79, null, 77, 74, null],
+      [75, null, 74, 72, 70, null, 69, null],
+      [67, null, 70, 72, 74, 72, 70, 69],
+      [67, null, null, 62, 67, null, null, null],
+    ].flat(),
+    chords: [
+      [43, 46, 50],
+      [41, 45, 48],
+      [43, 46, 50],
+      [39, 43, 46],
+      [46, 50, 53],
+      [44, 48, 51],
+      [41, 45, 48],
+      [43, 46, 50],
     ],
   },
   // Bright and twinkling, like sleigh bells, for the snowy peaks.

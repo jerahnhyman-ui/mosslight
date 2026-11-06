@@ -208,9 +208,9 @@ describe("New pickups in the worlds", () => {
     ["Frostglass Lake", iceLevel, "spring"],
     ["Ember Caldera", volcanoLevel, "shield"],
   ] as const)("%s has a %s block and a coin ring", (_, level, power) => {
-    expect(
-      level.platforms.filter((p) => p.rewardPower === power),
-    ).toHaveLength(1);
+    expect(level.platforms.filter((p) => p.rewardPower === power)).toHaveLength(
+      1,
+    );
     expect(level.coinRings).toHaveLength(1);
     expect(level.coins.some((c) => c.move)).toBe(true);
   });

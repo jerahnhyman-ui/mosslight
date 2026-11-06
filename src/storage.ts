@@ -362,6 +362,7 @@ export const WORLD_IDS = [
   "world.snowdrift-peaks",
   "world.frostglass-lake",
   "world.ember-caldera",
+  "world.thunderhead-heights",
 ] as const;
 /** Worlds every v3 save already contains; later worlds may be missing. */
 const ORIGINAL_WORLD_COUNT = 4;
@@ -374,6 +375,10 @@ export const CHALLENGE_IDS = [
   "challenge.glimmerdeep-caverns",
   "challenge.tidewell-depths",
   "challenge.nightglow-woods",
+  "challenge.snowdrift-peaks",
+  "challenge.frostglass-lake",
+  "challenge.ember-caldera",
+  "challenge.thunderhead-heights",
 ] as const;
 const emptyHoops = (): HoopRecord => ({
   revision: 1,

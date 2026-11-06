@@ -1,3 +1,4 @@
+import { STORM_FINALE_X, thunderhornLevel } from "./storm-level";
 import { grumbleLevel, SNOW_FINALE_X } from "./snow-level";
 import { shellshockLevel, ICE_FINALE_X } from "./ice-level";
 import { cinderLevel, VOLCANO_FINALE_X } from "./volcano-level";
@@ -110,3 +111,4 @@ registerFinale("world.nightglow-woods", NIGHTGLOW_FINALE_X, gloomwingLevel);
 registerFinale("world.snowdrift-peaks", SNOW_FINALE_X, grumbleLevel);
 registerFinale("world.frostglass-lake", ICE_FINALE_X, shellshockLevel);
 registerFinale("world.ember-caldera", VOLCANO_FINALE_X, cinderLevel);
+registerFinale("world.thunderhead-heights", STORM_FINALE_X, thunderhornLevel);

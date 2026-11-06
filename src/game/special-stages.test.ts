@@ -165,7 +165,7 @@ function rideBoat(g: Game, id: string, rocks: number[], landX: number) {
 
 describe("special stages", () => {
   it("are the challenge rooms for Tidewell Depths and Nightglow Woods", () => {
-    expect(challengeLevels.slice(6)).toEqual([floodgateDash, leafboatRiver]);
+    expect(challengeLevels.slice(6, 8)).toEqual([floodgateDash, leafboatRiver]);
   });
 
   it("catches Pip if they stand still as the flood rolls in", () => {

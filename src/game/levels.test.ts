@@ -530,6 +530,7 @@ describe("Living garden level safety", () => {
       undefined,
       undefined,
       undefined,
+      undefined,
     ]);
     for (const level of levels.slice(0, 3)) {
       const boss = level.boss!;
@@ -589,13 +590,13 @@ describe("Living garden level safety", () => {
     },
   );
 
-  it("provides a safe playable home and eight separate challenge rooms", () => {
+  it("provides a safe playable home and twelve separate challenge rooms", () => {
     expect(groveLevel.kind).toBe("grove");
     expect(groveLevel.enemies).toHaveLength(0);
     expect(groveLevel.boss).toBeUndefined();
     expect(groveLevel.coins).toHaveLength(0);
-    expect(challengeLevels).toHaveLength(8);
-    expect(new Set(challengeLevels.map((level) => level.name)).size).toBe(8);
+    expect(challengeLevels).toHaveLength(12);
+    expect(new Set(challengeLevels.map((level) => level.name)).size).toBe(12);
     for (const level of challengeLevels) {
       expect(level.kind).toBe("challenge");
       expect(level.challengeTime).toBeGreaterThan(0);

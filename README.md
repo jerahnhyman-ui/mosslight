@@ -1,7 +1,7 @@
 # Mosslight
 
 An original side-scrolling platformer for iPhone, iPad, and the browser.
-Guide Pip or Poppy through Sunlit Meadow, Firefly Hollow, Cloudtop Crossing, Windmill Garden, Reedwater Marsh, Glimmerdeep Caverns, Tidewell Depths, Nightglow Woods, Snowdrift Peaks, Frostglass Lake, and Ember Caldera:
+Guide Pip or Poppy through Sunlit Meadow, Firefly Hollow, Cloudtop Crossing, Windmill Garden, Reedwater Marsh, Glimmerdeep Caverns, Tidewell Depths, Nightglow Woods, Snowdrift Peaks, Frostglass Lake, Ember Caldera, and Thunderhead Heights:
 collect golden coins, grow with Sunseeds, power up with stars, rescue hidden
 fireflies, and bring light back to the forest. Four extended trails include
 multiple checkpoints, optional routes, light-activated plants, and three-phase
@@ -85,6 +85,16 @@ animated characters, and collectible/landing effects.
   away from Pip, and spits arcing fireballs; dodge, hop the stepping stones
   and stomp it. Each of these dedicated bosses takes five hits over three
   phases, with a checkpoint and recovery blocks first.
+- **Thunderhead Heights** opens after Ember Caldera. Gusts of wind blow back
+  across parts of the ridge on a steady beat, with wind streaks warning just
+  before each one; cross the windy gaps in the calm (gusts never blow over
+  moving or crumbling ledges). As every fourth world does, it ends at a
+  separate major-boss level, Thunderhorn's Crag: Thunderhorn, the Storm Ram,
+  marks where lightning will strike, rears while the bolts fall, then
+  charges to the wall. Six hits over three phases.
+- **Challenge rooms for worlds 9–12:** Icicle Dash, Floe Hopper, Ember
+  Gauntlet and Gale Run, each unlocked by rescuing that world's three
+  fireflies, with gold targets checked by real-input runs.
 - **Special stages** join the challenge rooms: Floodgate Dash (outrun a flood
   rolling in behind you) for Tidewell Depths, and Leafboat River (ride leaf
   boats downstream and hop the rocks) for Nightglow Woods.
