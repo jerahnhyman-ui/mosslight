@@ -1,3 +1,4 @@
+import { fightBoss } from "./boss-bot";
 import { describe, expect, it } from "vitest";
 import { Game, type GameInput } from "./engine";
 import { levels, groveLevel, challengeLevels, type Level } from "./levels";
@@ -102,6 +103,13 @@ function jumpTo(
 function defeatBossAndFinish(game: Game) {
   const phases = new Set<number>();
   const events = new Set<string>();
+  if (game.boss && game.boss.kind !== "moth") {
+    // The stag and spider stalk and mix in feints and pounces: read them
+    // with the shared fight bot, then walk to the finish.
+    const fought = fightBoss(game, { seconds: 120 });
+    fought.phases.forEach((p) => phases.add(p));
+    fought.events.forEach((e) => events.add(e));
+  }
   for (let frame = 0; frame < 120 * 90 && game.state === "playing"; frame++) {
     const boss = game.boss!;
     const p = game.player;

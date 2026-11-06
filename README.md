@@ -92,6 +92,15 @@ animated characters, and collectible/landing effects.
   separate major-boss level, Thunderhorn's Crag: Thunderhorn, the Storm Ram,
   marks where lightning will strike, rears while the bolts fall, then
   charges to the wall. Six hits over three phases.
+- **Living guardians:** every guardian stalks Pip between attacks, steps back
+  to wind up, builds speed into a charge and skids into the wall (its
+  shockwave rolls out a beat later). Hits make it flinch, and each new phase
+  starts with a rearing roar. From phase two most guardians mix in a second
+  attack (a stutter-charge, a double charge, a pounce, a double hop, a fake
+  dive, a rolling charge, a shard volley or a fireball fan), never the same
+  special twice running; phase one keeps the signature attack. Choices are
+  random but repeatable, so every fight is tested. Spider webs and tortoise
+  shards break when the guardian goes dizzy, keeping each stomp window clear.
 - **Challenge rooms for worlds 9–12:** Icicle Dash, Floe Hopper, Ember
   Gauntlet and Gale Run, each unlocked by rescuing that world's three
   fireflies, with gold targets checked by real-input runs.

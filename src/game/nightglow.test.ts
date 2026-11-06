@@ -8,6 +8,7 @@ import {
   NIGHTGLOW_FINALE_X,
 } from "./nightglow-level";
 import { createFinaleRun, finaleFor } from "./boss-level";
+import { fightBoss } from "./boss-bot";
 
 // Real directional and jump input only.
 const idle: GameInput = {
@@ -261,52 +262,10 @@ describe("Nightglow Woods", () => {
 describe("Gloomwing, the Night Owl", () => {
   it("can be beaten in its arena: six hits over three phases", () => {
     const g = createFinaleRun(gloomwingLevel, "classic");
-    const hits: number[] = [];
-    const phases = new Set<number>();
-    let previousJump = false;
-    for (let frame = 0; frame < 120 * 240 && g.state === "playing"; frame++) {
-      const b = g.boss!,
-        p = g.player;
-      phases.add(b.phase);
-      const px = p.x + p.w / 2;
-      const mark = b.attackTargetX + b.w / 2;
-      let target: number;
-      if (b.state === "defeated") target = g.level.goal.x + 20;
-      else if (b.state === "recover") target = b.x + b.w / 2;
-      else {
-        // Step well clear of the marked dive spot.
-        const left = mark - 240,
-          right = mark + 240;
-        target =
-          left < b.minX
-            ? right
-            : right > b.maxX + b.w
-              ? left
-              : px < mark
-                ? left
-                : right;
-      }
-      const dx = target - px - (p.vx * Math.abs(p.vx)) / 3700;
-      const incoming = g.hazards.some(
-        (h) =>
-          (h.vx > 0 && h.x + h.w < p.x + 6 && p.x - (h.x + h.w) < 34) ||
-          (h.vx < 0 && h.x > p.x + p.w - 6 && h.x - (p.x + p.w) < 34),
-      );
-      const steer = dx;
-      const jump: boolean =
-        ((b.state === "recover" && Math.abs(px - (b.x + b.w / 2)) < 70) ||
-          incoming ||
-          !p.grounded) &&
-        !(p.grounded && previousJump);
-      g.update(1 / 120, {
-        left: steer < -2,
-        right: steer > 2,
-        jump,
-        jumpPressed: jump && !previousJump,
-      });
-      previousJump = jump;
-      if (g.events.includes("boss-hit")) hits.push(g.boss!.health);
-    }
+    // It now mixes in fake dives, so the shared bot reads it.
+    const { hits, phases } = fightBoss(g, {
+      trace: process.env.DBG ? (snap) => console.log("DEATH", snap) : undefined,
+    });
     expect(g.state, `Gloomwing hits: ${hits.join(", ")}`).toBe("won");
     expect(hits).toEqual([5, 4, 3, 2, 1, 0]);
     expect(phases).toEqual(new Set([1, 2, 3]));

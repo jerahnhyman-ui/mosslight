@@ -2852,8 +2852,42 @@ export class Renderer {
       c.rect(b.x - 200, b.groundY - 600, b.w + 400, 600);
       c.clip();
     }
+    if (b.skid > 0)
+      // Dust kicked up by a skid, a slam or a flinch.
+      for (let i = 0; i < 4; i++) {
+        const k = 1 - b.skid / 0.4;
+        this.ellipse(
+          cx - b.facing * (b.w / 2 + 6 + i * 12 + k * 18),
+          feet - 6 - i * 3 - k * 8,
+          9 + k * 6,
+          6 + k * 4,
+          `rgba(235,228,210,${0.55 * (b.skid / 0.4)})`,
+        );
+      }
+    if (b.fury > 0) {
+      // A new phase: a red flare as it rears up and roars.
+      const glow = Math.sin((b.fury / 0.9) * Math.PI);
+      this.ellipse(
+        cx,
+        feet - b.h / 2,
+        b.w * 0.85,
+        b.h * 0.85,
+        `rgba(255,90,70,${0.3 * glow})`,
+      );
+    }
     c.translate(cx, feet);
     c.scale(b.facing < 0 ? -1 : 1, 1);
+    // Body language: a flinch shakes it back, a roar rears it up, a wind-up
+    // crouches it, and the first moment of an attack stretches it forward.
+    if (b.stagger > 0) {
+      c.translate(Math.sin(time * 70) * 3 - 4, 0);
+      c.rotate(-0.08);
+    }
+    if (b.fury > 0) c.rotate(-0.16 * Math.sin((b.fury / 0.9) * Math.PI));
+    if (warning && b.stateTime < 0.28 && b.kind !== "owl" && b.kind !== "moth")
+      c.scale(1.08, 0.9);
+    else if (b.state === "attack" && b.attackElapsed < 0.15)
+      c.scale(0.94, 1.07);
     c.scale(b.w / 82, b.h / 58);
     if (b.invulnerable > 0) c.globalAlpha = 0.65 + Math.sin(time * 16) * 0.15;
     const stride = Math.sin(time * (b.state === "attack" ? 25 : 9)) * 3;
@@ -2984,6 +3018,30 @@ export class Renderer {
       c.restore();
       this.ellipse(38 + lean, -34, 3, 3.5, "#fff4d4");
       this.ellipse(39 + lean, -34, 1.5, 2.2, "#283040");
+    } else if (
+      b.kind === "bear" &&
+      b.state === "attack" &&
+      b.variant === "roll"
+    ) {
+      // Curled into a rolling snowball.
+      c.save();
+      c.scale(82 / b.w, 58 / b.h);
+      c.translate(0, -35);
+      c.rotate(time * 14);
+      this.ellipse(0, 0, 35, 35, "#f4f8fb", "#9fb2c4", 3);
+      for (let i = 0; i < 3; i++) {
+        const a = (i / 3) * Math.PI * 2;
+        this.ellipse(Math.cos(a) * 20, Math.sin(a) * 20, 6, 4, "#d6e2ec");
+      }
+      this.line(
+        [
+          [-30, 8],
+          [30, -8],
+        ],
+        "#d9534f",
+        6,
+      );
+      c.restore();
     } else if (b.kind === "bear") {
       const rear = warning ? Math.abs(Math.sin(time * 6)) * 6 : 0;
       // A big white bear with a scarf, rearing as it winds up a slam.
@@ -6660,6 +6718,10 @@ export class Renderer {
         70,
       );
     if (game.events.includes("boss-hit")) this.shake = 0.22;
+    if (game.events.includes("boss-slam"))
+      this.shake = Math.max(this.shake, 0.16);
+    if (game.events.includes("boss-roar"))
+      this.shake = Math.max(this.shake, 0.35);
     if (game.events.includes("boss-defeat")) this.shake = 0.4;
     if (game.events.includes("boss-start") && game.boss)
       this.bossBanner = { name: game.boss.name, life: 2.4 };

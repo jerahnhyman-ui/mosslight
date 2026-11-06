@@ -23,6 +23,26 @@ export type BossState = Rect & {
   millNextDirection?: number;
   /** Where the guardian starts; the salamander keeps to its island here. */
   homeX: number;
+  /** Deterministic randomness: the same fight plays out the same way for
+   * the same inputs, but attacks are not a fixed loop. */
+  seed: number;
+  /** Which attack this guardian chose for its current warning. */
+  variant: string;
+  /** Eased sideways speed, so starts and stops build up and skid. */
+  speed: number;
+  /** Seconds a hit (or a phase change) holds the guardian in a flinch. */
+  stagger: number;
+  /** Seconds of the rearing roar that marks a new phase. */
+  fury: number;
+  /** Seconds of dust after a skid or slam, for the renderer. */
+  skid: number;
+  /** How far the guardian likes to keep from Pip while it stalks. */
+  stalk: number;
+  /** One fake-out per attack at most. */
+  feinted: boolean;
+  /** A wall-impact shockwave waiting to roll out, and its direction. */
+  pendingWave: number;
+  pendingWaveDir: number;
 };
 export type MillState =
   | "settle"
@@ -77,8 +97,37 @@ export const MOLE_BURROW = 1.7;
 export const MOLE_LOCK = 0.6;
 /** Seconds the mole takes to burst out of the ground. */
 export const MOLE_EMERGE = 0.3;
+/** Seconds the spider spends in the air on a pounce. */
+export const SPIDER_POUNCE = 0.9;
 /** Seconds the marsh toad spends in the air on each leap. */
 export const TOAD_LEAP = 1.05;
+
+/** A small deterministic random number generator (0 ≤ n < 1). */
+function rand(boss: BossState) {
+  boss.seed = (Math.imul(boss.seed, 1664525) + 1013904223) >>> 0;
+  return boss.seed / 4294967296;
+}
+/** Extra attacks each guardian mixes in from phase two (phase three adds
+ * the last one listed for some). Phase one keeps the signature attack, so
+ * every fight starts readable. */
+const VARIANTS: Partial<Record<BossSpec["kind"], string[][]>> = {
+  stag: [["main"], ["main", "stutter"], ["main", "stutter", "double"]],
+  spider: [["main"], ["main", "pounce"], ["main", "pounce"]],
+  toad: [["main"], ["main", "hop2"], ["main", "hop2"]],
+  owl: [["main"], ["main", "feint"], ["main", "feint"]],
+  bear: [["main"], ["main", "roll"], ["main", "roll"]],
+  tortoise: [["main"], ["main", "volley"], ["main", "volley"]],
+  salamander: [["main"], ["main", "fan"], ["main", "fan"]],
+  ram: [["main"], ["main", "stutter"], ["main", "stutter"]],
+};
+/** Pick the next attack: never the same special attack twice running. */
+function chooseVariant(boss: BossState) {
+  const options = VARIANTS[boss.kind]?.[boss.phase - 1] ?? ["main"];
+  const fresh = options.filter((v) => v === "main" || v !== boss.variant);
+  boss.variant = fresh[Math.floor(rand(boss) * fresh.length)] ?? "main";
+}
+/** Guardians that walk the arena floor stalk Pip between attacks. */
+const STALKERS = new Set<BossSpec["kind"]>(["stag", "spider", "bear", "ram"]);
 
 const clamp = (n: number, min: number, max: number) =>
   Math.max(min, Math.min(max, n));
@@ -129,6 +178,16 @@ export function createBoss(spec: BossSpec): BossState {
     attackTargetX: spec.x,
     shotsFired: 0,
     homeX: spec.x,
+    seed: (Math.round(spec.x) * 2654435761 + spec.kind.length * 97) >>> 0,
+    variant: "main",
+    speed: 0,
+    stagger: 0,
+    fury: 0,
+    skid: 0,
+    stalk: 240,
+    feinted: false,
+    pendingWave: 0,
+    pendingWaveDir: 0,
     ...(spec.kind === "millkeeper"
       ? {
           millState: "settle" as const,
@@ -175,6 +234,16 @@ export function hitBoss(
   boss.invulnerable = 1.35;
   hazards.length = 0;
   events.push("boss-hit");
+  const phaseBefore = boss.phase;
+  // A flinch: it is knocked back a little and reels for a moment.
+  boss.stagger = 0.35;
+  boss.speed = 0;
+  boss.skid = 0.3;
+  boss.x = clamp(
+    boss.x + (player.x + player.w / 2 < boss.x + boss.w / 2 ? 14 : -14),
+    boss.minX,
+    boss.maxX,
+  );
   if (boss.health <= 0) {
     boss.health = 0;
     boss.state = "defeated";
@@ -197,6 +266,13 @@ export function hitBoss(
           );
     if (boss.kind === "heartwood" || boss.kind === "owl" || boss.kind === "ram")
       boss.phaseCheckpoint = Math.max(boss.phaseCheckpoint ?? 1, boss.phase);
+    if (boss.phase > phaseBefore) {
+      // A new phase: it rears up and roars before fighting on, faster.
+      boss.stagger = 0.9;
+      boss.fury = 0.9;
+      events.push("boss-roar");
+    }
+    if (boss.kind === "bear") restoreBear(boss);
     warnBoss(boss, player, events, hazards);
   }
   return true;
@@ -319,6 +395,10 @@ export function warnBoss(
   hazards: BossHazard[] = [],
 ) {
   boss.state = "warning";
+  boss.feinted = false;
+  boss.speed = 0;
+  chooseVariant(boss);
+  boss.stalk = 200 + rand(boss) * 90;
   boss.stateTime =
     boss.kind === "heartwood"
       ? 1.4
@@ -332,7 +412,10 @@ export function warnBoss(
   // The toad marks the spot where Pip stands; the others charge a set
   // distance. Either way the target is shown for the whole warning.
   boss.attackTargetX = clamp(
-    boss.kind === "toad" || boss.kind === "mole" || boss.kind === "owl"
+    boss.kind === "toad" ||
+      boss.kind === "mole" ||
+      boss.kind === "owl" ||
+      (boss.kind === "spider" && boss.variant === "pounce")
       ? player.x + player.w / 2 - boss.w / 2
       : boss.x + boss.facing * (320 + boss.phase * 30),
     boss.minX,
@@ -409,6 +492,29 @@ export function stepBoss(
     }
     return;
   }
+  boss.skid = Math.max(0, boss.skid - dt);
+  boss.fury = Math.max(0, boss.fury - dt);
+  if (boss.pendingWave > 0) {
+    // The shockwave rolls out a beat after the impact, so Pip has time to
+    // land from jumping the charge before hopping the wave.
+    boss.pendingWave = Math.max(0, boss.pendingWave - dt);
+    if (boss.pendingWave === 0)
+      hazards.push({
+        kind: "gust",
+        x: boss.pendingWaveDir > 0 ? boss.x + boss.w - 24 : boss.x,
+        y: boss.groundY - 24,
+        w: 24,
+        h: 24,
+        vx: boss.pendingWaveDir * (170 + boss.phase * 25),
+        vy: 0,
+        remaining: 3.2,
+      });
+  }
+  if (boss.stagger > 0) {
+    // Reeling from a hit: everything else waits.
+    boss.stagger = Math.max(0, boss.stagger - dt);
+    return;
+  }
   boss.stateTime = Math.max(0, boss.stateTime - dt);
   if (boss.stateTime < 1e-9) boss.stateTime = 0;
   const towardPlayer = player.x + player.w / 2 < boss.x + boss.w / 2 ? -1 : 1;
@@ -418,11 +524,30 @@ export function stepBoss(
     // Guardians keep moving while they telegraph. Each attack still starts
     // from wherever the guardian is when the warning ends.
     // The stag paws the ground, rocking in place, so its charge still reaches the wall.
-    if (boss.kind === "stag" || boss.kind === "ram")
-      roam(boss, dt, Math.sin(boss.stateTime * 14) * 60);
-    else if (boss.kind === "spider")
-      roam(boss, dt, Math.sin(boss.stateTime * 9) * 70);
-    else if (boss.kind === "heartwood") roam(boss, dt, towardPlayer * 30);
+    if (STALKERS.has(boss.kind) && boss.kind !== "bear") {
+      // It stalks: closing in or backing off to its chosen distance, with
+      // momentum, then steps back to wind up just before it attacks.
+      const gap = Math.abs(player.x + player.w / 2 - (boss.x + boss.w / 2));
+      const want =
+        boss.stateTime < 0.28
+          ? -towardPlayer * 70
+          : gap > boss.stalk + 30
+            ? towardPlayer * 95
+            : gap < boss.stalk - 30
+              ? -towardPlayer * 85
+              : 0;
+      boss.speed = approach(boss.speed, want, 420 * dt);
+      roam(boss, dt, boss.speed);
+      boss.facing = towardPlayer;
+      // The charge or pounce aims from wherever it ends up.
+      if (boss.kind !== "spider" || boss.variant !== "pounce")
+        boss.attackTargetX = clamp(
+          boss.x + boss.facing * (320 + boss.phase * 30),
+          boss.minX,
+          boss.maxX,
+        );
+      boss.attackOriginX = boss.x;
+    } else if (boss.kind === "heartwood") roam(boss, dt, towardPlayer * 30);
     else if (boss.kind === "owl") {
       // It rises and circles above Pip; its mark follows, then locks.
       boss.y = approach(boss.y, boss.groundY - boss.h - 210, 260 * dt);
@@ -458,6 +583,7 @@ export function stepBoss(
         boss.shotsFired++;
       }
     } else if (boss.kind === "bear") {
+      if (boss.variant === "roll") boss.facing = towardPlayer;
       roam(boss, dt, Math.sin(boss.stateTime * 10) * 40);
     } else if (boss.kind === "tortoise") {
       // It tucks into its shell and spins up, facing Pip.
@@ -499,7 +625,7 @@ export function stepBoss(
     boss.state = "attack";
     boss.stateTime =
       boss.kind === "stag"
-        ? 1.35
+        ? 3.2
         : boss.kind === "ram"
           ? RAM_REAR + 2.6
           : boss.kind === "spider"
@@ -521,7 +647,19 @@ export function stepBoss(
                           : boss.kind === "crab"
                             ? CRAB_SCUTTLE
                             : 1.3;
+    // Some chosen attacks run differently.
+    if (boss.kind === "spider" && boss.variant === "pounce")
+      boss.stateTime = SPIDER_POUNCE;
+    if (boss.kind === "bear" && boss.variant === "roll") {
+      // It curls into a ball, low enough to jump, and rolls at Pip.
+      boss.stateTime = 3;
+      boss.h = 70;
+      boss.y = boss.groundY - boss.h;
+    }
+    if (boss.kind === "tortoise" && boss.variant === "volley")
+      boss.stateTime = 1.5;
     boss.attackElapsed = 0;
+    boss.speed = 0;
   }
   if (boss.state === "attack") {
     boss.attackElapsed += dt;
@@ -546,26 +684,53 @@ export function stepBoss(
     if (boss.kind === "ram" && boss.attackElapsed < RAM_REAR) {
       // Rearing in place.
     } else if (boss.kind === "stag" || boss.kind === "ram") {
-      boss.x +=
-        boss.facing *
-        (boss.kind === "ram" ? 280 + boss.phase * 50 : 290 + boss.phase * 55) *
-        dt;
+      const top =
+        boss.kind === "ram" ? 280 + boss.phase * 50 : 290 + boss.phase * 55;
+      const charging =
+        boss.kind === "ram"
+          ? boss.attackElapsed - RAM_REAR
+          : boss.attackElapsed;
+      // A stutter: it digs in partway, then bursts on again.
+      const stutter =
+        boss.variant === "stutter" && charging > 0.4 && charging < 0.85;
+      boss.speed = approach(
+        boss.speed,
+        stutter ? 0 : top,
+        (stutter ? 1400 : 1100) * dt,
+      );
+      if (stutter && !boss.feinted) {
+        boss.feinted = true;
+        boss.skid = 0.35;
+        events.push("boss-skid");
+      }
+      boss.x += boss.facing * boss.speed * dt;
       if (boss.x <= boss.minX || boss.x >= boss.maxX) {
         boss.x = clamp(boss.x, boss.minX, boss.maxX);
-        // The wall impact sends a low wave back into the arena. The charge
-        // and direction make the impact readable; a jump clears the wave.
-        hazards.push({
-          kind: "gust",
-          x: boss.facing > 0 ? boss.x : boss.x + boss.w - 24,
-          y: boss.groundY - 24,
-          w: 24,
-          h: 24,
-          vx: -boss.facing * (170 + boss.phase * 25),
-          vy: 0,
-          remaining: 3.2,
-        });
-        recover(boss);
+        // The wall impact sends a low wave back into the arena, a beat
+        // later. The charge and direction make the impact readable; a jump
+        // clears the wave.
+        boss.pendingWave = 0.4;
+        boss.pendingWaveDir = -boss.facing;
+        events.push("boss-slam");
+        boss.skid = 0.4;
+        // It rebounds a step off the wall.
+        boss.x -= boss.facing * 12;
+        if (boss.variant === "double" && boss.shotsFired === 0) {
+          // Shaking it off, it turns and charges straight back.
+          boss.shotsFired = 1;
+          boss.facing *= -1;
+          boss.speed = 0;
+          boss.stagger = 0.4;
+          boss.stateTime = Math.max(boss.stateTime, 3);
+        } else recover(boss);
       }
+    } else if (boss.kind === "spider" && boss.variant === "pounce") {
+      // A high pounce onto the spot it marked.
+      const fraction = clamp(boss.attackElapsed / SPIDER_POUNCE, 0, 1);
+      boss.x =
+        boss.attackOriginX +
+        (boss.attackTargetX - boss.attackOriginX) * fraction;
+      boss.y = boss.groundY - boss.h - Math.sin(fraction * Math.PI) * 150;
     } else if (boss.kind === "spider") {
       // It backs away while spitting web balls along the floor; jumping is
       // always a valid counter.
@@ -612,6 +777,16 @@ export function stepBoss(
         });
         boss.shotsFired++;
       }
+    } else if (boss.kind === "bear" && boss.variant === "roll") {
+      boss.speed = approach(boss.speed, 300 + boss.phase * 30, 700 * dt);
+      boss.x += boss.facing * boss.speed * dt;
+      if (boss.x <= boss.minX || boss.x >= boss.maxX) {
+        boss.x = clamp(boss.x, boss.minX, boss.maxX) - boss.facing * 12;
+        events.push("boss-slam");
+        boss.skid = 0.4;
+        restoreBear(boss);
+        recover(boss);
+      }
     } else if (boss.kind === "bear") {
       // A heavy ground slam: a shockwave each way, and icicles shaken loose
       // from the ceiling high above, falling where Pip and nearby stand.
@@ -650,6 +825,26 @@ export function stepBoss(
             remaining: 3,
           });
       }
+    } else if (boss.kind === "tortoise" && boss.variant === "volley") {
+      // Braced in its shell, it flings ice shards along the floor, first one
+      // way, then the other.
+      if (
+        boss.shotsFired < 3 &&
+        boss.attackElapsed >= 0.25 + boss.shotsFired * 0.4
+      ) {
+        const direction = boss.shotsFired % 2 ? -boss.facing : boss.facing;
+        hazards.push({
+          kind: "shard",
+          x: direction > 0 ? boss.x + boss.w + 2 : boss.x - 26,
+          y: boss.groundY - 22,
+          w: 24,
+          h: 22,
+          vx: direction * (210 + boss.phase * 20),
+          vy: 0,
+          remaining: 3,
+        });
+        boss.shotsFired++;
+      }
     } else if (boss.kind === "tortoise") {
       // Spinning in its shell, it slides across the ice and rebounds off the
       // walls (more times each phase), chipping off a shard at each wall.
@@ -678,7 +873,12 @@ export function stepBoss(
         boss.attackElapsed >= 0.25 + boss.shotsFired * 0.22
       ) {
         const fromX = boss.x + boss.w / 2;
-        const dx = clamp(player.x + player.w / 2 - fromX, -620, 620);
+        // A fan sprays both ways at set spreads instead of aiming at Pip.
+        const dx =
+          boss.variant === "fan"
+            ? [-420, 300, -220][boss.shotsFired % 3]! -
+              (boss.shotsFired - (Math.min(3, boss.phase + 1) - 1) / 2) * 70
+            : clamp(player.x + player.w / 2 - fromX, -620, 620);
         // Aim so the arc lands near Pip, spreading the later shots.
         const spread =
           (boss.shotsFired - (Math.min(3, boss.phase + 1) - 1) / 2) * 70;
@@ -695,6 +895,19 @@ export function stepBoss(
         });
         boss.shotsFired++;
       }
+    } else if (
+      boss.kind === "owl" &&
+      boss.variant === "feint" &&
+      !boss.feinted &&
+      boss.attackElapsed > OWL_DIVE * 0.45
+    ) {
+      // A fake-out: it pulls up from the dive, circles once more and locks
+      // a fresh mark before diving for real.
+      boss.feinted = true;
+      boss.state = "warning";
+      boss.stateTime = OWL_LOCK + 0.35;
+      boss.shotsFired = 1;
+      events.push("boss-warning");
     } else if (boss.kind === "owl") {
       // A steep dive onto the locked mark.
       const fraction = clamp(boss.attackElapsed / OWL_DIVE, 0, 1);
@@ -762,10 +975,37 @@ export function stepBoss(
         boss.shotsFired++;
       }
     }
-    if (boss.stateTime === 0) {
-      if (boss.kind === "toad" || boss.kind === "mole" || boss.kind === "owl")
+    if (boss.stateTime === 0 && boss.state === "attack") {
+      if (
+        boss.kind === "toad" ||
+        boss.kind === "mole" ||
+        boss.kind === "owl" ||
+        (boss.kind === "spider" && boss.variant === "pounce")
+      )
         toadSplash(boss, hazards);
-      recover(boss);
+      if (boss.kind === "toad" && boss.variant === "hop2" && !boss.feinted) {
+        // A second, quicker hop toward where Pip is now, marked as it lands.
+        boss.feinted = true;
+        boss.attackOriginX = boss.x;
+        boss.attackTargetX = clamp(
+          boss.x +
+            clamp(player.x + player.w / 2 - (boss.x + boss.w / 2), -260, 260),
+          boss.minX,
+          boss.maxX,
+        );
+        boss.state = "warning";
+        boss.stateTime = 0.55;
+      } else {
+        if (boss.kind === "bear") restoreBear(boss);
+        // The tortoise's thrown shards shatter as it goes dizzy, so the
+        // stomp window on slippery ice is never a dodge as well.
+        if (boss.kind === "tortoise" && boss.variant === "volley")
+          for (const h of hazards) if (h.kind === "shard") h.remaining = 0;
+        // Likewise the spider's webs snap once it is dizzy.
+        if (boss.kind === "spider")
+          for (const h of hazards) if (h.kind === "web") h.remaining = 0;
+        recover(boss);
+      }
     }
   } else if (boss.state === "recover") {
     // A dazed guardian staggers slowly away from Pip, so the stomp has to
@@ -809,6 +1049,13 @@ function toadSplash(boss: BossState, hazards: BossHazard[]) {
         vy: 0,
         remaining: 4,
       });
+}
+
+/** The bear uncurls from its roll. */
+function restoreBear(boss: BossState) {
+  if (boss.h === 100) return;
+  boss.h = 100;
+  boss.y = boss.groundY - boss.h;
 }
 
 /** Move a guardian sideways, staying inside its arena. */

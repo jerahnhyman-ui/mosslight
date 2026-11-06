@@ -1764,6 +1764,7 @@ function frame(now: number) {
         "leaf",
       ],
       ["boss-hit", "A perfect opening!", "pip"],
+      ["boss-roar", "It's getting angry! New attacks ahead.", "pip"],
       ["boss-start", "Watch the warning. Jump when the guardian rests!", "pip"],
       ["awaken", "Your glow woke a new path!", "leaf"],
       ["enemy-break", "A beetle opened a secret route!", "diamond"],

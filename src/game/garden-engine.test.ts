@@ -1,3 +1,4 @@
+import { fightBoss } from "./boss-bot";
 import { describe, expect, it } from "vitest";
 import { Game, MAX_LIVES, type GameInput } from "./engine";
 import type { Level, BossKind } from "./levels";
@@ -70,7 +71,17 @@ describe("garden guardian fights", () => {
   for (const kind of ["stag", "spider", "moth"] as const) {
     it(`${kind} is beatable through normal movement and jumps`, () => {
       const game = new Game(0, { level: arena(kind) });
-      const hits = fight(game);
+      // The stag and spider now stalk and mix in feints and pounces, so the
+      // shared bot reads them; the moth keeps its simple swoop.
+      const hits =
+        kind === "moth"
+          ? fight(game)
+          : fightBoss(game, {
+              seconds: 90,
+              trace: process.env.DBG
+                ? (snap) => console.log("DEATH", snap)
+                : undefined,
+            }).hits;
       expect(game.boss!.state).toBe("defeated");
       expect(game.deaths).toBe(0);
       expect(hits).toEqual([3, 2, 1, 0]);
@@ -84,6 +95,18 @@ describe("garden guardian fights", () => {
       const level = arena(kind);
       level.diamonds = [];
       const game = new Game(0, { level });
+      if (kind !== "moth")
+        fightBoss(game, {
+          seconds: 90,
+          trace: process.env.DBG
+            ? (snap) => console.log("DEATH", snap)
+            : undefined,
+          watch: process.env.DBG2
+            ? (snap, f) => {
+                if (f % 4 === 0) console.log(f, snap);
+              }
+            : undefined,
+        });
       let previousJump = false;
       for (let frame = 0; frame < 120 * 90; frame++) {
         const boss = game.boss!;
