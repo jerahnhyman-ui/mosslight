@@ -49,6 +49,14 @@ const layouts: Record<string, readonly Placement[]> = {
     // block to its left and the approach platform to its right.
     ["feather", 2016, 300],
   ],
+  "world.reedwater-marsh": [
+    ["feather", 200, 300],
+    ["diamond", 1060, 300],
+    ["star", 3900, 300],
+    ["diamond", 7700, 300],
+    // Recovery diamond on the guardian's bank, after the last checkpoint.
+    ["diamond", 10620, 300],
+  ],
   grove: [["feather", 260, 300]],
   "secret.beehive": [
     ["feather", 150, 300],

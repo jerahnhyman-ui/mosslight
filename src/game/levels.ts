@@ -1,4 +1,5 @@
 import { windmillLevel } from "./expansion-levels";
+import { marshLevel } from "./marsh-level";
 import { cloudAscentPlatforms } from "./cloud-garden";
 import { withTrailChallenges } from "./challenge-balance";
 import { withRewardBlocks } from "./reward-layouts";
@@ -43,7 +44,13 @@ export type EnemySpawn = {
   maxX: number;
 };
 
-export type BossKind = "stag" | "spider" | "moth" | "millkeeper" | "heartwood";
+export type BossKind =
+  | "stag"
+  | "spider"
+  | "moth"
+  | "toad"
+  | "millkeeper"
+  | "heartwood";
 export type BossSpec = {
   kind: BossKind;
   name: string;
@@ -77,7 +84,8 @@ export interface Level {
     | "windmill"
     | "hive"
     | "cloud"
-    | "grotto";
+    | "grotto"
+    | "marsh";
   spawn: { x: number; y: number };
   platforms: Platform[];
   coins: { x: number; y: number }[];
@@ -1093,6 +1101,7 @@ export const levels: Level[] = [
     );
   }),
   windmillLevel,
+  marshLevel,
 ];
 
 /** A real, safe platforming space: all residents and purchased furnishings are

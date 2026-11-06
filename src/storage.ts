@@ -192,7 +192,10 @@ export const WORLD_IDS = [
   "world.firefly-hollow",
   "world.cloudtop-crossing",
   "world.windmill-garden",
+  "world.reedwater-marsh",
 ] as const;
+/** Worlds every v3 save already contains; later worlds may be missing. */
+const ORIGINAL_WORLD_COUNT = 4;
 export const CHALLENGE_IDS = [
   "challenge.sunlit-meadow",
   "challenge.firefly-hollow",
@@ -233,7 +236,7 @@ const blank = (): Save => ({
     seedStack: { bestScore: null, bestLines: null },
   },
   claimedRewards: [],
-  progress: Array.from({ length: 4 }, () => ({
+  progress: Array.from({ length: WORLD_IDS.length }, () => ({
     completed: false,
     stars: 0,
     coins: 0,
@@ -306,7 +309,11 @@ export function readSave(): Save {
             Array.isArray(candidate.worlds)
           )
             continue;
-          const worlds = WORLD_IDS.map((id) => candidate.worlds[id]);
+          const worlds = WORLD_IDS.map((id, i) =>
+            i >= ORIGINAL_WORLD_COUNT && candidate.worlds[id] === undefined
+              ? {}
+              : candidate.worlds[id],
+          );
           if (
             !worlds.every(
               (world) =>
@@ -599,14 +606,17 @@ export function recordChallenge(
   return improved;
 }
 
-/** Windmill Garden opens only after the current Meadow guardian, not a legacy trail. */
-export function worldUnlocked(save: Save, index: number): boolean {
-  return (
-    index >= 0 &&
-    index < 4 &&
-    (index !== 3 ||
-      Object.values(save.progress[0].garden).some((record) => record.completed))
+const gardenCompleted = (save: Save, world: number) =>
+  Object.values(save.progress[world]?.garden ?? {}).some(
+    (record) => record.completed,
   );
+/** Windmill Garden opens after the current Meadow guardian, not a legacy
+ * trail; Reedwater Marsh opens once the Thorn King has been defeated. */
+export function worldUnlocked(save: Save, index: number): boolean {
+  if (index < 0 || index >= WORLD_IDS.length) return false;
+  if (index === 3) return gardenCompleted(save, 0);
+  if (index === 4) return gardenCompleted(save, 3);
+  return true;
 }
 export function discoverFeather(save: Save): boolean {
   if (save.unlocks.windFeatherDiscovered) return false;

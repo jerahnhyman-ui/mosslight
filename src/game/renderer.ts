@@ -14,7 +14,8 @@ type Theme =
   | "windmill"
   | "hive"
   | "grotto"
-  | "cloud";
+  | "cloud"
+  | "marsh";
 type Palette = {
   sky: string;
   horizon: string;
@@ -64,6 +65,23 @@ const thornGrovePalette: Palette = {
   rock: "#ddc297",
 };
 const palettes: Record<Theme, Palette> = {
+  marsh: {
+    sky: "#8cc6c4",
+    horizon: "#f6dcae",
+    sun: "#ffe7a6",
+    far: "#a9cdb8",
+    middle: "#83b59c",
+    near: "#5f9a80",
+    leaf: "#3f8a68",
+    leafLight: "#93c97f",
+    leafShade: "#2f6e57",
+    trunk: "#7a6248",
+    grass: "#78b465",
+    grassLight: "#cfe596",
+    soil: "#9a7c5a",
+    soilShade: "#6f5a45",
+    rock: "#c2ad86",
+  },
   grotto: {
     sky: "#123f58",
     horizon: "#4ca5a9",
@@ -448,6 +466,7 @@ export class Renderer {
     this.restoredLight(Math.max(0, Math.min(1, restoration)), time, camera);
     c.save();
     c.translate(-camera, -this.cameraY);
+    if (game.level.theme === "marsh") this.marshWater(camera, time);
 
     // The trees sit on actual ground sections; no scenery suggests a floor over a pit.
     for (const platform of game.platforms) {
@@ -2385,6 +2404,37 @@ export class Renderer {
         "#fff0d5",
         3,
       );
+    } else if (b.kind === "toad") {
+      const airborne = b.state === "attack";
+      const crouch = warning ? 4 + Math.sin(time * 14) * 1.5 : 0;
+      const legs = airborne ? 10 : 0;
+      // Back legs fold under while resting and stretch out mid-leap.
+      for (const side of [-1, 1]) {
+        this.ellipse(
+          -22 - legs,
+          -10 + legs * 0.4,
+          17,
+          9,
+          side < 0 ? "#5f8f4c" : "#6f9f58",
+          "#3f6a39",
+          2,
+        );
+      }
+      this.ellipse(22, -6 + legs * 0.3, 8, 5, "#6f9f58", "#3f6a39", 2);
+      this.ellipse(0, -24 + crouch, 38, 22 - crouch * 0.4, shell, "#3f6a39", 3);
+      this.ellipse(6, -14 + crouch, 24, 10, "#e3e0a2");
+      for (let i = 0; i < 3; i++)
+        this.ellipse(-18 + i * 11, -34 + crouch, 4, 3, "rgba(63,106,57,.45)");
+      this.ellipse(22, -40 + crouch, 11, 11, shell, "#3f6a39", 2);
+      this.line(
+        [
+          [12, -18 + crouch],
+          [24, -16 + crouch],
+          [34, -21 + crouch],
+        ],
+        "#3f6a39",
+        2.5,
+      );
     } else {
       const flutter =
         b.state === "attack"
@@ -2420,8 +2470,8 @@ export class Renderer {
         3,
       );
     }
-    const eyeX = b.kind === "moth" ? 0 : 27,
-      eyeY = b.kind === "moth" ? -47 : -26;
+    const eyeX = b.kind === "moth" ? 0 : b.kind === "toad" ? 22 : 27,
+      eyeY = b.kind === "moth" ? -47 : b.kind === "toad" ? -41 : -26;
     if (recovering) {
       this.line(
         [
@@ -2845,6 +2895,30 @@ export class Renderer {
             2,
           );
         }
+      } else if (game.level.theme === "marsh") {
+        // A clump of cattails marks each new stretch of the marsh.
+        for (let stalk = 0; stalk < 3; stalk++) {
+          const sx = signX - 36 + stalk * 9;
+          const top = y - 118 + stalk * 14;
+          const sway = Math.sin(time * 1.4 + index + stalk) * 3;
+          this.line(
+            [
+              [sx, y],
+              [sx + sway, top],
+            ],
+            "#5d8f55",
+            3,
+          );
+          this.rounded(sx + sway - 4, top - 4, 8, 24, 4, "#8a5a3a");
+          this.line(
+            [
+              [sx + sway, top - 4],
+              [sx + sway, top - 12],
+            ],
+            "#5d8f55",
+            2,
+          );
+        }
       } else {
         this.line(
           [
@@ -3031,6 +3105,10 @@ export class Renderer {
           );
         }
       }
+      return;
+    }
+    if (r.id?.startsWith("marsh.lily.") || r.id?.startsWith("marsh.sinkpad.")) {
+      this.lilyPad(r, time);
       return;
     }
     if (
@@ -3301,6 +3379,93 @@ export class Renderer {
       ],
       "#fff7dc",
       2.5,
+    );
+  }
+
+  /** Open marsh water: drawn beneath the banks, so only real gaps show it. */
+  private marshWater(camera: number, time: number) {
+    const c = this.ctx;
+    const left = camera - 40;
+    const right = camera + this.viewportWidth + 40;
+    const surface = 452;
+    const water = c.createLinearGradient(0, surface, 0, 660);
+    water.addColorStop(0, "#5fa6a0");
+    water.addColorStop(1, "#2f6763");
+    c.fillStyle = water;
+    c.fillRect(left, surface, right - left, 700 - surface);
+    for (let xx = Math.floor(left / 90) * 90; xx < right; xx += 90) {
+      const drift = Math.sin(time * 1.3 + xx * 0.05) * 6;
+      this.line(
+        [
+          [xx + drift, surface + 9],
+          [xx + 34 + drift, surface + 9],
+        ],
+        "rgba(222,247,233,.45)",
+        2,
+      );
+    }
+    this.line(
+      [
+        [left, surface],
+        [right, surface],
+      ],
+      "rgba(214,244,226,.7)",
+      3,
+    );
+  }
+
+  /** Lily pads: sliding pads and sinking pads share a look; sinking pads
+   * turn amber and wobble during their warning before they slip under. */
+  private lilyPad(r: Game["platforms"][number], time: number) {
+    const c = this.ctx;
+    const { x, y, w, h } = r;
+    const sinking = r.kind === "crumble";
+    const warning = sinking && r.crumbleRemaining > 0;
+    const urgency = warning
+      ? 1 - Math.min(1, r.crumbleRemaining / CRUMBLE_WARNING)
+      : 0;
+    const wobble = warning ? Math.sin(time * 31) * urgency * 2 : 0;
+    c.save();
+    c.translate(wobble, urgency * 4);
+    const fill = warning ? "#c9c46b" : sinking ? "#7fbf7a" : "#5fb889";
+    const edge = warning ? "#8a7d3e" : sinking ? "#4c8a58" : "#2f7a63";
+    this.rounded(x, y, w, h, h / 2, fill, edge);
+    // A notch marks the pad as a lily without changing its flat top.
+    c.beginPath();
+    c.moveTo(x + w / 2, y + h / 2);
+    c.lineTo(x + w / 2 - 9, y + h);
+    c.lineTo(x + w / 2 + 9, y + h);
+    c.closePath();
+    c.fillStyle = "#4f948c";
+    c.fill();
+    this.line(
+      [
+        [x + 6, y + 2],
+        [x + w - 6, y + 2],
+      ],
+      warning ? "#f1e6a1" : "#c8efb2",
+      3,
+    );
+    for (let i = 1; i < 4; i++) {
+      const xx = x + (w * i) / 4;
+      this.line(
+        [
+          [x + w / 2, y + h / 2],
+          [xx, y + 4],
+        ],
+        sinking ? "rgba(52,110,70,.35)" : "rgba(40,110,84,.35)",
+        1.5,
+      );
+    }
+    if (!sinking) this.ellipse(x + w - 22, y + 5, 7, 4, "#f6b6c6");
+    c.restore();
+    // Ripples show the pad is afloat.
+    this.ellipse(
+      x + w / 2,
+      y + h + 4,
+      w * 0.55 + Math.sin(time * 2 + x) * 4,
+      4,
+      "rgba(214,244,226,.25)",
     );
   }
 

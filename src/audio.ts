@@ -1,7 +1,7 @@
 import { Capacitor } from "@capacitor/core";
 import { Haptics, ImpactStyle, NotificationType } from "@capacitor/haptics";
 
-type Theme = "meadow" | "dusk" | "alpine" | "windmill" | "hive";
+type Theme = "meadow" | "dusk" | "alpine" | "windmill" | "hive" | "marsh";
 type MusicScene = "trail" | "boss" | "grove";
 type ScoreName = Theme | "star" | "boss" | "grove";
 type Score = {
@@ -133,6 +133,30 @@ const scores: Record<ScoreName, Score> = {
       [48, 52, 55],
       [38, 42, 45],
       [43, 47, 50],
+    ],
+  },
+  marsh: {
+    bpm: 92,
+    voice: "sine",
+    melody: [
+      [69, null, 72, 76, null, 74, 72, null],
+      [71, null, 74, null, 72, null, 69, null],
+      [67, null, 71, 74, null, 72, 71, null],
+      [69, null, 72, null, 69, null, null, null],
+      [76, null, 79, 81, null, 79, 76, null],
+      [74, null, 72, null, 71, null, 74, null],
+      [72, null, 71, 69, null, 67, 69, null],
+      [69, null, 72, 76, 69, null, null, null],
+    ].flat(),
+    chords: [
+      [45, 48, 52],
+      [43, 47, 50],
+      [41, 45, 48],
+      [45, 48, 52],
+      [48, 52, 55],
+      [43, 47, 50],
+      [41, 45, 48],
+      [45, 48, 52],
     ],
   },
   star: {
