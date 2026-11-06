@@ -38,6 +38,9 @@ export type BossHazard = Rect & {
   remaining: number;
 };
 
+/** Seconds the marsh toad spends in the air on each leap. */
+export const TOAD_LEAP = 1.05;
+
 const clamp = (n: number, min: number, max: number) =>
   Math.max(min, Math.min(max, n));
 const approach = (n: number, target: number, amount: number) =>
@@ -53,7 +56,9 @@ export function createBoss(spec: BossSpec): BossState {
           ? { w: 104, h: 88 }
           : spec.kind === "heartwood"
             ? { w: 156, h: 100 }
-            : { w: 92, h: 64 };
+            : spec.kind === "toad"
+              ? { w: 96, h: 66 }
+              : { w: 92, h: 64 };
   return {
     ...spec,
     ...size,
@@ -257,8 +262,12 @@ export function warnBoss(boss: BossState, player: Rect, events: string[]) {
     boss.kind === "heartwood" ? 1.4 : 1.15 - (boss.phase - 1) * 0.1;
   boss.facing = player.x + player.w / 2 < boss.x + boss.w / 2 ? -1 : 1;
   boss.attackOriginX = boss.x;
+  // The toad marks the spot where Pip stands; the others charge a set
+  // distance. Either way the target is shown for the whole warning.
   boss.attackTargetX = clamp(
-    boss.x + boss.facing * (320 + boss.phase * 30),
+    boss.kind === "toad"
+      ? player.x + player.w / 2 - boss.w / 2
+      : boss.x + boss.facing * (320 + boss.phase * 30),
     boss.minX,
     boss.maxX,
   );
@@ -311,7 +320,9 @@ export function stepBoss(
           ? 1.55
           : boss.kind === "heartwood"
             ? 2.05
-            : 1.3;
+            : boss.kind === "toad"
+              ? TOAD_LEAP
+              : 1.3;
     boss.attackElapsed = 0;
   }
   if (boss.state === "attack") {
@@ -376,6 +387,13 @@ export function stepBoss(
         });
         boss.shotsFired++;
       }
+    } else if (boss.kind === "toad") {
+      // A high, readable leap onto the marked spot.
+      const fraction = clamp(boss.attackElapsed / TOAD_LEAP, 0, 1);
+      boss.x =
+        boss.attackOriginX +
+        (boss.attackTargetX - boss.attackOriginX) * fraction;
+      boss.y = boss.groundY - boss.h - Math.sin(fraction * Math.PI) * 170;
     } else {
       // The moth swoops to its signalled side, then lands with its wings folded.
       const fraction = clamp(boss.attackElapsed / 1.3, 0, 1);
@@ -400,8 +418,30 @@ export function stepBoss(
         boss.shotsFired++;
       }
     }
-    if (boss.stateTime === 0) recover(boss);
+    if (boss.stateTime === 0) {
+      if (boss.kind === "toad") toadSplash(boss, hazards);
+      recover(boss);
+    }
   } else if (boss.state === "recover" && boss.stateTime === 0) {
     warnBoss(boss, player, events);
   }
+}
+
+/** Landing sends a low ripple each way; a jump clears it. Phase three adds
+ * a slower second pair, so a single hop must be timed rather than mashed. */
+function toadSplash(boss: BossState, hazards: BossHazard[]) {
+  boss.x = boss.attackTargetX;
+  const speeds = boss.phase >= 3 ? [175, 105] : [150 + boss.phase * 20];
+  for (const speed of speeds)
+    for (const direction of [-1, 1])
+      hazards.push({
+        kind: "gust",
+        x: boss.x + boss.w / 2 + direction * (boss.w / 2 + 4) - 12,
+        y: boss.groundY - 20,
+        w: 24,
+        h: 20,
+        vx: direction * speed,
+        vy: 0,
+        remaining: 4,
+      });
 }

@@ -255,7 +255,7 @@ describe("adventure progress", () => {
     });
     expect(save.progress[0].fireflies).toEqual([0, 2]);
     expect(save.progress[0].adventureBestTime).toBeNull();
-    expect(save.progress).toHaveLength(4);
+    expect(save.progress).toHaveLength(5);
   });
 
   it("continues with session-only progress when storage is unavailable", () => {
@@ -517,10 +517,10 @@ describe("windmill save migration and rewards", () => {
     writeSave(save);
     expect(readSave()).toEqual(save);
   });
-  it("persists discoveries, twelve rescues, and idempotent bee and hoop rewards", () => {
+  it("persists discoveries, fifteen rescues, and idempotent bee and hoop rewards", () => {
     const save = readSave();
     for (const world of save.progress) recordFireflies(world, [0, 1, 2]);
-    expect(rescuedTotal(save)).toBe(12);
+    expect(rescuedTotal(save)).toBe(15);
     expect(challengeUnlocked(save, 3)).toBe(false);
     expect(purchaseItem(save, "cosmetic.bee_scarf")).toBe("locked");
     expect(purchaseItem(save, "cosmetic.pinwheel_garland")).toBe("locked");
@@ -580,5 +580,36 @@ describe("windmill save migration and rewards", () => {
     expect(recordHoops(save, { ...best, score: 2601 })).toBe(false);
     writeSave(save);
     expect(readSave()).toEqual(save);
+  });
+});
+
+describe("Reedwater Marsh progress", () => {
+  it("keeps a four-world v3 save when the fifth world is missing", () => {
+    const save = readSave();
+    recordFireflies(save.progress[3]!, [0, 2]);
+    recordGardenRun(save, 3, "classic", 400);
+    writeSave(save);
+    const stored = JSON.parse(items.get(SAVE_KEY)!);
+    delete stored.worlds["world.reedwater-marsh"];
+    items.set(SAVE_KEY, JSON.stringify(stored));
+    const loaded = readSave();
+    expect(loaded.progress).toHaveLength(5);
+    expect(loaded.progress[3]!.fireflies).toEqual([0, 2]);
+    expect(loaded.progress[3]!.garden.classic.completed).toBe(true);
+    expect(loaded.progress[4]!.fireflies).toEqual([]);
+    expect(loaded.progress[4]!.garden.classic.completed).toBe(false);
+  });
+
+  it("opens only after the Thorn King is defeated, and saves its fireflies", () => {
+    const save = readSave();
+    expect(worldUnlocked(save, 4)).toBe(false);
+    recordGardenRun(save, 0, "classic", 300);
+    expect(worldUnlocked(save, 4)).toBe(false);
+    recordGardenRun(save, 3, "relaxed", 500);
+    expect(worldUnlocked(save, 4)).toBe(true);
+    expect(worldUnlocked(save, 5)).toBe(false);
+    recordFireflies(save.progress[4]!, [1]);
+    writeSave(save);
+    expect(readSave().progress[4]!.fireflies).toEqual([1]);
   });
 });
