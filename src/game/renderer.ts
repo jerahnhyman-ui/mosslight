@@ -1,4 +1,9 @@
-import { CRUMBLE_WARNING, ENEMY_SQUASH_DURATION, type Game } from "./engine";
+import {
+  MOUNT_SIZE,
+  CRUMBLE_WARNING,
+  ENEMY_SQUASH_DURATION,
+  type Game,
+} from "./engine";
 import type { Rect } from "./levels";
 import { CREATURES } from "./creatures";
 
@@ -637,9 +642,41 @@ export class Renderer {
       }
       this.bossCreature(game, time);
       this.bossHazards(game, time);
+      for (const mount of game.mounts)
+        if (mount !== game.riding && this.visible(mount.x, 80))
+          this.gulpFrog(
+            mount.x + MOUNT_SIZE.w / 2,
+            mount.y,
+            mount.facing,
+            time,
+            mount.state === "fleeing",
+          );
       const player = game.player;
       const center = player.x + player.w / 2;
-      const feet = player.y + player.h;
+      // Riding Gulp, Pip sits on its back.
+      const feet = player.y + player.h - (game.riding ? 18 : 0);
+      if (game.riding) {
+        if (game.tongueTarget) {
+          const mouthX = center + player.facing * 24;
+          const mouthY = player.y + player.h - 14;
+          this.line(
+            [
+              [mouthX, mouthY],
+              [game.tongueTarget.x, game.tongueTarget.y],
+            ],
+            "#e8708a",
+            5,
+          );
+          this.ellipse(
+            game.tongueTarget.x,
+            game.tongueTarget.y,
+            6,
+            6,
+            "#f28fa3",
+          );
+        }
+        this.gulpFrog(center, player.y + player.h, player.facing, time, false);
+      }
       const size = player.h / 38;
       if (game.starPowerRemaining <= 0) {
         const glow = c.createRadialGradient(
@@ -1018,7 +1055,24 @@ export class Renderer {
       c.beginPath();
       c.rect(zone.x, zone.y, zone.w, zone.h);
       c.clip();
-      if (!zone.currentY) {
+      if (zone.currentX) {
+        // Streaks drift in the current's direction; no extra tint.
+        for (let i = 0; i < Math.max(6, Math.floor(zone.w / 70)); i++) {
+          const span = zone.w + 80;
+          const along =
+            (time * zone.currentX * 0.8 + hash(i + 7) * span) % span;
+          const x = zone.x + ((along + span) % span) - 40;
+          const y = zone.y + 20 + hash(i + 91) * (zone.h - 40);
+          this.line(
+            [
+              [x, y],
+              [x + Math.sign(zone.currentX) * 28, y],
+            ],
+            "rgba(220,255,250,.35)",
+            2,
+          );
+        }
+      } else if (!zone.currentY) {
         c.fillStyle = "rgba(43, 183, 189, .22)";
         c.fillRect(zone.x, zone.y, zone.w, zone.h);
         this.line(
@@ -2459,6 +2513,48 @@ export class Renderer {
         "#fff0d5",
         3,
       );
+    } else if (b.kind === "crab") {
+      const flipped = recovering;
+      if (flipped) {
+        // Tired, it rolls onto its shell with legs waving: stomp now.
+        c.translate(0, -26);
+        c.rotate(Math.PI);
+        c.translate(0, 26);
+      }
+      for (const side of [-1, 1])
+        for (let i = 0; i < 3; i++)
+          this.line(
+            [
+              [side * (10 + i * 8), -10],
+              [side * (24 + i * 7), -2 + (i % 2 ? stride : -stride)],
+            ],
+            "#c4553d",
+            3.5,
+          );
+      // A spiral shell on its back, then the body and two big claws.
+      this.ellipse(-8, -34, 26, 22, shell, "#6a4a3a", 3);
+      c.strokeStyle = "rgba(255,240,210,.6)";
+      c.lineWidth = 2;
+      c.beginPath();
+      c.arc(-8, -34, 12, 0.2, Math.PI * 1.6);
+      c.stroke();
+      this.ellipse(6, -16, 26, 12, "#e2674a", "#9b3a2a", 2);
+      const snap = warning ? Math.abs(Math.sin(time * 18)) * 0.5 : 0.15;
+      for (const [x0, y0] of [
+        [30, -24],
+        [-22, -22],
+      ] as const) {
+        c.save();
+        c.translate(x0, y0);
+        c.rotate(-snap);
+        this.ellipse(0, -4, 10, 7, "#ee7a58", "#9b3a2a", 2);
+        c.restore();
+        c.save();
+        c.translate(x0, y0);
+        c.rotate(snap);
+        this.ellipse(0, 4, 9, 5, "#ee7a58", "#9b3a2a", 2);
+        c.restore();
+      }
     } else if (b.kind === "mole") {
       const crystal =
         b.phase === 3 ? "#f28f9c" : b.phase === 2 ? "#e2a3dc" : "#aa9cf2";
@@ -2578,7 +2674,9 @@ export class Renderer {
             ? 22
             : b.kind === "mole"
               ? 22
-              : 27,
+              : b.kind === "crab"
+                ? 16
+                : 27,
       eyeY =
         b.kind === "moth"
           ? -47
@@ -2586,7 +2684,9 @@ export class Renderer {
             ? -41
             : b.kind === "mole"
               ? -34
-              : -26;
+              : b.kind === "crab"
+                ? -26
+                : -26;
     if (recovering) {
       this.line(
         [
@@ -2799,6 +2899,19 @@ export class Renderer {
             "#ffe4a3",
             3,
           );
+      } else if (r.kind === "bubble") {
+        // A big wobbling bubble with a bright highlight.
+        const wobble = Math.sin(time * 6 + r.x * 0.1) * 1.5;
+        this.ellipse(
+          cx,
+          cy,
+          r.w / 2 + wobble,
+          r.h / 2 - wobble,
+          "rgba(205,250,245,.35)",
+          "#e8fffb",
+          2,
+        );
+        this.ellipse(cx - 4, cy - 4, 3.5, 2.5, "rgba(255,255,255,.85)");
       } else if (r.kind === "web") {
         this.ellipse(cx, cy, r.w / 2, r.h / 2, "#f5dce9", "#ad79a7", 2);
         for (let i = 0; i < 3; i++) {
@@ -3633,6 +3746,48 @@ export class Renderer {
     c.restore();
   }
 
+  /** Gulp, the garden tree frog Pip can ride. Drawn standing on `feet`. */
+  private gulpFrog(
+    cx: number,
+    feet: number,
+    facing: number,
+    time: number,
+    startled: boolean,
+  ) {
+    const c = this.ctx;
+    c.save();
+    c.translate(cx, feet);
+    c.scale(facing < 0 ? -1 : 1, 1);
+    const bob = startled
+      ? Math.abs(Math.sin(time * 18)) * -6
+      : Math.sin(time * 3) * 0.8;
+    c.translate(0, bob);
+    this.ellipse(0, 0, 24, 4, "rgba(30,60,40,.2)");
+    // Back legs, body, pale belly and a leafy crest.
+    this.ellipse(-16, -6, 11, 7, "#3f9a52", "#2a6b3a", 1.5);
+    this.ellipse(14, -4, 6, 4, "#3f9a52", "#2a6b3a", 1.5);
+    this.ellipse(0, -13, 25, 13, "#56b866", "#2a6b3a", 2);
+    this.ellipse(6, -8, 15, 6, "#d9efb0");
+    this.leaf(-8, -24, 9, -1.2, "#8fd86f");
+    // Big friendly eyes on top of the head.
+    for (const ex of [12, 22]) {
+      this.ellipse(ex, -24, 6, 6, "#56b866", "#2a6b3a", 1.5);
+      this.ellipse(ex + 1, -24, 3.5, 3.5, "#fffbe8");
+      this.ellipse(ex + 2, -24, 1.8, 2.2, "#2b3a32");
+    }
+    this.line(
+      [
+        [14, -11],
+        [22, -10],
+        [28, -13],
+      ],
+      "#2a6b3a",
+      1.6,
+    );
+    this.ellipse(18, -12, 3, 2, "rgba(242,143,163,.6)");
+    c.restore();
+  }
+
   /** Open marsh water: drawn beneath the banks, so only real gaps show it. */
   private marshWater(camera: number, time: number) {
     const c = this.ctx;
@@ -4263,6 +4418,36 @@ export class Renderer {
     }
     if (enemy.kind === "hopper") {
       this.grasshopper(enemy, time, squashed);
+      c.restore();
+      return;
+    }
+    if (enemy.kind === "fish") {
+      // A round little minnow with a flicking tail, facing its direction.
+      const flick = Math.sin(time * 14 + enemy.x * 0.05) * 0.35;
+      c.save();
+      c.translate(-16, -14);
+      c.rotate(flick);
+      c.beginPath();
+      c.moveTo(4, 0);
+      c.lineTo(-10, -9);
+      c.lineTo(-10, 9);
+      c.closePath();
+      c.fillStyle = "#f2a15f";
+      c.fill();
+      c.restore();
+      this.ellipse(0, -14, 17, 12, "#f7b968", "#b9683a", 2);
+      this.ellipse(2, -9, 10, 4, "#ffe2b0");
+      this.line(
+        [
+          [-4, -24],
+          [2, -30],
+          [8, -24],
+        ],
+        "#e88a4d",
+        2.5,
+      );
+      this.ellipse(9, -17, 3.5, 3.5, "#fffbe8");
+      this.ellipse(10, -17, 1.8, 2, "#2b3a32");
       c.restore();
       return;
     }

@@ -204,6 +204,7 @@ export const WORLD_IDS = [
   "world.windmill-garden",
   "world.reedwater-marsh",
   "world.glimmerdeep-caverns",
+  "world.tidewell-depths",
 ] as const;
 /** Worlds every v3 save already contains; later worlds may be missing. */
 const ORIGINAL_WORLD_COUNT = 4;
@@ -661,6 +662,7 @@ export function worldUnlocked(save: Save, index: number): boolean {
   if (index === 3) return gardenCompleted(save, 0);
   if (index === 4) return gardenCompleted(save, 3);
   if (index === 5) return gardenCompleted(save, 4);
+  if (index === 6) return gardenCompleted(save, 5);
   return true;
 }
 export function discoverFeather(save: Save): boolean {

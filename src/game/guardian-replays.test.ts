@@ -13,6 +13,7 @@ describe("guardian rematch arenas", () => {
       "moth",
       "toad",
       "mole",
+      "crab",
     ]);
     expect(guardianArena(levels[3]!)).toBeNull(); // the Thorn King has its own
   });

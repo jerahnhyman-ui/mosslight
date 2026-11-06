@@ -89,6 +89,8 @@ export const marshLevel: Level = withRewardBlocks({
   theme: "marsh",
   width: 11700,
   spawn: { x: 80, y: 392 },
+  // Gulp waits on the first bank. Ride it to snap up bugs ahead.
+  mounts: [{ x: 380, y: 430 }],
   platforms: [
     // Mistgate Landing: a calm bank with two easy steps.
     ground(0, 1280),

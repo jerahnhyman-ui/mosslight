@@ -1,6 +1,7 @@
 import { windmillLevel } from "./expansion-levels";
 import { marshLevel } from "./marsh-level";
 import { cavernLevel } from "./cavern-level";
+import { tidewellLevel } from "./tidewell-level";
 import { expansionChallenges } from "./challenge-expansion";
 import { cloudAscentPlatforms } from "./cloud-garden";
 import { withTrailChallenges } from "./challenge-balance";
@@ -37,7 +38,7 @@ export type Platform = Rect & {
   wakeRadius?: number;
   enemyBreakable?: boolean;
 };
-export type EnemyKind = "beetle" | "hopper" | "charger";
+export type EnemyKind = "beetle" | "hopper" | "charger" | "fish";
 export type EnemySpawn = {
   kind: EnemyKind;
   x: number;
@@ -52,6 +53,7 @@ export type BossKind =
   | "moth"
   | "toad"
   | "mole"
+  | "crab"
   | "millkeeper"
   | "heartwood";
 export type BossSpec = {
@@ -103,7 +105,11 @@ export interface Level {
   goal: { x: number; y: number };
   kind?: "world" | "grove" | "challenge" | "secret" | "minigame";
   featherFountains?: { x: number; y: number }[];
-  waterZones?: (Rect & { currentY?: number })[];
+  /** Where Gulp the tree frog waits to be ridden (y is the ground surface). */
+  mounts?: { x: number; y: number }[];
+  /** Water. currentY lifts (negative) or pulls down (positive); currentX
+   * pushes sideways. Overlapping zones add their currents together. */
+  waterZones?: (Rect & { currentY?: number; currentX?: number })[];
   mechanisms?: {
     id: string;
     kind:
@@ -1107,6 +1113,7 @@ export const levels: Level[] = [
   windmillLevel,
   marshLevel,
   cavernLevel,
+  tidewellLevel,
 ];
 
 /** A real, safe platforming space: all residents and purchased furnishings are

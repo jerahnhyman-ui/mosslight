@@ -68,6 +68,25 @@ export type Enemy = Rect & {
   airSpeed?: number;
 };
 
+/** Gulp, the rideable tree frog. Riding it, Pip jumps a little higher and
+ * Gulp snaps up bugs ahead with its tongue. A hit knocks Pip off instead of
+ * hurting them, and Gulp hops away to wait where it lands. */
+export type Mount = {
+  x: number;
+  /** Ground surface under the frog. */
+  y: number;
+  homeX: number;
+  homeY: number;
+  state: "waiting" | "ridden" | "fleeing";
+  vx: number;
+  timer: number;
+  facing: number;
+};
+export const MOUNT_SIZE = { w: 52, h: 26 };
+/** How far ahead Gulp's tongue reaches for a bug. */
+export const TONGUE_REACH = 130;
+const MOUNT_JUMP_BOOST = 1.12;
+
 export const MAX_LIVES = 3;
 export const COINS_PER_LIFE = 50;
 export const STAR_POWER_DURATION = 10;
@@ -108,6 +127,12 @@ export class Game {
   readonly level: Level;
   readonly mode: RunMode;
   boss: BossState | null = null;
+  mounts: Mount[] = [];
+  riding: Mount | null = null;
+  /** Seconds left on the tongue animation, and where it is reaching. */
+  tongue = 0;
+  tongueTarget: { x: number; y: number } | null = null;
+  private tongueCooldown = 0;
   /** A fourth-world finale is a separate encounter after the level guardian. */
   finalBossStarted = false;
   hazards: BossHazard[] = [];
@@ -295,6 +320,7 @@ export class Game {
       ...c,
       collected: false,
     }));
+    this.resetMounts();
     this.enemies = this.level.enemies.map((e, i) => ({
       ...e,
       w: 32,
@@ -526,7 +552,10 @@ export class Game {
       this.liftActive = false;
       this.glideArmed = false;
       this.jumpCanShorten = false;
-      const current = Math.min(0, ...water.map((zone) => zone.currentY ?? 0));
+      const current = water.reduce(
+        (sum, zone) => sum + (zone.currentY ?? 0),
+        0,
+      );
       const target = (input.jump && this.hurtLock === 0 ? -160 : 115) + current;
       p.vy = approach(p.vy, target, 440 * STEP);
     } else if (
@@ -549,8 +578,12 @@ export class Game {
       if (this.glideArmed && this.hurtLock === 0) p.vy = Math.min(p.vy, 180);
     }
 
-    p.x += p.vx * STEP;
-    this.resolveHorizontal(p.vx);
+    // A sideways current carries Pip along while swimming.
+    const drift = swimming
+      ? water.reduce((sum, zone) => sum + (zone.currentX ?? 0), 0)
+      : 0;
+    p.x += (p.vx + drift) * STEP;
+    this.resolveHorizontal(p.vx + drift);
     p.x = Math.max(0, Math.min(this.level.width - p.w, p.x));
     if (this.boss && this.boss.state !== "defeated") {
       if (this.boss.kind === "millkeeper") {
@@ -739,6 +772,7 @@ export class Game {
       }
     }
 
+    this.updateMounts();
     for (const enemy of this.enemies) {
       enemy.squashed = Math.max(0, enemy.squashed - STEP);
       if (!enemy.alive) continue;
@@ -1071,6 +1105,25 @@ export class Game {
       this.level.kind === "grove"
     )
       return false;
+    if (this.riding) {
+      // Gulp takes the hit: Pip tumbles off and Gulp hops away.
+      const mount = this.riding;
+      this.riding = null;
+      const away =
+        mount.x + MOUNT_SIZE.w / 2 < source.x + source.w / 2 ? -1 : 1;
+      mount.state = "fleeing";
+      mount.timer = 0.9;
+      mount.vx = away * 160;
+      mount.facing = away;
+      p.invulnerable = 1.5;
+      p.vy = -320;
+      p.vx = -away * 120;
+      p.grounded = false;
+      this.hurtLock = 0.2;
+      this.clearInput();
+      this.events.push("dismount");
+      return false;
+    }
     if (p.form === "small") return this.loseLife();
     this.resize("small");
     if (this.reserveDiamond) this.releaseReserveDiamond(source);
@@ -1234,7 +1287,18 @@ export class Game {
     const sameFloor =
       onFloor && center > enemy.minX && center < enemy.maxX + enemy.w;
     const toward = dx >= 0 ? 1 : -1;
-    if (enemy.kind === "beetle") {
+    if (enemy.kind === "fish") {
+      // A fish weaves up and down as it swims its patrol, turning toward
+      // Pip when Pip swims into its water.
+      enemy.stateTime += STEP * 2;
+      const alert =
+        Math.abs(dx) < ENEMY_SIGHT &&
+        center > enemy.minX &&
+        center < enemy.maxX + enemy.w;
+      if (alert) enemy.facing = toward;
+      enemy.vx = enemy.facing * (alert ? 95 : 65);
+      enemy.y = enemy.baseY + Math.sin(enemy.stateTime * 1.6) * 22;
+    } else if (enemy.kind === "beetle") {
       // A beetle that spots Pip turns and scurries toward them.
       const alert = sameFloor && Math.abs(dx) < ENEMY_SIGHT;
       if (alert) enemy.facing = toward;
@@ -1354,6 +1418,93 @@ export class Game {
       enemy.facing = Math.sign(enemy.vx);
   }
 
+  private resetMounts() {
+    this.riding = null;
+    this.tongue = 0;
+    this.tongueTarget = null;
+    this.tongueCooldown = 0;
+    this.mounts = (this.level.mounts ?? []).map((m) => ({
+      x: m.x,
+      y: m.y,
+      homeX: m.x,
+      homeY: m.y,
+      state: "waiting",
+      vx: 0,
+      timer: 0,
+      facing: 1,
+    }));
+  }
+
+  /** Ground under a point at a given surface height, for a fleeing frog. */
+  private groundAt(x: number, y: number) {
+    return this.platforms.some(
+      (t) =>
+        active(t) &&
+        (t.kind === "ground" || t.kind === "platform") &&
+        Math.abs(t.y - y) < 2 &&
+        x >= t.x &&
+        x <= t.x + t.w,
+    );
+  }
+
+  private updateMounts() {
+    const p = this.player;
+    this.tongue = Math.max(0, this.tongue - STEP);
+    if (this.tongue === 0) this.tongueTarget = null;
+    this.tongueCooldown = Math.max(0, this.tongueCooldown - STEP);
+    for (const mount of this.mounts) {
+      if (mount.state === "fleeing") {
+        mount.timer = Math.max(0, mount.timer - STEP);
+        const nextX = mount.x + mount.vx * STEP;
+        // It hops away along solid ground and never over a gap.
+        if (
+          this.groundAt(nextX, mount.y) &&
+          this.groundAt(nextX + MOUNT_SIZE.w, mount.y)
+        )
+          mount.x = nextX;
+        if (mount.timer === 0) mount.state = "waiting";
+      } else if (
+        mount.state === "waiting" &&
+        !this.riding &&
+        p.invulnerable === 0 &&
+        overlaps(p, {
+          x: mount.x,
+          y: mount.y - MOUNT_SIZE.h,
+          w: MOUNT_SIZE.w,
+          h: MOUNT_SIZE.h,
+        })
+      ) {
+        this.riding = mount;
+        mount.state = "ridden";
+        this.events.push("mount");
+      }
+    }
+    const ride = this.riding;
+    if (!ride) return;
+    ride.x = p.x + p.w / 2 - MOUNT_SIZE.w / 2;
+    ride.y = p.y + p.h;
+    ride.facing = p.facing;
+    if (this.tongueCooldown > 0) return;
+    const cx = p.x + p.w / 2;
+    const prey = this.enemies.find((e) => {
+      if (!e.alive) return false;
+      const dx = e.x + e.w / 2 - cx;
+      return (
+        Math.sign(dx) === p.facing &&
+        Math.abs(dx) <= TONGUE_REACH &&
+        Math.abs(e.y + e.h - (p.y + p.h)) < 50
+      );
+    });
+    if (!prey) return;
+    prey.alive = false;
+    prey.squashed = ENEMY_SQUASH_DURATION;
+    prey.vx = prey.vy = 0;
+    this.tongue = 0.22;
+    this.tongueTarget = { x: prey.x + prey.w / 2, y: prey.y + prey.h / 2 };
+    this.tongueCooldown = 0.35;
+    this.events.push("gulp");
+  }
+
   private squash(enemy: Enemy) {
     enemy.alive = false;
     enemy.squashed = ENEMY_SQUASH_DURATION;
@@ -1385,7 +1536,8 @@ export class Game {
     )
       return;
     if (this.player.grounded) this.activateOnTakeoff(input);
-    this.player.vy = input.jump ? JUMP : SHORT_JUMP;
+    this.player.vy =
+      (input.jump ? JUMP : SHORT_JUMP) * (this.riding ? MOUNT_JUMP_BOOST : 1);
     this.player.grounded = false;
     this.coyote = 0;
     this.jumpBuffer = 0;
@@ -1551,6 +1703,7 @@ export class Game {
     }
     if (this.mode !== "relaxed") this.lives--;
     this.deaths++;
+    this.resetMounts();
     this.starPowerRemaining = 0;
     this.events.push("life-lost");
     this.hazards = [];

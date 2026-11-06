@@ -300,15 +300,18 @@ function worldArt(index: number) {
     ["#95dce8", "#fff0b3", "#a1cf64", "#5aa56a"],
     ["#8ec5c2", "#f7dcae", "#7fb08a", "#4f8a72"],
     ["#2f3360", "#7c6fb8", "#5b5a96", "#3f3f72"],
+    ["#2b8fa3", "#9be3dc", "#3f9f9a", "#257a7f"],
   ][index];
   return `<svg class="world-art" viewBox="0 0 240 130" aria-hidden="true"><defs><linearGradient id="sky-${index}" x2="0" y2="1"><stop stop-color="${colors[0]}"/><stop offset="1" stop-color="${colors[1]}"/></linearGradient></defs><rect width="240" height="130" rx="16" fill="url(#sky-${index})"/><circle cx="181" cy="34" r="18" fill="#fff5b6"/><path d="M0 87Q40 16 90 88Q138 40 191 81Q224 58 240 78V130H0" fill="${colors[2]}"/><path d="M0 112Q66 62 123 110Q178 71 240 101V130H0" fill="${colors[3]}"/><path d="M0 119Q74 112 133 119T240 119V130H0" fill="#207357"/><g fill="#fff" opacity=".8"><ellipse cx="50" cy="34" rx="24" ry="8"/><ellipse cx="59" cy="28" rx="14" ry="10"/></g><path d="m113 78 4 8 9 1-7 6 2 9-8-5-8 5 2-9-7-6 9-1Z" fill="#ffdb73"/></svg>`;
 }
 function lockedHint(index: number) {
-  return index === 5
-    ? "Finish Reedwater Marsh to open"
-    : index === 4
-      ? "Defeat the Thorn King to open"
-      : "Beat the Meadow guardian to open";
+  return index === 6
+    ? "Finish Glimmerdeep Caverns to open"
+    : index === 5
+      ? "Finish Reedwater Marsh to open"
+      : index === 4
+        ? "Defeat the Thorn King to open"
+        : "Beat the Meadow guardian to open";
 }
 function fireflyMarks(indices: number[]) {
   return [0, 1, 2]
@@ -337,7 +340,7 @@ function updateWorlds() {
   $("#world-strip").innerHTML = levels
     .map(
       (level, i) =>
-        `<button class="world-tab ${selected === i ? "selected" : ""}" data-world="${i}" ${worldUnlocked(save, i) ? "" : "disabled"} aria-pressed="${selected === i}"><span class="tab-number">0${i + 1}</span><span><small>${!worldUnlocked(save, i) ? (i === 5 ? "FINISH THE MARSH" : i === 4 ? "BEAT THE THORN KING" : "BEAT MEADOW TO OPEN") : selected === i ? "YOUR NEXT ADVENTURE" : "EXPLORE"}</small><strong>${level.name}</strong></span><span class="tab-stars" aria-label="${save.progress[i].fireflies.length} of 3 fireflies rescued">${fireflyMarks(save.progress[i].fireflies)}</span></button>`,
+        `<button class="world-tab ${selected === i ? "selected" : ""}" data-world="${i}" ${worldUnlocked(save, i) ? "" : "disabled"} aria-pressed="${selected === i}"><span class="tab-number">0${i + 1}</span><span><small>${!worldUnlocked(save, i) ? (i === 6 ? "FINISH THE CAVES" : i === 5 ? "FINISH THE MARSH" : i === 4 ? "BEAT THE THORN KING" : "BEAT MEADOW TO OPEN") : selected === i ? "YOUR NEXT ADVENTURE" : "EXPLORE"}</small><strong>${level.name}</strong></span><span class="tab-stars" aria-label="${save.progress[i].fireflies.length} of 3 fireflies rescued">${fireflyMarks(save.progress[i].fireflies)}</span></button>`,
     )
     .join("");
   document
@@ -364,7 +367,7 @@ function updateWorlds() {
             : progress.bestTime !== null
               ? `Original trail ${formatTime(progress.bestTime)}`
               : "Meet this world’s guardian";
-      return `<button class="menu-world ${selected === i ? "selected" : ""} ${light > 0 ? "restored" : ""}" data-menu-world="${i}" ${worldUnlocked(save, i) ? "" : "disabled"} data-light="${light}" style="--world-light:${light}" aria-label="${level.name}, ${progress.fireflies.length} of 3 fireflies rescued, ${completed ? "trail completed" : "explore trail"}"><span class="map-island">${worldArt(i)}<span class="map-node-number">${completed ? "✓" : `0${i + 1}`}</span></span><span class="menu-world-info"><strong>${level.name}</strong><span>${!worldUnlocked(save, i) ? lockedHint(i) : completed ? "Trail completed" : ["Bouncing mushrooms", "Ride the leaves", "Brave the cloud bridges", "Take flight. Turn the garden.", "Hop the lily pads", "Explore the glowing caves"][i]}</span><span class="map-fireflies" aria-hidden="true">${fireflyMarks(progress.fireflies)}</span><small class="world-best">${best}</small></span></button>`;
+      return `<button class="menu-world ${selected === i ? "selected" : ""} ${light > 0 ? "restored" : ""}" data-menu-world="${i}" ${worldUnlocked(save, i) ? "" : "disabled"} data-light="${light}" style="--world-light:${light}" aria-label="${level.name}, ${progress.fireflies.length} of 3 fireflies rescued, ${completed ? "trail completed" : "explore trail"}"><span class="map-island">${worldArt(i)}<span class="map-node-number">${completed ? "✓" : `0${i + 1}`}</span></span><span class="menu-world-info"><strong>${level.name}</strong><span>${!worldUnlocked(save, i) ? lockedHint(i) : completed ? "Trail completed" : ["Bouncing mushrooms", "Ride the leaves", "Brave the cloud bridges", "Take flight. Turn the garden.", "Hop the lily pads", "Explore the glowing caves", "Swim the deep lagoon"][i]}</span><span class="map-fireflies" aria-hidden="true">${fireflyMarks(progress.fireflies)}</span><small class="world-best">${best}</small></span></button>`;
     })
     .join("");
   document
@@ -1387,6 +1390,8 @@ function frame(now: number) {
       ["enemy-break", "A beetle opened a secret route!", "diamond"],
       ["break", "A hidden coin cache!", "diamond"],
       ["star-end", "Star power ended", "leaf"],
+      ["mount", "Gulp the frog! It snaps up bugs ahead of you.", "leaf"],
+      ["dismount", "Gulp hopped off to keep you safe. Catch it again!", "leaf"],
       [
         "reward-full",
         "You already have a Wind Feather. Use it up, then bump this block again.",
