@@ -322,6 +322,7 @@ const worldArtColors = [
   ["#9fc9e8", "#f4f9fc", "#d6e6f2", "#a9c3da"],
   ["#2b4b7a", "#8fd3e0", "#9fdcf0", "#5f9fc4"],
   ["#4a1f24", "#d9683a", "#6b2d2a", "#3a2420"],
+  ["#3a4458", "#8f9db5", "#56637a", "#2f3a4c"],
 ];
 function worldArt(index: number) {
   const colors = worldArtColors[index]!;
@@ -563,7 +564,7 @@ function updateWorlds() {
             : progress.bestTime !== null
               ? `Original trail ${formatTime(progress.bestTime)}`
               : "Meet this world’s guardian";
-      return `<button class="menu-world ${selected === i ? "selected" : ""} ${light > 0 ? "restored" : ""}" data-menu-world="${i}" ${worldUnlocked(save, i) ? "" : "disabled"} data-light="${light}" style="--world-light:${light}" aria-label="${level.name}, ${progress.fireflies.length} of 3 fireflies rescued, ${completed ? "trail completed" : "explore trail"}"><span class="map-island">${worldArt(i)}<span class="map-node-number">${completed ? "✓" : String(i + 1).padStart(2, "0")}</span>${FINALES.some((f) => f.world === level.contentId) ? `<span class="map-boss" title="Boss level">♛</span>` : ""}${worldUnlocked(save, i) ? "" : `<span class="map-fog"></span>`}</span><span class="menu-world-info"><strong>${level.name}</strong><span>${!worldUnlocked(save, i) ? lockedHint(i) : completed ? "Trail completed" : ["Bouncing mushrooms", "Ride the leaves", "Brave the cloud bridges", "Take flight. Turn the garden.", "Hop the lily pads", "Explore the glowing caves", "Swim the deep lagoon", "Light the night lanterns", "Dodge the falling icicles", "Slide across the frozen lake", "Cross the lava"][i]}</span><span class="map-fireflies" aria-hidden="true">${fireflyMarks(progress.fireflies)}</span><small class="map-acorns" aria-label="${progress.acorns.length} of 5 acorns found">🌰 ${progress.acorns.length}/5</small><small class="world-best">${best}</small></span></button>`;
+      return `<button class="menu-world ${selected === i ? "selected" : ""} ${light > 0 ? "restored" : ""}" data-menu-world="${i}" ${worldUnlocked(save, i) ? "" : "disabled"} data-light="${light}" style="--world-light:${light}" aria-label="${level.name}, ${progress.fireflies.length} of 3 fireflies rescued, ${completed ? "trail completed" : "explore trail"}"><span class="map-island">${worldArt(i)}<span class="map-node-number">${completed ? "✓" : String(i + 1).padStart(2, "0")}</span>${FINALES.some((f) => f.world === level.contentId) ? `<span class="map-boss" title="Boss level">♛</span>` : ""}${worldUnlocked(save, i) ? "" : `<span class="map-fog"></span>`}</span><span class="menu-world-info"><strong>${level.name}</strong><span>${!worldUnlocked(save, i) ? lockedHint(i) : completed ? "Trail completed" : ["Bouncing mushrooms", "Ride the leaves", "Brave the cloud bridges", "Take flight. Turn the garden.", "Hop the lily pads", "Explore the glowing caves", "Swim the deep lagoon", "Light the night lanterns", "Dodge the falling icicles", "Slide across the frozen lake", "Cross the lava", "Cross between the gusts"][i]}</span><span class="map-fireflies" aria-hidden="true">${fireflyMarks(progress.fireflies)}</span><small class="map-acorns" aria-label="${progress.acorns.length} of 5 acorns found">🌰 ${progress.acorns.length}/5</small><small class="world-best">${best}</small></span></button>`;
     })
     .join("");
   $("#menu-worlds").insertAdjacentHTML(

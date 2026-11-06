@@ -42,7 +42,10 @@ export type BossHazard = Rect & {
     | "feather"
     | "icicle"
     | "fireball"
-    | "shard";
+    | "shard"
+    /** A harmless glowing mark where lightning will strike. */
+    | "mark"
+    | "bolt";
   vx: number;
   vy: number;
   remaining: number;
@@ -59,7 +62,13 @@ export const arenaKind = (kind: BossSpec["kind"]) =>
   kind === "bear" || kind === "tortoise" || kind === "salamander";
 /** Major guardians take six hits over three phases. */
 export const majorKind = (kind: BossSpec["kind"]) =>
-  kind === "millkeeper" || kind === "heartwood" || kind === "owl";
+  kind === "millkeeper" ||
+  kind === "heartwood" ||
+  kind === "owl" ||
+  kind === "ram";
+/** Seconds the storm ram rears, while its lightning strikes, before it
+ * charges. */
+export const RAM_REAR = 0.55;
 /** Longest a hermit crab scuttles before stopping to rest. */
 export const CRAB_SCUTTLE = 1.4;
 /** Seconds the crystal mole spends tunnelling, and how long its mark is
@@ -100,7 +109,9 @@ export function createBoss(spec: BossSpec): BossState {
                         ? { w: 112, h: 66 }
                         : spec.kind === "salamander"
                           ? { w: 120, h: 58 }
-                          : { w: 92, h: 64 };
+                          : spec.kind === "ram"
+                            ? { w: 120, h: 72 }
+                            : { w: 92, h: 64 };
   return {
     ...spec,
     ...size,
@@ -125,7 +136,7 @@ export function createBoss(spec: BossSpec): BossState {
           millNextDirection: 0,
         }
       : {}),
-    ...(spec.kind === "heartwood" || spec.kind === "owl"
+    ...(spec.kind === "heartwood" || spec.kind === "owl" || spec.kind === "ram"
       ? { phaseCheckpoint: 1 }
       : {}),
   };
@@ -177,16 +188,16 @@ export function hitBoss(
     setMillState(boss, crossed ? "transition" : "settle", crossed ? 1.5 : 1);
   } else {
     boss.phase =
-      boss.kind === "heartwood" || boss.kind === "owl"
+      boss.kind === "heartwood" || boss.kind === "owl" || boss.kind === "ram"
         ? Math.min(3, 1 + Math.floor((boss.maxHealth - boss.health) / 2))
         : Math.min(
             3,
             1 +
               Math.floor(((boss.maxHealth - boss.health) * 3) / boss.maxHealth),
           );
-    if (boss.kind === "heartwood" || boss.kind === "owl")
+    if (boss.kind === "heartwood" || boss.kind === "owl" || boss.kind === "ram")
       boss.phaseCheckpoint = Math.max(boss.phaseCheckpoint ?? 1, boss.phase);
-    warnBoss(boss, player, events);
+    warnBoss(boss, player, events, hazards);
   }
   return true;
 }
@@ -301,7 +312,12 @@ function stepMill(
 }
 
 /** Each phase begins with a visible warning and ends with a generous stomp window. */
-export function warnBoss(boss: BossState, player: Rect, events: string[]) {
+export function warnBoss(
+  boss: BossState,
+  player: Rect,
+  events: string[],
+  hazards: BossHazard[] = [],
+) {
   boss.state = "warning";
   boss.stateTime =
     boss.kind === "heartwood"
@@ -330,6 +346,28 @@ export function warnBoss(boss: BossState, player: Rect, events: string[]) {
     boss.stateTime += 0.4;
   }
   if (boss.kind === "tortoise") boss.stateTime = 1.0;
+  if (boss.kind === "ram") {
+    // It paws the ground and calls the storm: glowing marks show where
+    // lightning will strike when it charges.
+    boss.stateTime = 1.35 - (boss.phase - 1) * 0.1;
+    const spots =
+      boss.phase === 1 ? [0] : boss.phase === 2 ? [-150, 150] : [-220, 0, 220];
+    for (const dx of spots)
+      hazards.push({
+        kind: "mark",
+        x: clamp(
+          player.x + player.w / 2 + dx - 16,
+          boss.minX,
+          boss.maxX + boss.w - 32,
+        ),
+        y: boss.groundY - 10,
+        w: 32,
+        h: 10,
+        vx: 0,
+        vy: 0,
+        remaining: boss.stateTime + 0.05,
+      });
+  }
   boss.attackElapsed = 0;
   boss.shotsFired = 0;
   events.push("boss-warning");
@@ -340,7 +378,7 @@ function recover(boss: BossState) {
   // Later phases leave a shorter, still readable opportunity to stomp.
   // Swimming is slower than running, so the underwater crab rests longer.
   boss.stateTime =
-    boss.kind === "heartwood" || boss.kind === "owl"
+    boss.kind === "heartwood" || boss.kind === "owl" || boss.kind === "ram"
       ? 2.4 - (boss.phase - 1) * 0.2
       : boss.kind === "crab"
         ? 3.2 - (boss.phase - 1) * 0.2
@@ -367,7 +405,7 @@ export function stepBoss(
   if (boss.state === "dormant") {
     if (player.x + player.w >= boss.minX) {
       events.push("boss-start");
-      warnBoss(boss, player, events);
+      warnBoss(boss, player, events, hazards);
     }
     return;
   }
@@ -380,7 +418,7 @@ export function stepBoss(
     // Guardians keep moving while they telegraph. Each attack still starts
     // from wherever the guardian is when the warning ends.
     // The stag paws the ground, rocking in place, so its charge still reaches the wall.
-    if (boss.kind === "stag")
+    if (boss.kind === "stag" || boss.kind === "ram")
       roam(boss, dt, Math.sin(boss.stateTime * 14) * 60);
     else if (boss.kind === "spider")
       roam(boss, dt, Math.sin(boss.stateTime * 9) * 70);
@@ -462,31 +500,56 @@ export function stepBoss(
     boss.stateTime =
       boss.kind === "stag"
         ? 1.35
-        : boss.kind === "spider"
-          ? 1.55
-          : boss.kind === "heartwood"
-            ? 2.05
-            : boss.kind === "toad"
-              ? TOAD_LEAP
-              : boss.kind === "owl"
-                ? OWL_DIVE
-                : boss.kind === "bear"
-                  ? 1.1
-                  : boss.kind === "tortoise"
-                    ? 4
-                    : boss.kind === "salamander"
-                      ? 1.2
-                      : boss.kind === "mole"
-                        ? MOLE_EMERGE
-                        : boss.kind === "crab"
-                          ? CRAB_SCUTTLE
-                          : 1.3;
+        : boss.kind === "ram"
+          ? RAM_REAR + 2.6
+          : boss.kind === "spider"
+            ? 1.55
+            : boss.kind === "heartwood"
+              ? 2.05
+              : boss.kind === "toad"
+                ? TOAD_LEAP
+                : boss.kind === "owl"
+                  ? OWL_DIVE
+                  : boss.kind === "bear"
+                    ? 1.1
+                    : boss.kind === "tortoise"
+                      ? 4
+                      : boss.kind === "salamander"
+                        ? 1.2
+                        : boss.kind === "mole"
+                          ? MOLE_EMERGE
+                          : boss.kind === "crab"
+                            ? CRAB_SCUTTLE
+                            : 1.3;
     boss.attackElapsed = 0;
   }
   if (boss.state === "attack") {
     boss.attackElapsed += dt;
-    if (boss.kind === "stag") {
-      boss.x += boss.facing * (290 + boss.phase * 55) * dt;
+    if (boss.kind === "ram" && boss.shotsFired === 0) {
+      // The marks become lightning bolts as the charge begins.
+      boss.shotsFired = 1;
+      for (const mark of hazards.filter((h) => h.kind === "mark"))
+        hazards.push({
+          kind: "bolt",
+          x: mark.x + 2,
+          y: boss.groundY - 470,
+          w: 28,
+          h: 470,
+          vx: 0,
+          vy: 0,
+          remaining: 0.45,
+        });
+      for (const mark of hazards) if (mark.kind === "mark") mark.remaining = 0;
+    }
+    // The ram rears while its lightning strikes, then charges: one threat
+    // at a time.
+    if (boss.kind === "ram" && boss.attackElapsed < RAM_REAR) {
+      // Rearing in place.
+    } else if (boss.kind === "stag" || boss.kind === "ram") {
+      boss.x +=
+        boss.facing *
+        (boss.kind === "ram" ? 280 + boss.phase * 50 : 290 + boss.phase * 55) *
+        dt;
       if (boss.x <= boss.minX || boss.x >= boss.maxX) {
         boss.x = clamp(boss.x, boss.minX, boss.maxX);
         // The wall impact sends a low wave back into the arena. The charge
@@ -724,7 +787,7 @@ export function stepBoss(
     // The salamander never staggers off its island into the lava.
     if (boss.kind === "salamander")
       boss.x = clamp(boss.x, boss.homeX - 80, boss.homeX + 80);
-    if (boss.stateTime === 0) warnBoss(boss, player, events);
+    if (boss.stateTime === 0) warnBoss(boss, player, events, hazards);
   }
 }
 

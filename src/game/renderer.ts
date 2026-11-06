@@ -21,7 +21,8 @@ type Theme =
   | "cavern"
   | "snow"
   | "ice"
-  | "volcano";
+  | "volcano"
+  | "storm";
 type Palette = {
   sky: string;
   horizon: string;
@@ -71,6 +72,23 @@ const thornGrovePalette: Palette = {
   rock: "#ddc297",
 };
 const palettes: Record<Theme, Palette> = {
+  storm: {
+    sky: "#47526a",
+    horizon: "#9aa6bb",
+    sun: "#dfe6f2",
+    far: "#5d6a82",
+    middle: "#4e5a70",
+    near: "#414b5e",
+    leaf: "#4f7a64",
+    leafLight: "#87b39a",
+    leafShade: "#3a5c4b",
+    trunk: "#4d4a48",
+    grass: "#7f9a86",
+    grassLight: "#b1c7b6",
+    soil: "#5b6170",
+    soilShade: "#434856",
+    rock: "#8e97a8",
+  },
   snow: {
     sky: "#9fc9e8",
     horizon: "#eef6fb",
@@ -727,6 +745,7 @@ export class Renderer {
           this.coin(coin.x, coin.y, time, i);
       });
       for (const ring of game.coinRings) this.coinRing(ring, time);
+      this.windStreaks(game, time);
       if (game.level.chase && Number.isFinite(game.chaseX))
         this.floodWall(game.chaseX, time);
       for (const lantern of game.lanterns)
@@ -1104,6 +1123,10 @@ export class Renderer {
           "rgba(9,52,65,.25)",
         );
       }
+      return;
+    }
+    if (theme === "storm") {
+      this.stormBackdrop(p, time, camera);
       return;
     }
     if (theme === "snow" || theme === "ice" || theme === "volcano") {
@@ -2918,6 +2941,49 @@ export class Renderer {
         "#fff0d5",
         3,
       );
+    } else if (b.kind === "ram") {
+      const charge = b.state === "attack";
+      const lean = charge ? 6 : 0;
+      // A storm ram: grey storm-cloud fleece, curled horns crackling with
+      // light, and stamping hooves.
+      for (const fx of [-24, -10, 12, 26])
+        this.rounded(
+          fx - 3,
+          -18 + (charge ? Math.sin(time * 30 + fx) * 3 : 0),
+          7,
+          18,
+          3,
+          "#3e4250",
+        );
+      for (const [dx, dy, r] of [
+        [-22, -34, 18],
+        [-4, -40, 20],
+        [14, -34, 18],
+        [-12, -24, 18],
+        [8, -24, 18],
+      ] as const)
+        this.ellipse(dx, dy, r, r * 0.9, "#c9ced9", "#7d8496", 2);
+      this.ellipse(32 + lean, -32, 13, 11, "#5a5f6e", "#3e4250", 2);
+      c.save();
+      c.strokeStyle = "#e8d48a";
+      c.lineWidth = 5;
+      c.lineCap = "round";
+      c.beginPath();
+      c.arc(28 + lean, -40, 9, Math.PI * 1.1, Math.PI * 2.4);
+      c.stroke();
+      if (warning || charge) {
+        c.strokeStyle = `rgba(255,245,170,${0.5 + Math.sin(time * 25) * 0.4})`;
+        c.lineWidth = 2;
+        c.beginPath();
+        c.moveTo(22 + lean, -52);
+        c.lineTo(28 + lean, -60);
+        c.lineTo(26 + lean, -55);
+        c.lineTo(34 + lean, -64);
+        c.stroke();
+      }
+      c.restore();
+      this.ellipse(38 + lean, -34, 3, 3.5, "#fff4d4");
+      this.ellipse(39 + lean, -34, 1.5, 2.2, "#283040");
     } else if (b.kind === "bear") {
       const rear = warning ? Math.abs(Math.sin(time * 6)) * 6 : 0;
       // A big white bear with a scarf, rearing as it winds up a slam.
@@ -3221,6 +3287,7 @@ export class Renderer {
     if (
       b.kind === "owl" ||
       b.kind === "bear" ||
+      b.kind === "ram" ||
       (b.kind === "tortoise" && (warning || b.state === "attack"))
     ) {
       // The owl and bear draw their own eyes; the spinning tortoise has
@@ -3437,6 +3504,36 @@ export class Renderer {
             "#ffe4a3",
             3,
           );
+      } else if (r.kind === "mark") {
+        // A crackling mark where lightning will strike.
+        const pulse = 0.5 + Math.sin(time * 18) * 0.3;
+        this.ellipse(
+          cx,
+          r.y + r.h - 2,
+          r.w / 2 + 6,
+          6,
+          `rgba(255,230,120,${pulse})`,
+        );
+        this.ellipse(cx, r.y + r.h - 2, r.w / 2 - 4, 3, "#fff6c8");
+      } else if (r.kind === "bolt") {
+        c.save();
+        c.fillStyle = "rgba(255,250,210,.35)";
+        c.fillRect(r.x - 10, r.y, r.w + 20, r.h);
+        c.strokeStyle = "#fffbe0";
+        c.lineWidth = 5;
+        c.lineJoin = "round";
+        c.beginPath();
+        let bx = cx;
+        c.moveTo(bx, r.y);
+        for (let yy = r.y; yy < r.y + r.h; yy += 40) {
+          bx = cx + (hash(yy + Math.floor(time * 20)) - 0.5) * 22;
+          c.lineTo(bx, yy + 40);
+        }
+        c.stroke();
+        c.strokeStyle = "#ffe27a";
+        c.lineWidth = 2;
+        c.stroke();
+        c.restore();
       } else if (r.kind === "icicle") {
         // A falling icicle, with its shadow marking where it will land.
         const ground = game.boss?.groundY ?? 470;
@@ -4315,6 +4412,105 @@ export class Renderer {
       "#fff7dc",
       2.5,
     );
+  }
+
+  /** A stormy ridge: rolling clouds, slanting rain and far lightning. */
+  private stormBackdrop(p: Palette, time: number, camera: number) {
+    const c = this.ctx;
+    const w = this.viewportWidth,
+      h = this.viewportHeight;
+    // A far flash every few seconds lights the whole sky for a moment.
+    const flash = Math.max(0, 1 - ((time % 6.3) - 5.9) * 4);
+    if (time % 6.3 > 5.9) {
+      c.fillStyle = `rgba(230,236,255,${0.25 * flash})`;
+      c.fillRect(0, 0, w, h);
+    }
+    for (let layer = 0; layer < 3; layer++) {
+      const parallax = 0.08 + layer * 0.12;
+      const spacing = 360 - layer * 50;
+      const shift = camera * parallax;
+      const color = layer === 0 ? p.far : layer === 1 ? p.middle : p.near;
+      for (
+        let i = Math.floor(shift / spacing) - 1;
+        i <= Math.floor(shift / spacing) + Math.ceil(w / spacing) + 1;
+        i++
+      ) {
+        const x = i * spacing - shift;
+        const peak = 210 + layer * 60 + hash(i + layer * 17) * 60;
+        c.beginPath();
+        c.moveTo(x - 160, h);
+        c.lineTo(x - 20, peak + 30);
+        c.lineTo(x + 40, peak);
+        c.lineTo(x + 110, peak + 40);
+        c.lineTo(x + 240, h);
+        c.closePath();
+        c.fillStyle = color;
+        c.fill();
+      }
+    }
+    // Heavy clouds drift across the top of the sky.
+    for (let i = 0; i < 7; i++) {
+      const x =
+        ((((hash(i + 40) * (w + 400) - time * (14 + i * 3) - camera * 0.04) %
+          (w + 400)) +
+          w +
+          400) %
+          (w + 400)) -
+        200;
+      const y = 40 + hash(i + 60) * 90;
+      for (const [dx, dy, r] of [
+        [0, 0, 46],
+        [44, -10, 38],
+        [-42, 6, 34],
+        [80, 8, 30],
+      ] as const)
+        this.ellipse(x + dx, y + dy, r * 1.4, r, "rgba(70,78,96,.75)");
+    }
+    // Slanting rain.
+    c.strokeStyle = "rgba(200,212,232,.35)";
+    c.lineWidth = 1.2;
+    c.beginPath();
+    const drops = Math.ceil((70 * w) / WIDTH);
+    for (let i = 0; i < drops; i++) {
+      const x =
+        (hash(i + 700) * (w + 60) - camera * 0.2 + time * -90 + w * 9) %
+        (w + 60);
+      const y = (hash(i + 720) * h + time * 520) % h;
+      c.moveTo(x, y);
+      c.lineTo(x - 6, y + 16);
+    }
+    c.stroke();
+  }
+
+  /** Wind streaks: faint and flickering just before a gust, strong while
+   * it blows. */
+  private windStreaks(game: Game, time: number) {
+    const c = this.ctx;
+    for (const zone of game.level.windZones ?? []) {
+      if (!this.visible(zone.x + zone.w / 2, zone.w / 2 + 40)) continue;
+      const t = game.windCycle(zone);
+      const blowing = t < zone.duration;
+      const warning = !blowing && zone.period - t < 0.8;
+      if (!blowing && !warning) continue;
+      const alpha = blowing ? 0.85 : 0.45 + Math.sin(time * 30) * 0.2;
+      c.save();
+      c.strokeStyle = `rgba(235,242,255,${alpha})`;
+      c.lineWidth = blowing ? 4 : 2.5;
+      c.lineCap = "round";
+      const dir = Math.sign(zone.speed) || -1;
+      for (let i = 0; i < Math.ceil(zone.w / 35); i++) {
+        const y = 150 + hash(i + zone.x) * 260;
+        const travel =
+          (time * 420 * dir + hash(i * 3 + zone.x) * zone.w) % zone.w;
+        const x = zone.x + ((travel + zone.w) % zone.w);
+        const len = blowing ? 80 : 40;
+        c.beginPath();
+        c.moveTo(x, y);
+        c.quadraticCurveTo(x - dir * len * 0.5, y - 5, x - dir * len, y);
+        c.stroke();
+      }
+      c.restore();
+    }
   }
 
   /** Backdrops for the snow, ice and fire worlds. */

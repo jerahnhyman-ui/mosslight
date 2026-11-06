@@ -106,6 +106,15 @@ const layouts: Record<string, readonly Placement[]> = {
     // Recovery Sunseed before Cinder's gate.
     ["diamond", 8820, 300],
   ],
+  "world.thunderhead-heights": [
+    ["feather", 200, 300],
+    ["diamond", 1800, 300],
+    ["spring", 2150, 300],
+    ["star", 4300, 300],
+    ["diamond", 5300, 300],
+    // Recovery Sunseed before Thunderhorn's gate.
+    ["diamond", 8700, 300],
+  ],
   grove: [["feather", 260, 300]],
   "secret.beehive": [
     ["feather", 150, 300],

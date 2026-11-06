@@ -263,7 +263,7 @@ describe("adventure progress", () => {
     });
     expect(save.progress[0].fireflies).toEqual([0, 2]);
     expect(save.progress[0].adventureBestTime).toBeNull();
-    expect(save.progress).toHaveLength(11);
+    expect(save.progress).toHaveLength(12);
   });
 
   it("continues with session-only progress when storage is unavailable", () => {
@@ -571,10 +571,10 @@ describe("windmill save migration and rewards", () => {
     writeSave(save);
     expect(readSave()).toEqual(save);
   });
-  it("persists discoveries, thirty-three rescues, and idempotent bee and hoop rewards", () => {
+  it("persists discoveries, thirty-six rescues, and idempotent bee and hoop rewards", () => {
     const save = readSave();
     for (const world of save.progress) recordFireflies(world, [0, 1, 2]);
-    expect(rescuedTotal(save)).toBe(33);
+    expect(rescuedTotal(save)).toBe(36);
     // Every world, Windmill Garden included, now has a challenge room.
     expect(challengeUnlocked(save, 3)).toBe(true);
     expect(purchaseItem(save, "cosmetic.bee_scarf")).toBe("locked");
@@ -648,7 +648,7 @@ describe("Reedwater Marsh progress", () => {
     delete stored.worlds["world.reedwater-marsh"];
     items.set(SAVE_KEY, JSON.stringify(stored));
     const loaded = readSave();
-    expect(loaded.progress).toHaveLength(11);
+    expect(loaded.progress).toHaveLength(12);
     expect(loaded.progress[3]!.fireflies).toEqual([0, 2]);
     expect(loaded.progress[3]!.garden.classic.completed).toBe(true);
     expect(loaded.progress[4]!.fireflies).toEqual([]);
