@@ -38,6 +38,12 @@ export type BossHazard = Rect & {
   remaining: number;
 };
 
+/** Seconds the crystal mole spends tunnelling, and how long its mark is
+ * locked in place before it bursts up. */
+export const MOLE_BURROW = 1.7;
+export const MOLE_LOCK = 0.6;
+/** Seconds the mole takes to burst out of the ground. */
+export const MOLE_EMERGE = 0.3;
 /** Seconds the marsh toad spends in the air on each leap. */
 export const TOAD_LEAP = 1.05;
 
@@ -58,7 +64,9 @@ export function createBoss(spec: BossSpec): BossState {
             ? { w: 156, h: 100 }
             : spec.kind === "toad"
               ? { w: 96, h: 66 }
-              : { w: 92, h: 64 };
+              : spec.kind === "mole"
+                ? { w: 100, h: 64 }
+                : { w: 92, h: 64 };
   return {
     ...spec,
     ...size,
@@ -259,13 +267,17 @@ function stepMill(
 export function warnBoss(boss: BossState, player: Rect, events: string[]) {
   boss.state = "warning";
   boss.stateTime =
-    boss.kind === "heartwood" ? 1.4 : 1.15 - (boss.phase - 1) * 0.1;
+    boss.kind === "heartwood"
+      ? 1.4
+      : boss.kind === "mole"
+        ? MOLE_BURROW - (boss.phase - 1) * 0.1
+        : 1.15 - (boss.phase - 1) * 0.1;
   boss.facing = player.x + player.w / 2 < boss.x + boss.w / 2 ? -1 : 1;
   boss.attackOriginX = boss.x;
   // The toad marks the spot where Pip stands; the others charge a set
   // distance. Either way the target is shown for the whole warning.
   boss.attackTargetX = clamp(
-    boss.kind === "toad"
+    boss.kind === "toad" || boss.kind === "mole"
       ? player.x + player.w / 2 - boss.w / 2
       : boss.x + boss.facing * (320 + boss.phase * 30),
     boss.minX,
@@ -325,6 +337,18 @@ export function stepBoss(
       // wherever it is. (The moth already rises to hover as it warns.)
       roam(boss, dt, Math.sin(boss.stateTime * 6) * 45);
       boss.attackOriginX = boss.x;
+    } else if (boss.kind === "mole") {
+      // The mole digs under the floor, out of reach, and tunnels toward Pip.
+      // Its mark follows Pip at first, then locks for the last stretch so
+      // there is always time to step away from the cracking spot.
+      boss.y = approach(boss.y, boss.groundY + 6, 260 * dt);
+      if (boss.stateTime > MOLE_LOCK)
+        boss.attackTargetX = approach(
+          boss.attackTargetX,
+          clamp(player.x + player.w / 2 - boss.w / 2, boss.minX, boss.maxX),
+          170 * dt,
+        );
+      boss.x = approach(boss.x, boss.attackTargetX, 300 * dt);
     }
     if (boss.stateTime > 0) return;
     boss.state = "attack";
@@ -337,7 +361,9 @@ export function stepBoss(
             ? 2.05
             : boss.kind === "toad"
               ? TOAD_LEAP
-              : 1.3;
+              : boss.kind === "mole"
+                ? MOLE_EMERGE
+                : 1.3;
     boss.attackElapsed = 0;
   }
   if (boss.state === "attack") {
@@ -406,6 +432,11 @@ export function stepBoss(
         });
         boss.shotsFired++;
       }
+    } else if (boss.kind === "mole") {
+      // It bursts up through the marked spot.
+      boss.x = boss.attackTargetX;
+      const fraction = clamp(boss.attackElapsed / MOLE_EMERGE, 0, 1);
+      boss.y = boss.groundY + 6 - (boss.h + 6) * fraction;
     } else if (boss.kind === "toad") {
       // A high, readable leap onto the marked spot.
       const fraction = clamp(boss.attackElapsed / TOAD_LEAP, 0, 1);
@@ -438,7 +469,8 @@ export function stepBoss(
       }
     }
     if (boss.stateTime === 0) {
-      if (boss.kind === "toad") toadSplash(boss, hazards);
+      if (boss.kind === "toad" || boss.kind === "mole")
+        toadSplash(boss, hazards);
       recover(boss);
     }
   } else if (boss.state === "recover") {
@@ -450,8 +482,9 @@ export function stepBoss(
   }
 }
 
-/** Landing sends a low ripple each way; a jump clears it. Phase three adds
- * a slower second pair, so a single hop must be timed rather than mashed. */
+/** Landing (or the mole bursting out) sends a low ripple or shard each way;
+ * a jump clears it. Phase three adds a slower second pair, so a single hop
+ * must be timed rather than mashed. */
 function toadSplash(boss: BossState, hazards: BossHazard[]) {
   boss.x = boss.attackTargetX;
   const speeds = boss.phase >= 3 ? [175, 105] : [150 + boss.phase * 20];

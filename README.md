@@ -1,7 +1,7 @@
 # Mosslight
 
 An original side-scrolling platformer for iPhone, iPad, and the browser.
-Guide Pip or Poppy through Sunlit Meadow, Firefly Hollow, Cloudtop Crossing, Windmill Garden, and Reedwater Marsh:
+Guide Pip or Poppy through Sunlit Meadow, Firefly Hollow, Cloudtop Crossing, Windmill Garden, Reedwater Marsh, and Glimmerdeep Caverns:
 collect golden coins, grow with Sunseeds, power up with stars, rescue hidden
 fireflies, and bring light back to the forest. Four extended trails include
 multiple checkpoints, optional routes, light-activated plants, and three-phase
@@ -45,6 +45,11 @@ animated characters, and collectible/landing effects.
   pads, keep moving across pads that sink after you land, and bounce or climb
   to two hidden perches. Gloam, the Bog Toad, marks where it will land; move
   away, jump its ripples, and stomp it while it rests.
+- **Glimmerdeep Caverns** opens after finishing Reedwater Marsh. Ride crystals
+  that slide or rise and fall, cross cracked crystals before they shatter, and
+  bounce on glowcaps to three hidden perches. Rumble, the Crystal Mole, tunnels
+  toward Pip and bursts up where the floor cracks; step away, jump its shards,
+  and stomp it while it is dazed.
 - **Hidden sky gardens** sit above Sunlit Meadow, Firefly Hollow, and Cloudtop
   Crossing. Look for drifting petals, earn a Wind Feather, and land on the
   cloud ledges to recharge. Stand still at a glowing SKY portal, then press

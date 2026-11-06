@@ -201,6 +201,7 @@ export const WORLD_IDS = [
   "world.cloudtop-crossing",
   "world.windmill-garden",
   "world.reedwater-marsh",
+  "world.glimmerdeep-caverns",
 ] as const;
 /** Worlds every v3 save already contains; later worlds may be missing. */
 const ORIGINAL_WORLD_COUNT = 4;
@@ -643,11 +644,13 @@ const gardenCompleted = (save: Save, world: number) =>
     (record) => record.completed,
   );
 /** Windmill Garden opens after the current Meadow guardian, not a legacy
- * trail; Reedwater Marsh opens once the Thorn King has been defeated. */
+ * trail; Reedwater Marsh opens once the Thorn King has been defeated, and
+ * Glimmerdeep Caverns once Reedwater Marsh is finished. */
 export function worldUnlocked(save: Save, index: number): boolean {
   if (index < 0 || index >= WORLD_IDS.length) return false;
   if (index === 3) return gardenCompleted(save, 0);
   if (index === 4) return gardenCompleted(save, 3);
+  if (index === 5) return gardenCompleted(save, 4);
   return true;
 }
 export function discoverFeather(save: Save): boolean {

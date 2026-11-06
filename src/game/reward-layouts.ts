@@ -57,6 +57,14 @@ const layouts: Record<string, readonly Placement[]> = {
     // Recovery diamond on the guardian's bank, after the last checkpoint.
     ["diamond", 10620, 300],
   ],
+  "world.glimmerdeep-caverns": [
+    ["feather", 200, 300],
+    ["diamond", 2060, 300],
+    ["star", 3190, 300],
+    ["diamond", 5460, 300],
+    // Recovery Sunseed on the mole's floor, after the last checkpoint.
+    ["diamond", 8210, 300],
+  ],
   grove: [["feather", 260, 300]],
   "secret.beehive": [
     ["feather", 150, 300],

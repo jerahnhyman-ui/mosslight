@@ -10,7 +10,8 @@ type Theme =
   | "hive"
   | "grotto"
   | "cloud"
-  | "marsh";
+  | "marsh"
+  | "cavern";
 type Palette = {
   sky: string;
   horizon: string;
@@ -60,6 +61,23 @@ const thornGrovePalette: Palette = {
   rock: "#ddc297",
 };
 const palettes: Record<Theme, Palette> = {
+  cavern: {
+    sky: "#232646",
+    horizon: "#4a4479",
+    sun: "#b9a8ff",
+    far: "#34365f",
+    middle: "#3f416f",
+    near: "#4b4e82",
+    leaf: "#4f9a8c",
+    leafLight: "#9fe6cf",
+    leafShade: "#346a66",
+    trunk: "#5a4f6e",
+    grass: "#5fae9c",
+    grassLight: "#b0f1d9",
+    soil: "#64587a",
+    soilShade: "#443b58",
+    rock: "#9a8cbc",
+  },
   marsh: {
     sky: "#8cc6c4",
     horizon: "#f6dcae",
@@ -470,6 +488,7 @@ export class Renderer {
         game.level.theme === "hive" ||
         game.level.theme === "grotto" ||
         game.level.theme === "cloud" ||
+        game.level.theme === "cavern" ||
         thornGrove
       )
         continue;
@@ -857,6 +876,10 @@ export class Renderer {
           "rgba(9,52,65,.25)",
         );
       }
+      return;
+    }
+    if (theme === "cavern") {
+      this.cavernBackdrop(camera, time);
       return;
     }
     if (theme === "cloud") {
@@ -2293,12 +2316,14 @@ export class Renderer {
         this.ellipse(end, b.groundY - 4, b.w / 2, 7, "rgba(177,207,234,.3)");
       }
       c.restore();
-      this.rounded(cx - 12, b.y - 41, 24, 29, 9, "#fff0ba", "#be7652");
+      // A burrowed mole shows its warning above the floor, not inside it.
+      const bubbleY = b.kind === "mole" ? Math.min(b.y, b.groundY - 70) : b.y;
+      this.rounded(cx - 12, bubbleY - 41, 24, 29, 9, "#fff0ba", "#be7652");
       c.save();
       c.font = "800 21px 'DM Sans', sans-serif";
       c.textAlign = "center";
       c.fillStyle = "#a35b44";
-      c.fillText("!", cx, b.y - 19);
+      c.fillText("!", cx, bubbleY - 19);
       c.restore();
     }
     if (recovering) {
@@ -2310,7 +2335,41 @@ export class Renderer {
         c.fill();
       }
     }
+    if (b.kind === "mole" && b.y + b.h > b.groundY + 1) {
+      // Burrowing: a moving mound of rubble, with crystals poking through,
+      // and a crack where it will burst up.
+      const mx = cx;
+      this.ellipse(mx, b.groundY + 2, 42, 14, "#5b4f6c", "#3c3350", 2);
+      for (let i = 0; i < 3; i++)
+        this.ellipse(
+          mx - 24 + i * 22 + Math.sin(time * 20 + i) * 2,
+          b.groundY - 6 - (i % 2) * 4,
+          7,
+          5,
+          "#7d6f92",
+        );
+      const tx = b.attackTargetX + b.w / 2;
+      const shake = Math.sin(time * 30) * 1.5;
+      c.save();
+      c.strokeStyle = "#f5e3a6";
+      c.lineWidth = 3;
+      c.lineCap = "round";
+      c.beginPath();
+      c.moveTo(tx - 30 + shake, b.groundY);
+      c.lineTo(tx - 12, b.groundY - 5);
+      c.lineTo(tx + 4, b.groundY + 1);
+      c.lineTo(tx + 18, b.groundY - 6);
+      c.lineTo(tx + 32 + shake, b.groundY);
+      c.stroke();
+      c.restore();
+    }
     c.save();
+    if (b.kind === "mole") {
+      // Hide whatever part of the mole is still under the floor.
+      c.beginPath();
+      c.rect(b.x - 200, b.groundY - 600, b.w + 400, 600);
+      c.clip();
+    }
     c.translate(cx, feet);
     c.scale(b.facing < 0 ? -1 : 1, 1);
     c.scale(b.w / 82, b.h / 58);
@@ -2400,6 +2459,52 @@ export class Renderer {
         "#fff0d5",
         3,
       );
+    } else if (b.kind === "mole") {
+      const crystal =
+        b.phase === 3 ? "#f28f9c" : b.phase === 2 ? "#e2a3dc" : "#aa9cf2";
+      // Big digging claws.
+      for (const [x0, y0] of [
+        [22, -8],
+        [-20, -6],
+      ] as const)
+        for (let i = 0; i < 3; i++)
+          this.line(
+            [
+              [x0 + i * 4, y0],
+              [x0 + i * 4 + 4, y0 + 7 + (i % 2 ? stride : -stride) * 0.5],
+            ],
+            "#e7d9c0",
+            2.5,
+          );
+      this.ellipse(-2, -25, 37, 26, "#6b5c72", "#3f3448", 3);
+      this.ellipse(8, -15, 20, 11, "#9b8996");
+      // Crystals grow from its back and change colour as it tires.
+      for (const [x0, h, wid] of [
+        [-22, 22, 7],
+        [-8, 28, 8],
+        [6, 20, 6],
+      ] as const) {
+        c.beginPath();
+        c.moveTo(x0 - wid, -44);
+        c.lineTo(x0, -44 - h);
+        c.lineTo(x0 + wid, -44);
+        c.closePath();
+        c.fillStyle = crystal;
+        c.fill();
+        c.strokeStyle = "rgba(255,255,255,.6)";
+        c.lineWidth = 1.2;
+        c.stroke();
+      }
+      this.ellipse(36, -24, 7, 6, "#f4a7b6", "#b0606f", 1.5);
+      for (const dy of [-3, 2])
+        this.line(
+          [
+            [38, -24 + dy],
+            [50, -27 + dy * 2],
+          ],
+          "#d9cfc4",
+          1.2,
+        );
     } else if (b.kind === "toad") {
       const airborne = b.state === "attack";
       const crouch = warning ? 4 + Math.sin(time * 14) * 1.5 : 0;
@@ -2466,8 +2571,22 @@ export class Renderer {
         3,
       );
     }
-    const eyeX = b.kind === "moth" ? 0 : b.kind === "toad" ? 22 : 27,
-      eyeY = b.kind === "moth" ? -47 : b.kind === "toad" ? -41 : -26;
+    const eyeX =
+        b.kind === "moth"
+          ? 0
+          : b.kind === "toad"
+            ? 22
+            : b.kind === "mole"
+              ? 22
+              : 27,
+      eyeY =
+        b.kind === "moth"
+          ? -47
+          : b.kind === "toad"
+            ? -41
+            : b.kind === "mole"
+              ? -34
+              : -26;
     if (recovering) {
       this.line(
         [
@@ -2891,6 +3010,32 @@ export class Renderer {
             2,
           );
         }
+      } else if (game.level.theme === "cavern") {
+        // A glowing crystal cluster marks each new stretch of the caves.
+        const glow = 0.55 + Math.sin(time * 2 + index) * 0.15;
+        this.ellipse(
+          signX - 26,
+          y - 30,
+          26,
+          26,
+          `rgba(185,168,255,${glow * 0.35})`,
+        );
+        for (const [dx, h, wid, color] of [
+          [-36, 46, 9, "#b9a8ff"],
+          [-26, 64, 11, "#d9cdff"],
+          [-15, 40, 8, "#8fe6d6"],
+        ] as const) {
+          c.beginPath();
+          c.moveTo(signX + dx - wid, y);
+          c.lineTo(signX + dx, y - h);
+          c.lineTo(signX + dx + wid, y);
+          c.closePath();
+          c.fillStyle = color;
+          c.fill();
+          c.strokeStyle = "rgba(255,255,255,.5)";
+          c.lineWidth = 1.2;
+          c.stroke();
+        }
       } else if (game.level.theme === "marsh") {
         // A clump of cattails marks each new stretch of the marsh.
         for (let stalk = 0; stalk < 3; stalk++) {
@@ -3101,6 +3246,10 @@ export class Renderer {
           );
         }
       }
+      return;
+    }
+    if (r.id?.startsWith("cave.lift.") || r.id?.startsWith("cave.crack.")) {
+      this.crystalLedge(r, time);
       return;
     }
     if (r.id?.startsWith("marsh.lily.") || r.id?.startsWith("marsh.sinkpad.")) {
@@ -3376,6 +3525,112 @@ export class Renderer {
       "#fff7dc",
       2.5,
     );
+  }
+
+  /** Cave walls, hanging stalactites and glowing crystals in the distance.
+   * Nothing here looks like a surface Pip could stand on. */
+  private cavernBackdrop(camera: number, time: number) {
+    const c = this.ctx;
+    const w = this.viewportWidth;
+    const h = this.viewportHeight;
+    for (let layer = 0; layer < 2; layer++) {
+      const parallax = 0.08 + layer * 0.12;
+      const spacing = 150 - layer * 30;
+      const shift = camera * parallax;
+      const first = Math.floor(shift / spacing) - 1;
+      for (let i = first; i <= first + Math.ceil(w / spacing) + 2; i++) {
+        const x = i * spacing - shift;
+        const length = 60 + hash(i * 3 + layer * 17) * (110 - layer * 30);
+        c.beginPath();
+        c.moveTo(x - 26, 0);
+        c.lineTo(x, length);
+        c.lineTo(x + 26, 0);
+        c.closePath();
+        c.fillStyle = layer ? "#2c2f55" : "#272a4c";
+        c.fill();
+        // Distant crystal clusters glow softly on the far wall.
+        if (hash(i + layer * 50) > 0.55) {
+          const cy = h * (0.45 + hash(i * 7 + layer) * 0.25);
+          const pulse = 0.35 + Math.sin(time * 1.5 + i) * 0.15;
+          this.ellipse(x + 40, cy, 34, 34, `rgba(170,150,255,${pulse * 0.35})`);
+          for (let k = 0; k < 3; k++) {
+            c.beginPath();
+            c.moveTo(x + 30 + k * 10, cy + 14);
+            c.lineTo(x + 34 + k * 10, cy - 10 - k * 6);
+            c.lineTo(x + 38 + k * 10, cy + 14);
+            c.closePath();
+            c.fillStyle = layer
+              ? `rgba(196,182,255,${0.45 + pulse})`
+              : `rgba(140,230,214,${0.35 + pulse})`;
+            c.fill();
+          }
+        }
+      }
+    }
+    // Floating motes of light drift slowly.
+    for (let i = 0; i < Math.ceil((30 * w) / WIDTH); i++) {
+      const x = (hash(i + 400) * (w + 100) - camera * 0.04 + w * 4) % (w + 100);
+      const y = (hash(i + 420) * h * 0.8 + Math.sin(time * 0.6 + i) * 8) % h;
+      c.globalAlpha = 0.3 + hash(i + 440) * 0.5;
+      this.ellipse(x, y, 1.6, 1.6, "#e8deff");
+    }
+    c.globalAlpha = 1;
+  }
+
+  /** Crystal ledges: sliding or rising ones are violet; cracked ones turn
+   * pale and split during their warning before they shatter. */
+  private crystalLedge(r: Game["platforms"][number], time: number) {
+    const c = this.ctx;
+    const { x, y, w, h } = r;
+    const cracked = r.kind === "crumble";
+    const warning = cracked && r.crumbleRemaining > 0;
+    const urgency = warning
+      ? 1 - Math.min(1, r.crumbleRemaining / CRUMBLE_WARNING)
+      : 0;
+    c.save();
+    c.translate(warning ? Math.sin(time * 33) * urgency * 2 : 0, 0);
+    const top = warning ? "#f2e4ff" : cracked ? "#c5b6ef" : "#a996f0";
+    const base = warning ? "#b49ad8" : cracked ? "#7e6fb2" : "#5f4fb0";
+    this.rounded(x, y, w, h, 4, base, "#3b2f75");
+    this.rounded(x + 2, y + 1, w - 4, 8, 3, top);
+    // Facets under the flat top, as crystal points.
+    for (let xx = x + 10; xx < x + w - 6; xx += 22) {
+      c.beginPath();
+      c.moveTo(xx - 8, y + h);
+      c.lineTo(xx, y + h + 9);
+      c.lineTo(xx + 8, y + h);
+      c.closePath();
+      c.fillStyle = base;
+      c.fill();
+    }
+    this.line(
+      [
+        [x + 4, y + 1.5],
+        [x + w - 4, y + 1.5],
+      ],
+      "rgba(255,255,255,.85)",
+      2,
+    );
+    if (cracked)
+      for (let i = 1; i < 4; i++) {
+        const xx = x + (w * i) / 4;
+        this.line(
+          [
+            [xx, y + 2],
+            [xx - 5, y + 9],
+            [xx + 2, y + h - 2 + urgency * 6],
+          ],
+          warning ? "#5b3f8f" : "rgba(59,47,117,.5)",
+          1.5 + urgency,
+        );
+      }
+    if (!cracked) {
+      // A soft glow shows which crystals carry you.
+      c.globalAlpha = 0.25 + Math.sin(time * 3 + x) * 0.1;
+      this.ellipse(x + w / 2, y + h / 2, w * 0.6, 16, "#bfaeff");
+      c.globalAlpha = 1;
+    }
+    c.restore();
   }
 
   /** Open marsh water: drawn beneath the banks, so only real gaps show it. */

@@ -1,7 +1,14 @@
 import { Capacitor } from "@capacitor/core";
 import { Haptics, ImpactStyle, NotificationType } from "@capacitor/haptics";
 
-type Theme = "meadow" | "dusk" | "alpine" | "windmill" | "hive" | "marsh";
+type Theme =
+  | "meadow"
+  | "dusk"
+  | "alpine"
+  | "windmill"
+  | "hive"
+  | "marsh"
+  | "cavern";
 type MusicScene = "trail" | "boss" | "grove";
 type ScoreName = Theme | "star" | "boss" | "grove";
 type Score = {
@@ -133,6 +140,31 @@ const scores: Record<ScoreName, Score> = {
       [48, 52, 55],
       [38, 42, 45],
       [43, 47, 50],
+    ],
+  },
+  // Slow and echoing, with a hint of mystery, for the crystal caves.
+  cavern: {
+    bpm: 80,
+    voice: "sine",
+    melody: [
+      [74, null, null, 77, 81, null, 80, null],
+      [76, null, null, null, 74, null, null, null],
+      [72, null, 76, null, 79, null, 81, null],
+      [80, null, 76, null, 74, null, null, null],
+      [81, null, null, 84, 86, null, 84, null],
+      [81, null, 80, null, 77, null, null, null],
+      [76, null, 77, null, 80, null, 76, null],
+      [74, null, null, 77, 74, null, null, null],
+    ].flat(),
+    chords: [
+      [50, 53, 57],
+      [47, 52, 56],
+      [45, 48, 52],
+      [52, 56, 59],
+      [50, 53, 57],
+      [46, 50, 53],
+      [45, 49, 52],
+      [50, 53, 57],
     ],
   },
   marsh: {

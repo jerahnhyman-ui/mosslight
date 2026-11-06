@@ -1,5 +1,6 @@
 import { windmillLevel } from "./expansion-levels";
 import { marshLevel } from "./marsh-level";
+import { cavernLevel } from "./cavern-level";
 import { cloudAscentPlatforms } from "./cloud-garden";
 import { withTrailChallenges } from "./challenge-balance";
 import { withRewardBlocks } from "./reward-layouts";
@@ -49,6 +50,7 @@ export type BossKind =
   | "spider"
   | "moth"
   | "toad"
+  | "mole"
   | "millkeeper"
   | "heartwood";
 export type BossSpec = {
@@ -85,7 +87,8 @@ export interface Level {
     | "hive"
     | "cloud"
     | "grotto"
-    | "marsh";
+    | "marsh"
+    | "cavern";
   spawn: { x: number; y: number };
   platforms: Platform[];
   coins: { x: number; y: number }[];
@@ -1102,6 +1105,7 @@ export const levels: Level[] = [
   }),
   windmillLevel,
   marshLevel,
+  cavernLevel,
 ];
 
 /** A real, safe platforming space: all residents and purchased furnishings are
