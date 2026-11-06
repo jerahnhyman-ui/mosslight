@@ -303,20 +303,21 @@ const formatTime = (seconds: number) =>
     .toString()
     .padStart(2, "0")}`;
 
+const worldArtColors = [
+  ["#83e1ee", "#e1f6bf", "#62cfa3", "#1c9d78"],
+  ["#6768bb", "#c9b5f2", "#9687cf", "#5463a0"],
+  ["#76c9ed", "#daf5e9", "#9ecbcd", "#4f9faf"],
+  ["#95dce8", "#fff0b3", "#a1cf64", "#5aa56a"],
+  ["#8ec5c2", "#f7dcae", "#7fb08a", "#4f8a72"],
+  ["#2f3360", "#7c6fb8", "#5b5a96", "#3f3f72"],
+  ["#2b8fa3", "#9be3dc", "#3f9f9a", "#257a7f"],
+  ["#1d2147", "#5b4f9a", "#3e3c78", "#2b2a5a"],
+  ["#9fc9e8", "#f4f9fc", "#d6e6f2", "#a9c3da"],
+  ["#2b4b7a", "#8fd3e0", "#9fdcf0", "#5f9fc4"],
+  ["#4a1f24", "#d9683a", "#6b2d2a", "#3a2420"],
+];
 function worldArt(index: number) {
-  const colors = [
-    ["#83e1ee", "#e1f6bf", "#62cfa3", "#1c9d78"],
-    ["#6768bb", "#c9b5f2", "#9687cf", "#5463a0"],
-    ["#76c9ed", "#daf5e9", "#9ecbcd", "#4f9faf"],
-    ["#95dce8", "#fff0b3", "#a1cf64", "#5aa56a"],
-    ["#8ec5c2", "#f7dcae", "#7fb08a", "#4f8a72"],
-    ["#2f3360", "#7c6fb8", "#5b5a96", "#3f3f72"],
-    ["#2b8fa3", "#9be3dc", "#3f9f9a", "#257a7f"],
-    ["#1d2147", "#5b4f9a", "#3e3c78", "#2b2a5a"],
-    ["#9fc9e8", "#f4f9fc", "#d6e6f2", "#a9c3da"],
-    ["#2b4b7a", "#8fd3e0", "#9fdcf0", "#5f9fc4"],
-    ["#4a1f24", "#d9683a", "#6b2d2a", "#3a2420"],
-  ][index]!;
+  const colors = worldArtColors[index]!;
   return `<svg class="world-art" viewBox="0 0 240 130" aria-hidden="true"><defs><linearGradient id="sky-${index}" x2="0" y2="1"><stop stop-color="${colors[0]}"/><stop offset="1" stop-color="${colors[1]}"/></linearGradient></defs><rect width="240" height="130" rx="16" fill="url(#sky-${index})"/><circle cx="181" cy="34" r="18" fill="#fff5b6"/><path d="M0 87Q40 16 90 88Q138 40 191 81Q224 58 240 78V130H0" fill="${colors[2]}"/><path d="M0 112Q66 62 123 110Q178 71 240 101V130H0" fill="${colors[3]}"/><path d="M0 119Q74 112 133 119T240 119V130H0" fill="#207357"/><g fill="#fff" opacity=".8"><ellipse cx="50" cy="34" rx="24" ry="8"/><ellipse cx="59" cy="28" rx="14" ry="10"/></g><path d="m113 78 4 8 9 1-7 6 2 9-8-5-8 5 2-9-7-6 9-1Z" fill="#ffdb73"/></svg>`;
 }
 function lockedHint(index: number) {
@@ -367,32 +368,163 @@ function mapNodes() {
     };
   });
 }
-/** Draw the dotted trail through the worlds in order and place Pip. */
-function layoutMapPath() {
+/** A smooth curve through the points (Catmull-Rom as cubic Béziers). */
+function smoothPath(points: { x: number; y: number }[]) {
+  if (!points.length) return "";
+  let d = `M${points[0]!.x.toFixed(1)} ${points[0]!.y.toFixed(1)}`;
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[i - 1] ?? points[i]!,
+      p1 = points[i]!,
+      p2 = points[i + 1]!,
+      p3 = points[i + 2] ?? p2;
+    const c1 = { x: p1.x + (p2.x - p0.x) / 6, y: p1.y + (p2.y - p0.y) / 6 };
+    const c2 = { x: p2.x - (p3.x - p1.x) / 6, y: p2.y - (p3.y - p1.y) / 6 };
+    d += ` C${c1.x.toFixed(1)} ${c1.y.toFixed(1)} ${c2.x.toFixed(1)} ${c2.y.toFixed(1)} ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+  }
+  return d;
+}
+/** Distance along the trail to each world, for Pip's walk. */
+let mapNodeLengths: number[] = [];
+let mapWalkerAt = -1;
+let mapWalkFrame = 0;
+const MAP_SEEN_KEY = "mosslight-map-opened";
+/** Furthest world that is open, so the trail behind it can glow. */
+const furthestOpen = () =>
+  levels.reduce((last, _, i) => (worldUnlocked(save, i) ? i : last), 0);
+/** Lay the worlds out along a winding trail that doubles back each row,
+ * and draw the trail, the lit part already travelled, and each region. */
+function layoutMapPath(revealFrom = -1) {
   const svg = document.querySelector<SVGSVGElement>("#menu-worlds .map-path");
   if (!svg) return;
   const map = $("#menu-worlds");
+  const columns = map.clientWidth >= 620 ? 3 : 2;
+  map.style.gridTemplateColumns = `repeat(${columns}, minmax(0, 1fr))`;
+  map.style.rowGap = columns === 2 ? "40px" : "28px";
+  document
+    .querySelectorAll<HTMLElement>("#menu-worlds .menu-world")
+    .forEach((button, i) => {
+      const row = Math.floor(i / columns),
+        place = i % columns;
+      button.style.gridRow = String(row + 1);
+      button.style.gridColumn = String(
+        (row % 2 ? columns - 1 - place : place) + 1,
+      );
+      // A gentle wave, so the trail never reads as a plain grid.
+      button.style.translate = `0 ${(place % 2 ? 18 : -6) + (row % 2 ? 6 : 0)}px`;
+    });
   svg.setAttribute("width", String(map.clientWidth));
   svg.setAttribute("height", String(map.clientHeight));
-  svg.querySelector("polyline")!.setAttribute(
-    "points",
-    mapNodes()
-      .map((n) => `${n.x.toFixed(0)},${n.y.toFixed(0)}`)
-      .join(" "),
-  );
-  moveMapWalker(selected, false);
+  const nodes = mapNodes();
+  const open = furthestOpen();
+  const trail = smoothPath(nodes);
+  const lit = smoothPath(nodes.slice(0, open + 1));
+  svg.innerHTML =
+    nodes
+      .map((n, i) => {
+        const art = worldArtColors[i] ?? worldArtColors[0]!;
+        return `<ellipse class="map-region ${worldUnlocked(save, i) ? "" : "locked"}" cx="${n.x.toFixed(0)}" cy="${(n.y + 14).toFixed(0)}" rx="${(map.clientWidth / columns / 2 + 6).toFixed(0)}" ry="92" fill="${art[1]}"/>`;
+      })
+      .join("") +
+    `<path class="map-trail-shadow" d="${trail}"/><path class="map-trail" d="${trail}"/><path class="map-trail-lit" d="${lit}"/>`;
+  const litPath = svg.querySelector<SVGPathElement>(".map-trail-lit")!;
+  // Measure the distance along the trail to each world.
+  const full = svg.querySelector<SVGPathElement>(".map-trail")!;
+  const total = full.getTotalLength();
+  mapNodeLengths = nodes.map(() => 0);
+  const best = nodes.map(() => Infinity);
+  for (let l = 0; l <= total; l += 3) {
+    const pt = full.getPointAtLength(l);
+    nodes.forEach((n, i) => {
+      const d = (pt.x - n.x) ** 2 + (pt.y - n.y) ** 2;
+      if (d < best[i]!) {
+        best[i] = d;
+        mapNodeLengths[i] = l;
+      }
+    });
+  }
+  if (revealFrom >= 0 && revealFrom < open) {
+    // A newly opened world: the lit trail grows out to it.
+    const from = mapNodeLengths[revealFrom] ?? 0,
+      to = litPath.getTotalLength();
+    litPath.style.strokeDasharray = `${to} ${to}`;
+    litPath.style.strokeDashoffset = String(to - from);
+    litPath.getBoundingClientRect();
+    litPath.style.transition = "stroke-dashoffset 1.4s ease-in-out";
+    litPath.style.strokeDashoffset = "0";
+  }
+  if (mapWalkerAt < 0 || revealFrom >= 0) {
+    mapWalkerAt = revealFrom >= 0 ? revealFrom : selected;
+  }
+  moveMapWalker(mapWalkerAt, false);
 }
+/** Pip walks along the winding trail itself to the chosen world. */
 function moveMapWalker(index: number, walk: boolean) {
   const walker = document.querySelector<HTMLElement>(
     "#menu-worlds .map-walker",
   );
-  const node = mapNodes()[index];
-  if (!walker || !node) return;
-  walker.classList.toggle("walking", walk);
-  walker.style.transition = walk ? "" : "none";
-  walker.style.transform = `translate(${node.x - 18}px, ${node.y - 52}px)`;
+  const trail = document.querySelector<SVGPathElement>(
+    "#menu-worlds .map-trail",
+  );
+  const target = mapNodeLengths[index];
+  if (!walker || !trail || target === undefined) return;
+  cancelAnimationFrame(mapWalkFrame);
+  // Pip follows the curve frame by frame, not a straight CSS slide.
+  walker.style.transition = "none";
+  const place = (length: number, facing: number) => {
+    const pt = trail.getPointAtLength(length);
+    walker.style.transform = `translate(${(pt.x - 18).toFixed(1)}px, ${(pt.y - 52).toFixed(1)}px)`;
+    walker.style.setProperty("--facing", String(facing));
+  };
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const from = mapNodeLengths[mapWalkerAt] ?? target;
+  mapWalkerAt = index;
+  if (!walk || reduced || from === target) {
+    walker.classList.remove("walking");
+    place(target, 1);
+    return;
+  }
+  const duration = Math.min(2.2, Math.abs(target - from) / 520 + 0.25);
+  const facing = target > from ? 1 : -1;
+  const begin = performance.now();
+  walker.classList.add("walking");
+  const step = (now: number) => {
+    const t = Math.min(1, (now - begin) / (duration * 1000));
+    const eased = t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
+    // The trail turns back and forth, so face the way Pip is going on screen.
+    const here = from + (target - from) * eased;
+    const ahead = trail.getPointAtLength(here + facing * 4).x;
+    place(here, ahead >= trail.getPointAtLength(here).x ? 1 : -1);
+    if (t < 1) mapWalkFrame = requestAnimationFrame(step);
+    else walker.classList.remove("walking");
+  };
+  mapWalkFrame = requestAnimationFrame(step);
 }
-window.addEventListener("resize", () => requestAnimationFrame(layoutMapPath));
+/** The first time the map opens after a world unlocks, the fog clears from
+ * it, the lit trail grows out to it and Pip walks over. */
+function celebrateUnlocks() {
+  const open = furthestOpen();
+  let seen = open;
+  try {
+    const stored = localStorage.getItem(MAP_SEEN_KEY);
+    if (stored !== null) seen = Number(stored);
+    localStorage.setItem(MAP_SEEN_KEY, String(open));
+  } catch {
+    return;
+  }
+  if (!(seen < open)) return;
+  const button = document.querySelector<HTMLElement>(
+    `[data-menu-world="${open}"]`,
+  );
+  button?.classList.add("unlocking");
+  requestAnimationFrame(() => {
+    layoutMapPath(seen);
+    window.setTimeout(() => moveMapWalker(open, true), 500);
+    button?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  });
+}
+window.addEventListener("resize", () =>
+  requestAnimationFrame(() => layoutMapPath()),
+);
 function updateWorlds() {
   $("#world-strip").innerHTML = levels
     .map(
@@ -424,14 +556,14 @@ function updateWorlds() {
             : progress.bestTime !== null
               ? `Original trail ${formatTime(progress.bestTime)}`
               : "Meet this world’s guardian";
-      return `<button class="menu-world ${selected === i ? "selected" : ""} ${light > 0 ? "restored" : ""}" data-menu-world="${i}" ${worldUnlocked(save, i) ? "" : "disabled"} data-light="${light}" style="--world-light:${light}" aria-label="${level.name}, ${progress.fireflies.length} of 3 fireflies rescued, ${completed ? "trail completed" : "explore trail"}"><span class="map-island">${worldArt(i)}<span class="map-node-number">${completed ? "✓" : String(i + 1).padStart(2, "0")}</span></span><span class="menu-world-info"><strong>${level.name}</strong><span>${!worldUnlocked(save, i) ? lockedHint(i) : completed ? "Trail completed" : ["Bouncing mushrooms", "Ride the leaves", "Brave the cloud bridges", "Take flight. Turn the garden.", "Hop the lily pads", "Explore the glowing caves", "Swim the deep lagoon", "Light the night lanterns", "Dodge the falling icicles", "Slide across the frozen lake", "Cross the lava"][i]}</span><span class="map-fireflies" aria-hidden="true">${fireflyMarks(progress.fireflies)}</span><small class="map-acorns" aria-label="${progress.acorns.length} of 5 acorns found">🌰 ${progress.acorns.length}/5</small><small class="world-best">${best}</small></span></button>`;
+      return `<button class="menu-world ${selected === i ? "selected" : ""} ${light > 0 ? "restored" : ""}" data-menu-world="${i}" ${worldUnlocked(save, i) ? "" : "disabled"} data-light="${light}" style="--world-light:${light}" aria-label="${level.name}, ${progress.fireflies.length} of 3 fireflies rescued, ${completed ? "trail completed" : "explore trail"}"><span class="map-island">${worldArt(i)}<span class="map-node-number">${completed ? "✓" : String(i + 1).padStart(2, "0")}</span>${FINALES.some((f) => f.world === level.contentId) ? `<span class="map-boss" title="Boss level">♛</span>` : ""}${worldUnlocked(save, i) ? "" : `<span class="map-fog"></span>`}</span><span class="menu-world-info"><strong>${level.name}</strong><span>${!worldUnlocked(save, i) ? lockedHint(i) : completed ? "Trail completed" : ["Bouncing mushrooms", "Ride the leaves", "Brave the cloud bridges", "Take flight. Turn the garden.", "Hop the lily pads", "Explore the glowing caves", "Swim the deep lagoon", "Light the night lanterns", "Dodge the falling icicles", "Slide across the frozen lake", "Cross the lava"][i]}</span><span class="map-fireflies" aria-hidden="true">${fireflyMarks(progress.fireflies)}</span><small class="map-acorns" aria-label="${progress.acorns.length} of 5 acorns found">🌰 ${progress.acorns.length}/5</small><small class="world-best">${best}</small></span></button>`;
     })
     .join("");
   $("#menu-worlds").insertAdjacentHTML(
     "beforeend",
-    `<svg class="map-path" aria-hidden="true"><polyline /></svg><span class="map-walker" aria-hidden="true">${icon("pip")}</span>`,
+    `<svg class="map-path" aria-hidden="true"></svg><span class="map-walker" aria-hidden="true">${icon("pip")}</span>`,
   );
-  requestAnimationFrame(layoutMapPath);
+  requestAnimationFrame(() => layoutMapPath());
   // Pip walks the trail to whichever world is pointed at or focused.
   document
     .querySelectorAll<HTMLButtonElement>("[data-menu-world]")
@@ -1053,12 +1185,15 @@ function bindPanel() {
   $("#home-button").addEventListener("click", showMenu);
 }
 function showMenu() {
-  requestAnimationFrame(layoutMapPath);
   groveDialog.close();
   pause();
   controls.reset();
   updateWorlds();
   menuDialog.showModal();
+  requestAnimationFrame(() => {
+    layoutMapPath();
+    celebrateUnlocks();
+  });
 }
 function showHelp() {
   helpReturn = document.activeElement as HTMLElement;
