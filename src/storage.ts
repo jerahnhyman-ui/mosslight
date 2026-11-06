@@ -181,8 +181,8 @@ export interface Save {
     seedStack: { bestScore: number | null; bestLines: number | null };
   };
   claimedRewards: string[];
-  /** Pause and show a large card the first time each tip appears. */
-  tipCards: boolean;
+  /** Pop-up messages and first-time tip cards. Off unless the player opts in. */
+  messages: boolean;
   /** Tips already shown as a card on this device ("level:index"). */
   tipsSeen: string[];
 }
@@ -244,7 +244,7 @@ const blank = (): Save => ({
     seedStack: { bestScore: null, bestLines: null },
   },
   claimedRewards: [],
-  tipCards: true,
+  messages: false,
   tipsSeen: [],
   progress: Array.from({ length: WORLD_IDS.length }, () => ({
     completed: false,
@@ -424,7 +424,8 @@ export function readSave(): Save {
         defaults.controls.height = DEFAULT_CONTROLS.height;
       }
     }
-    defaults.tipCards = raw.tipCards !== false;
+    // A new setting name, so earlier saves start with messages off.
+    defaults.messages = raw.messages === true;
     if (Array.isArray(raw.tipsSeen))
       defaults.tipsSeen = [
         ...new Set(

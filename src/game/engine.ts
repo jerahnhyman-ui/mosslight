@@ -64,6 +64,8 @@ export type Enemy = Rect & {
   squashed: number;
   minX: number;
   maxX: number;
+  /** Horizontal speed of a hopper's current leap. */
+  airSpeed?: number;
 };
 
 export const MAX_LIVES = 3;
@@ -81,7 +83,11 @@ const JUMP = -635;
 const SHORT_JUMP = -370;
 const MUSHROOM_BOUNCE = -820;
 const MAX_SPEED = 300;
+/** Speed multiplier while star power lasts. */
+export const STAR_SPEED_BOOST = 1.4;
 const COYOTE_TIME = 0.12;
+/** How far a bug on Pip's floor notices and reacts to Pip. */
+const ENEMY_SIGHT = 220;
 /** Walking pace or slower lets Pip use a portal; a full run passes through. */
 const PORTAL_MAX_SPEED = 90;
 const JUMP_BUFFER_TIME = 0.16;
@@ -454,9 +460,14 @@ export class Game {
       let acceleration = p.grounded ? 3200 : 2600;
       if (direction === 0) acceleration = p.grounded ? 4200 : 1800;
       else if (p.vx * direction < 0) acceleration = p.grounded ? 4800 : 3600;
+      // Star power makes Pip noticeably faster as well as invincible.
+      const starred = this.starPowerRemaining > 0;
+      if (starred && direction) acceleration *= STAR_SPEED_BOOST;
       p.vx = approach(
         p.vx,
-        direction * (swimming ? 190 : MAX_SPEED),
+        direction *
+          (swimming ? 190 : MAX_SPEED) *
+          (starred ? STAR_SPEED_BOOST : 1),
         acceleration * STEP,
       );
       if (direction) p.facing = direction;
@@ -1097,7 +1108,8 @@ export class Game {
         hitBoss(boss, p, this.hazards, this.events);
         if (stomp || !powered) this.bounceOffBoss(boss);
       } else if (stomp) this.bounceOffBoss(boss);
-      else if (this.hurt(boss)) return true;
+      // A dazed guardian wanders slowly but is harmless until it recovers.
+      else if (boss.state !== "recover" && this.hurt(boss)) return true;
     }
     for (const hazard of this.hazards) {
       hazard.remaining = Math.max(0, hazard.remaining - STEP);
@@ -1212,12 +1224,31 @@ export class Game {
 
   private moveEnemy(enemy: Enemy) {
     enemy.stateTime = Math.max(0, enemy.stateTime - STEP);
-    if (enemy.kind === "hopper") {
+    // Bugs notice Pip on their own floor and react, within their patrol.
+    const p = this.player;
+    const dx = p.x + p.w / 2 - enemy.x - enemy.w / 2;
+    const center = p.x + p.w / 2;
+    // Only react when Pip is within the bug's own ground, so it never stands
+    // pressed against the end of its patrol.
+    const onFloor = Math.abs(p.y + p.h - enemy.baseY - enemy.h) < 75;
+    const sameFloor =
+      onFloor && center > enemy.minX && center < enemy.maxX + enemy.w;
+    const toward = dx >= 0 ? 1 : -1;
+    if (enemy.kind === "beetle") {
+      // A beetle that spots Pip turns and scurries toward them.
+      const alert = sameFloor && Math.abs(dx) < ENEMY_SIGHT;
+      if (alert) enemy.facing = toward;
+      enemy.vx = enemy.facing * (alert ? 95 : 56);
+    } else if (enemy.kind === "hopper") {
       if (enemy.grounded && enemy.stateTime === 0) {
-        enemy.vy = -360;
+        // Near Pip, a hopper leaps at them; otherwise it hops along.
+        const lunge = sameFloor && Math.abs(dx) < ENEMY_SIGHT;
+        if (lunge) enemy.facing = toward;
+        enemy.vy = lunge ? -430 : -360;
+        enemy.airSpeed = lunge ? Math.min(150, Math.abs(dx) * 0.9 + 60) : 85;
         enemy.grounded = false;
       }
-      enemy.vx = enemy.facing * (enemy.grounded ? 35 : 85);
+      enemy.vx = enemy.facing * (enemy.grounded ? 35 : (enemy.airSpeed ?? 85));
       if (!enemy.grounded) {
         const oldBottom = enemy.y + enemy.h;
         enemy.vy += (enemy.vy < 0 ? GRAVITY : FALL_GRAVITY) * STEP;
@@ -1240,36 +1271,45 @@ export class Game {
           enemy.y = enemy.baseY;
           enemy.vy = 0;
           enemy.grounded = true;
-          enemy.stateTime = 0.8;
+          // Alert hoppers rest only briefly between leaps.
+          enemy.stateTime =
+            sameFloor && Math.abs(dx) < ENEMY_SIGHT ? 0.45 : 0.8;
         }
       }
     } else if (enemy.kind === "charger") {
-      const dx = this.player.x + this.player.w / 2 - enemy.x - enemy.w / 2;
-      const sameFloor =
-        Math.abs(this.player.y + this.player.h - enemy.y - enemy.h) < 75;
+      // Chargers also spot Pip just beyond their patrol and rush the edge.
       if (
         enemy.state === "patrol" &&
         enemy.stateTime === 0 &&
         Math.abs(dx) < 260 &&
-        sameFloor
+        onFloor
       ) {
-        enemy.facing = dx >= 0 ? 1 : -1;
+        enemy.facing = toward;
         enemy.state = "windup";
-        enemy.stateTime = 0.6;
+        enemy.stateTime = 0.5;
         this.events.push("charge");
       } else if (enemy.state === "windup" && enemy.stateTime === 0) {
         enemy.state = "charge";
         enemy.stateTime = 0.8;
       } else if (enemy.state === "charge" && enemy.stateTime === 0) {
         enemy.state = "recover";
-        enemy.stateTime = 0.65;
+        enemy.stateTime = 0.4;
       } else if (enemy.state === "recover" && enemy.stateTime === 0) {
         enemy.state = "patrol";
-        enemy.stateTime = 0.6;
+        enemy.stateTime = 0.5;
+        // Turn back toward Pip and stalk before the next charge.
+        if (onFloor && Math.abs(dx) < ENEMY_SIGHT + 60) enemy.facing = toward;
       }
-      const speed =
-        enemy.state === "charge" ? 240 : enemy.state === "patrol" ? 40 : 0;
-      enemy.vx = speed ? enemy.facing * speed : 0;
+      enemy.vx =
+        enemy.state === "charge"
+          ? enemy.facing * 250
+          : enemy.state === "patrol"
+            ? enemy.facing * 60
+            : enemy.state === "windup"
+              ? // It paws backward while winding up, so it is never static.
+                -enemy.facing * 28
+              : // After a charge it staggers, slowly, before turning back.
+                -enemy.facing * 22;
     }
     enemy.x += enemy.vx * STEP;
     if (enemy.kind === "charger") {
@@ -1295,7 +1335,9 @@ export class Game {
     }
     if (enemy.x <= enemy.minX || enemy.x >= enemy.maxX) {
       enemy.x = Math.max(enemy.minX, Math.min(enemy.maxX, enemy.x));
-      if (
+      if (enemy.kind === "charger" && enemy.state === "windup") {
+        enemy.vx = 0;
+      } else if (
         (enemy.x <= enemy.minX && enemy.vx < 0) ||
         (enemy.x >= enemy.maxX && enemy.vx > 0)
       ) {
@@ -1308,7 +1350,8 @@ export class Game {
         }
       }
     }
-    if (enemy.vx) enemy.facing = Math.sign(enemy.vx);
+    if (enemy.vx && !(enemy.kind === "charger" && enemy.state === "windup"))
+      enemy.facing = Math.sign(enemy.vx);
   }
 
   private squash(enemy: Enemy) {

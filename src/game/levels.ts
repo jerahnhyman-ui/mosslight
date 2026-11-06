@@ -517,7 +517,7 @@ const trails: Level[] = [
       },
       {
         x: 10090,
-        text: "A quiet clearing. Collect a diamond before the guardian's gate.",
+        text: "A quiet clearing. Collect a Sunseed before the guardian's gate.",
       },
     ],
     platforms: [

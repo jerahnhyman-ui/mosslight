@@ -2,7 +2,7 @@
 
 An original side-scrolling platformer for iPhone, iPad, and the browser.
 Guide Pip or Poppy through Sunlit Meadow, Firefly Hollow, Cloudtop Crossing, Windmill Garden, and Reedwater Marsh:
-collect golden coins, grow with diamonds, power up with stars, rescue hidden
+collect golden coins, grow with Sunseeds, power up with stars, rescue hidden
 fireflies, and bring light back to the forest. Four extended trails include
 multiple checkpoints, optional routes, light-activated plants, and three-phase
 guardian encounters. Return rescued fireflies to a playable home grove and
@@ -124,9 +124,9 @@ iOS plugin when supported.
   life, including while big or using star power.
 - **Earn power-ups by bumping marked blocks from below.** Either friend, small or big, can
   both hit these blocks. Feather and star blocks grant their powers when hit;
-  diamond blocks release a diamond to collect.
+  seed blocks release a golden Sunseed to collect.
 - **Wind Feathers let Pip fly in every world.** Bump a feather-marked block on the opening path; the Home Grove has one for practice too. Jump, release, then hold Jump again to rise. Release to glide and land to refill. The camera follows high flights. Shrinking retains the feather; losing a life drops it and makes feather blocks available again. Challenge rooms keep their original jumping rules.
-- **Diamonds make Pip big.** Bump a diamond-marked block and collect its diamond. A bug hit then shrinks Pip without taking a life.
+- **Sunseeds make Pip big.** Bump a seed-marked block and collect its Sunseed. A bug hit then shrinks Pip without taking a life.
   A hit while small costs a life. A brief grace period after shrinking or
   respawning prevents one collision from counting as several hits.
 - **Every 50 coins earns one life, up to 3.** The counter rolls over at 50 even
@@ -137,7 +137,7 @@ iOS plugin when supported.
   Bugs cannot hurt Pip and touching them squashes them. Another star refreshes the timer. Pausing freezes the timer;
   falling still costs a life.
 - Losing a life returns small Pip to the checkpoint, or the start if no checkpoint
-  is active, and clears star power. Diamond and feather blocks reset after a lost
+  is active, and clears star power. Seed and feather blocks reset after a lost
   life; spent star blocks stay spent for the run.
   Zero lives ends a Classic or Timed run. Relaxed mode keeps checkpoint retries
   available. Restarting or choosing another trail starts fresh.

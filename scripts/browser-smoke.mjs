@@ -516,8 +516,8 @@ try {
     headless: true,
     args: ["--no-sandbox"],
   });
-  // New tips pause play on a card. These routes test movement, not tips, so
-  // continue past each card as soon as it appears.
+  // With messages on, new tips pause play on a card. These routes test
+  // movement, not tips, so continue past each card as soon as it appears.
   const openPage = browser.newPage.bind(browser);
   browser.newPage = async (...options) => {
     const page = await openPage(...options);
@@ -525,6 +525,15 @@ try {
       new MutationObserver(() =>
         document.getElementById("tip-continue")?.click(),
       ).observe(document, { childList: true, subtree: true });
+      // Messages are off by default. These checks read them, so switch them
+      // on through the real Settings control once the app has loaded.
+      document.addEventListener("DOMContentLoaded", () => {
+        const toggle = document.getElementById("messages-toggle");
+        if (toggle && !toggle.checked) {
+          toggle.checked = true;
+          toggle.dispatchEvent(new Event("change"));
+        }
+      });
     });
     return page;
   };

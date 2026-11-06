@@ -558,11 +558,11 @@ h1 {
   letter-spacing: 0.3px;
 }
 .diamond-reserve[data-filled="true"] {
-  color: #268fa0;
+  color: #b06a2c;
 }
 .diamond-reserve[data-filled="true"] .icon {
-  fill: #a0f0f5;
-  filter: drop-shadow(0 1px 1px #65bac5);
+  fill: #f6c25c;
+  filter: drop-shadow(0 1px 1px #d7953e);
 }
 #star-power {
   font-size: 13px;
@@ -1699,8 +1699,8 @@ dialog h2 {
 
 /* Keep power and life information readable without covering the trail. */
 .diamond-guide {
-  background: #cef1f1;
-  color: #20838a;
+  background: #fbe6bd;
+  color: #a8652e;
 }
 .guide-symbol .icon {
   width: 27px;
