@@ -113,57 +113,70 @@ function ride(
 }
 const leftward = (t: Tile) => t.x - t.previousX < 0;
 const fresh = () => new Game(0, { level: { ...cavernLevel, enemies: [] } });
+/** Hop onto a moving crystal once `ready` says it is placed for the jump. */
+function hopTo(g: Game, id: string, ready: () => boolean) {
+  const pad = tile(g, id);
+  waitUntil(g, ready, `${id} ready`);
+  step(g, { ...steer(g, pad.x + pad.w / 2), jump: true, jumpPressed: true });
+  for (let i = 0; ; i++) {
+    alive(g, `hop to ${id}`);
+    const p = g.player;
+    if (
+      i > 12 &&
+      p.grounded &&
+      p.x + p.w > pad.x &&
+      p.x < pad.x + pad.w &&
+      Math.abs(p.y + p.h - pad.y) < 2
+    )
+      return;
+    if (i > 600) throw new Error(`could not reach ${id}`);
+    step(g, { ...steer(g, pad.x + pad.w / 2), jump: true });
+  }
+}
 
-function toEchoShaft(g: Game) {
+function crossSteps(g: Game) {
   walk(g, 1270);
-  ride(
-    g,
-    "cave.lift.steps",
-    (t) => t.x <= 1340 && leftward(t),
-    (t) => t.x + t.w >= 1580,
-  );
-  jump(g, 1690, 430);
+  const a = tile(g, "cave.lift.steps.a"),
+    b = tile(g, "cave.lift.steps.b");
+  hopTo(g, a.id!, () => a.x <= 1345 && leftward(a));
+  hopTo(g, b.id!, () => b.x - (a.x + a.w) <= 30);
+  waitUntil(g, () => b.x + b.w >= 1895, "steps crystal near the far floor");
+  jump(g, 2080, 430);
+}
+function toEchoShaft(g: Game) {
+  crossSteps(g);
   walk(g, 2490);
-  ride(
-    g,
-    "cave.lift.echo",
-    (t) => t.y >= 385,
-    () => true,
-  );
+  const a = tile(g, "cave.lift.echo.a");
+  hopTo(g, a.id!, () => a.y >= 385);
 }
 function toGlowcapGrove(g: Game) {
   toEchoShaft(g);
-  const echo = tile(g, "cave.lift.echo");
-  waitUntil(
-    g,
-    () => echo.y <= 320 && echo.y >= 290,
-    "echo crystal level with the ledge",
-  );
-  jump(g, 2880, 300);
+  const a = tile(g, "cave.lift.echo.a"),
+    b = tile(g, "cave.lift.echo.b");
+  hopTo(g, b.id!, () => Math.abs(a.y - b.y) < 20);
+  waitUntil(g, () => b.y >= 360, "second echo crystal low");
   jump(g, 3090, 430);
 }
 function toGallery(g: Game) {
   toGlowcapGrove(g);
   walk(g, 4380);
-  for (const [x, y] of [
-    [4510, 390],
-    [4670, 370],
-    [4830, 390],
-    [4990, 370],
-    [5180, 430],
-  ] as const)
-    jump(g, x, y);
+  jump(g, 4510, 390);
+  jump(g, 4655, 360);
+  const shard = tile(g, "cave.lift.shard");
+  hopTo(g, shard.id!, () => shard.x <= 4795 && leftward(shard));
+  waitUntil(g, () => shard.x + shard.w >= 5010, "shard crystal near the crack");
+  jump(g, 5140, 370);
+  jump(g, 5272, 430);
 }
 function runTrail(g: Game) {
   toGallery(g);
   walk(g, 6380);
-  ride(
-    g,
-    "cave.lift.rumble",
-    (t) => t.x <= 6565 && leftward(t),
-    (t) => t.x + t.w >= 6795,
-  );
-  jump(g, 6940, 430);
+  const a = tile(g, "cave.lift.rumble.a"),
+    b = tile(g, "cave.lift.rumble.b");
+  hopTo(g, a.id!, () => a.x <= 6455 && leftward(a));
+  hopTo(g, b.id!, () => b.x - (a.x + a.w) <= 30);
+  waitUntil(g, () => b.x + b.w >= 6940, "rumble crystal near the far floor");
+  jump(g, 7180, 430);
   walk(g, CAVERN_FINAL_CHECKPOINT + 20);
 }
 
@@ -245,6 +258,27 @@ describe("Glimmerdeep Caverns", () => {
     }
   });
 
+  it("makes every chasm too wide to jump without a moving crystal", () => {
+    const floors = cavernLevel.platforms
+      .filter((t) => t.kind === "ground")
+      .sort((a, b) => a.x - b.x);
+    const chasms = floors.slice(1).flatMap((next, i) => {
+      const end = floors[i]!.x + floors[i]!.w;
+      return next.x > end ? [[end, next.x] as const] : [];
+    });
+    expect(chasms).toHaveLength(4);
+    for (const [from, to] of chasms) {
+      // An ordinary running jump covers about 250px.
+      expect(to - from, `chasm ${from}-${to}`).toBeGreaterThanOrEqual(500);
+      expect(
+        cavernLevel.platforms.some(
+          (t) => t.kind === "moving" && t.x > from - 100 && t.x < to,
+        ),
+        `moving crystal in chasm ${from}-${to}`,
+      ).toBe(true);
+    }
+  });
+
   it("keeps checkpoints clear of enemy patrols", () => {
     for (const c of cavernLevel.checkpoints)
       for (const e of cavernLevel.enemies)
@@ -265,9 +299,9 @@ describe("Glimmerdeep Caverns", () => {
   it("reaches the Bat Roost from the top of the echo crystal", () => {
     const g = fresh();
     toEchoShaft(g);
-    const echo = tile(g, "cave.lift.echo");
+    const echo = tile(g, "cave.lift.echo.a");
     waitUntil(g, () => echo.y <= 264, "echo crystal at the top");
-    jump(g, 2800, 150);
+    jump(g, 2750, 150);
     expect(rescued(g)).toBe(1);
   });
 
@@ -283,7 +317,7 @@ describe("Glimmerdeep Caverns", () => {
   it("rides the gallery crystal to the hidden alcove", () => {
     const g = fresh();
     toGallery(g);
-    walk(g, 5250);
+    walk(g, 5330);
     jump(g, 5375, 340);
     jump(g, 5595, 250);
     ride(
