@@ -71,6 +71,14 @@ const layouts: Record<string, readonly Placement[]> = {
     // Recovery Sunseed on the seabed after the last checkpoint.
     ["diamond", 5480, 360],
   ],
+  "world.nightglow-woods": [
+    ["feather", 200, 300],
+    ["diamond", 1800, 300],
+    ["star", 3400, 300],
+    ["diamond", 5350, 300],
+    // Recovery Sunseed before Gloomwing's gate.
+    ["diamond", 8500, 300],
+  ],
   grove: [["feather", 260, 300]],
   "secret.beehive": [
     ["feather", 150, 300],

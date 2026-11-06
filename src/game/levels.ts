@@ -2,7 +2,9 @@ import { windmillLevel } from "./expansion-levels";
 import { marshLevel } from "./marsh-level";
 import { cavernLevel } from "./cavern-level";
 import { tidewellLevel } from "./tidewell-level";
+import { nightglowLevel } from "./nightglow-level";
 import { expansionChallenges } from "./challenge-expansion";
+import { floodgateDash, leafboatRiver } from "./special-stages";
 import { cloudAscentPlatforms } from "./cloud-garden";
 import { withTrailChallenges } from "./challenge-balance";
 import { withRewardBlocks } from "./reward-layouts";
@@ -33,6 +35,8 @@ export type Platform = Rect & {
     | "curled";
   motion?: { axis: "x" | "y"; range: number; period: number; phase?: number };
   rewardCoins?: number;
+  /** A boat: once Pip boards, it cruises right at `speed` until `until`. */
+  cruise?: { speed: number; until: number };
   /** Power released by bumping this solid block from below. */
   rewardPower?: "diamond" | "feather" | "star";
   wakeRadius?: number;
@@ -54,6 +58,7 @@ export type BossKind =
   | "toad"
   | "mole"
   | "crab"
+  | "owl"
   | "millkeeper"
   | "heartwood";
 export type BossSpec = {
@@ -105,6 +110,15 @@ export interface Level {
   goal: { x: number; y: number };
   kind?: "world" | "grove" | "challenge" | "secret" | "minigame";
   featherFountains?: { x: number; y: number }[];
+  /** A chase: a flood wall rolls in from the left at `speed` after `delay`
+   * seconds, starting `lead` pixels behind the spawn or checkpoint. Being
+   * caught by it costs a life. */
+  chase?: { speed: number; delay: number; lead: number };
+  /** Night levels: only Pip's glow and lit lanterns light the scene. */
+  dark?: boolean;
+  /** Lanterns (y is the ground they stand on). They light for good when
+   * Pip passes, and shed a wide circle of light. */
+  lanterns?: { x: number; y: number; lit?: boolean }[];
   /** Where Gulp the tree frog waits to be ridden (y is the ground surface). */
   mounts?: { x: number; y: number }[];
   /** Water. currentY lifts (negative) or pulls down (positive); currentX
@@ -1114,6 +1128,7 @@ export const levels: Level[] = [
   marshLevel,
   cavernLevel,
   tidewellLevel,
+  nightglowLevel,
 ];
 
 /** A real, safe platforming space: all residents and purchased furnishings are
@@ -1401,4 +1416,6 @@ export const challengeLevels: Level[] = [
     ] satisfies Level[]
   ).map(withRewardBlocks),
   ...expansionChallenges,
+  floodgateDash,
+  leafboatRiver,
 ];

@@ -21,7 +21,8 @@ import { AdventureSession, type SecretTarget } from "./game/session";
 import { moonpoolLevel } from "./game/moonpool-level";
 import { cloudGardenLevel } from "./game/cloud-garden";
 import { skySecretLevels } from "./game/sky-secrets";
-import { createThornKingRun, readyForThornKing } from "./game/boss-level";
+import { createFinaleRun, finaleFor, thornKingLevel } from "./game/boss-level";
+import { gloomwingLevel } from "./game/nightglow-level";
 import { guardianArena } from "./game/guardian-replays";
 import { GhostRecorder, loadGhost, saveGhost } from "./ghost";
 import { Renderer } from "./game/renderer";
@@ -104,6 +105,8 @@ let bossOrigin: Game | null = null;
 let bossReplay = false;
 /** The arena for a journal guardian rematch; null means the Thorn King. */
 let replayArena: Level | null = null;
+/** The major-boss arena for the current boss run (Thorn King by default). */
+let bossArena: Level = thornKingLevel;
 const seenTutorials = new Set<string>();
 const modeName = (value: PlayMode) =>
   ({ classic: "Classic", relaxed: "Relaxed", timed: "Timed" })[value];
@@ -305,17 +308,20 @@ function worldArt(index: number) {
     ["#8ec5c2", "#f7dcae", "#7fb08a", "#4f8a72"],
     ["#2f3360", "#7c6fb8", "#5b5a96", "#3f3f72"],
     ["#2b8fa3", "#9be3dc", "#3f9f9a", "#257a7f"],
+    ["#1d2147", "#5b4f9a", "#3e3c78", "#2b2a5a"],
   ][index];
   return `<svg class="world-art" viewBox="0 0 240 130" aria-hidden="true"><defs><linearGradient id="sky-${index}" x2="0" y2="1"><stop stop-color="${colors[0]}"/><stop offset="1" stop-color="${colors[1]}"/></linearGradient></defs><rect width="240" height="130" rx="16" fill="url(#sky-${index})"/><circle cx="181" cy="34" r="18" fill="#fff5b6"/><path d="M0 87Q40 16 90 88Q138 40 191 81Q224 58 240 78V130H0" fill="${colors[2]}"/><path d="M0 112Q66 62 123 110Q178 71 240 101V130H0" fill="${colors[3]}"/><path d="M0 119Q74 112 133 119T240 119V130H0" fill="#207357"/><g fill="#fff" opacity=".8"><ellipse cx="50" cy="34" rx="24" ry="8"/><ellipse cx="59" cy="28" rx="14" ry="10"/></g><path d="m113 78 4 8 9 1-7 6 2 9-8-5-8 5 2-9-7-6 9-1Z" fill="#ffdb73"/></svg>`;
 }
 function lockedHint(index: number) {
-  return index === 6
-    ? "Finish Glimmerdeep Caverns to open"
-    : index === 5
-      ? "Finish Reedwater Marsh to open"
-      : index === 4
-        ? "Defeat the Thorn King to open"
-        : "Beat the Meadow guardian to open";
+  return index === 7
+    ? "Finish Tidewell Depths to open"
+    : index === 6
+      ? "Finish Glimmerdeep Caverns to open"
+      : index === 5
+        ? "Finish Reedwater Marsh to open"
+        : index === 4
+          ? "Defeat the Thorn King to open"
+          : "Beat the Meadow guardian to open";
 }
 function fireflyMarks(indices: number[]) {
   return [0, 1, 2]
@@ -383,7 +389,7 @@ function updateWorlds() {
   $("#world-strip").innerHTML = levels
     .map(
       (level, i) =>
-        `<button class="world-tab ${selected === i ? "selected" : ""}" data-world="${i}" ${worldUnlocked(save, i) ? "" : "disabled"} aria-pressed="${selected === i}"><span class="tab-number">0${i + 1}</span><span><small>${!worldUnlocked(save, i) ? (i === 6 ? "FINISH THE CAVES" : i === 5 ? "FINISH THE MARSH" : i === 4 ? "BEAT THE THORN KING" : "BEAT MEADOW TO OPEN") : selected === i ? "YOUR NEXT ADVENTURE" : "EXPLORE"}</small><strong>${level.name}</strong></span><span class="tab-stars" aria-label="${save.progress[i].fireflies.length} of 3 fireflies rescued">${fireflyMarks(save.progress[i].fireflies)}</span></button>`,
+        `<button class="world-tab ${selected === i ? "selected" : ""}" data-world="${i}" ${worldUnlocked(save, i) ? "" : "disabled"} aria-pressed="${selected === i}"><span class="tab-number">0${i + 1}</span><span><small>${!worldUnlocked(save, i) ? (i === 7 ? "FINISH THE DEPTHS" : i === 6 ? "FINISH THE CAVES" : i === 5 ? "FINISH THE MARSH" : i === 4 ? "BEAT THE THORN KING" : "BEAT MEADOW TO OPEN") : selected === i ? "YOUR NEXT ADVENTURE" : "EXPLORE"}</small><strong>${level.name}</strong></span><span class="tab-stars" aria-label="${save.progress[i].fireflies.length} of 3 fireflies rescued">${fireflyMarks(save.progress[i].fireflies)}</span></button>`,
     )
     .join("");
   document
@@ -410,7 +416,7 @@ function updateWorlds() {
             : progress.bestTime !== null
               ? `Original trail ${formatTime(progress.bestTime)}`
               : "Meet this world’s guardian";
-      return `<button class="menu-world ${selected === i ? "selected" : ""} ${light > 0 ? "restored" : ""}" data-menu-world="${i}" ${worldUnlocked(save, i) ? "" : "disabled"} data-light="${light}" style="--world-light:${light}" aria-label="${level.name}, ${progress.fireflies.length} of 3 fireflies rescued, ${completed ? "trail completed" : "explore trail"}"><span class="map-island">${worldArt(i)}<span class="map-node-number">${completed ? "✓" : `0${i + 1}`}</span></span><span class="menu-world-info"><strong>${level.name}</strong><span>${!worldUnlocked(save, i) ? lockedHint(i) : completed ? "Trail completed" : ["Bouncing mushrooms", "Ride the leaves", "Brave the cloud bridges", "Take flight. Turn the garden.", "Hop the lily pads", "Explore the glowing caves", "Swim the deep lagoon"][i]}</span><span class="map-fireflies" aria-hidden="true">${fireflyMarks(progress.fireflies)}</span><small class="map-acorns" aria-label="${progress.acorns.length} of 5 acorns found">🌰 ${progress.acorns.length}/5</small><small class="world-best">${best}</small></span></button>`;
+      return `<button class="menu-world ${selected === i ? "selected" : ""} ${light > 0 ? "restored" : ""}" data-menu-world="${i}" ${worldUnlocked(save, i) ? "" : "disabled"} data-light="${light}" style="--world-light:${light}" aria-label="${level.name}, ${progress.fireflies.length} of 3 fireflies rescued, ${completed ? "trail completed" : "explore trail"}"><span class="map-island">${worldArt(i)}<span class="map-node-number">${completed ? "✓" : `0${i + 1}`}</span></span><span class="menu-world-info"><strong>${level.name}</strong><span>${!worldUnlocked(save, i) ? lockedHint(i) : completed ? "Trail completed" : ["Bouncing mushrooms", "Ride the leaves", "Brave the cloud bridges", "Take flight. Turn the garden.", "Hop the lily pads", "Explore the glowing caves", "Swim the deep lagoon", "Light the night lanterns"][i]}</span><span class="map-fireflies" aria-hidden="true">${fireflyMarks(progress.fireflies)}</span><small class="map-acorns" aria-label="${progress.acorns.length} of 5 acorns found">🌰 ${progress.acorns.length}/5</small><small class="world-best">${best}</small></span></button>`;
     })
     .join("");
   $("#menu-worlds").insertAdjacentHTML(
@@ -494,6 +500,9 @@ function updateAdventureChoices() {
 function updateJournal() {
   const hive = save.secrets.beehive;
   const hoops = save.minigames.flowerHoops;
+  const gloomwingUnlocked = Object.values(save.progress[7]?.garden ?? {}).some(
+    (record) => record.completed,
+  );
   const bossUnlocked =
     save.progress[3].adventureCompleted ||
     Object.values(save.progress[3].garden).some((record) => record.completed);
@@ -528,6 +537,7 @@ function updateJournal() {
     }).join("") +
     `<button class="challenge-entry" id="journal-hoops" ${save.unlocks.windFeatherDiscovered ? "" : "disabled"}><span><strong>Petal Post</strong><small>${save.unlocks.windFeatherDiscovered ? (hoops.best ? `${hoops.bestMedal === "none" ? "Practice" : hoops.bestMedal + " medal"} · best ${hoops.best.score} points` : "A little flight. Sixteen flower hoops.") : "Bump a feather block near a trail entrance"}</small></span><span>✿</span></button>` +
     `<button class="challenge-entry" id="journal-thorn-king" ${bossUnlocked ? "" : "disabled"}><span><strong>The Thorn King's Grove</strong><small>${bossUnlocked ? "Replay the major boss level" : "Finish Windmill Garden to unlock a replay"}</small></span><span>♛</span></button>` +
+    `<button class="challenge-entry" id="journal-gloomwing" ${gloomwingUnlocked ? "" : "disabled"}><span><strong>Gloomwing's Roost</strong><small>${gloomwingUnlocked ? "Replay the major boss level" : "Finish Nightglow Woods to unlock a replay"}</small></span><span>♛</span></button>` +
     `<h3>Guardian rematches</h3>` +
     levels
       .map((level, index) => {
@@ -558,11 +568,25 @@ function updateJournal() {
         start();
       }),
     );
+  $("#journal-gloomwing").addEventListener("click", () => {
+    if (!gloomwingUnlocked) return;
+    selected = 7;
+    bossReplay = true;
+    replayArena = null;
+    bossArena = gloomwingLevel;
+    bossOrigin = null;
+    runKind = "boss";
+    menuDialog.close();
+    groveDialog.close();
+    coinLedger = new RunCoinLedger();
+    start();
+  });
   $("#journal-thorn-king").addEventListener("click", () => {
     if (!bossUnlocked) return;
     selected = 3;
     bossReplay = true;
     replayArena = null;
+    bossArena = thornKingLevel;
     bossOrigin = null;
     runKind = "boss";
     menuDialog.close();
@@ -730,7 +754,7 @@ function start() {
   if (runKind === "boss") {
     game = replayArena
       ? new Game(0, { level: replayArena, mode: save.playMode })
-      : createThornKingRun(save.playMode, bossOrigin ?? undefined);
+      : createFinaleRun(bossArena, save.playMode, bossOrigin ?? undefined);
     // Running out of lives in the boss level retries the arena, not the trail.
     game.lives = MAX_LIVES;
     dressGame(game);
@@ -938,7 +962,7 @@ function updateUI() {
     overlay.innerHTML = `<div class="title-content"><p class="eyebrow"><span class="eyebrow-dot"></span> THE SUNSEED TRAILS</p><h1>A little hero.<br><span>A wild adventure.</span></h1><p class="title-description">Find a Wind Feather. Take flight.<br>Bring the garden’s tiny lights back home.</p><button class="primary-button" id="start-button">${icon("play")}<span>Play ${game.level.name}</span></button><div class="title-footnote">${icon("firefly")} ${modeName(save.playMode)} · 3 fireflies · a garden guardian</div></div><div class="hero-callout"><span>Hey, I’m Pip!</span><svg viewBox="0 0 70 50" aria-hidden="true"><path d="M5 5q42-6 48 32m-12-7 13 10 7-15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg></div>`;
     $("#start-button").addEventListener("click", start);
   } else if (mode === "boss-intro") {
-    overlay.innerHTML = `<div class="result-panel"><p class="eyebrow">${replayArena ? "GUARDIAN REMATCH" : "BOSS LEVEL"}</p><h2>${game.level.name}</h2><p>${replayArena ? `${game.boss?.name ?? "The guardian"} waits ahead. Power blocks are ready before the fight.` : "Briarheart waits ahead. A checkpoint and power blocks are ready before the fight."}</p><button class="primary-button" id="boss-start">${replayArena ? "Start the rematch" : "Enter the grove"} ${icon("arrow")}</button><div class="panel-links"><button id="home-button">Choose a world</button></div></div>`;
+    overlay.innerHTML = `<div class="result-panel"><p class="eyebrow">${replayArena ? "GUARDIAN REMATCH" : "BOSS LEVEL"}</p><h2>${game.level.name}</h2><p>${replayArena ? `${game.boss?.name ?? "The guardian"} waits ahead. Power blocks are ready before the fight.` : `${game.boss?.name.split(",")[0] ?? "The guardian"} waits ahead. A checkpoint and power blocks are ready before the fight.`}</p><button class="primary-button" id="boss-start">${replayArena ? "Start the rematch" : "Enter the arena"} ${icon("arrow")}</button><div class="panel-links"><button id="home-button">Choose a world</button></div></div>`;
     $("#boss-start").addEventListener("click", resume);
     $("#home-button").addEventListener("click", showMenu);
   } else if (mode === "tip") {
@@ -969,7 +993,7 @@ function updateUI() {
     $("#petal-grove").addEventListener("click", visitGrove);
     $("#petal-menu").addEventListener("click", showMenu);
   } else if (mode === "won" && runKind === "boss" && bossReplay) {
-    overlay.innerHTML = `<div class="result-panel"><p class="eyebrow">${replayArena ? "REMATCH WON" : "BOSS LEVEL COMPLETE"}</p><h2>${replayArena ? `${game.boss?.name.split(",")[0] ?? "The guardian"} rests.` : "The Thorn King rests."}</h2><p>${replayArena ? `${game.boss?.name ?? "The guardian"} has been defeated again.` : "Briarheart has been defeated again."}</p><button class="primary-button" id="restart-button">${replayArena ? "Rematch again" : "Play boss level again"} ${icon("arrow")}</button><div class="panel-links"><button id="home-button">World map</button></div></div>`;
+    overlay.innerHTML = `<div class="result-panel"><p class="eyebrow">${replayArena ? "REMATCH WON" : "BOSS LEVEL COMPLETE"}</p><h2>${game.boss?.name.split(",")[0] ?? "The guardian"} rests.</h2><p>${game.boss?.name ?? "The guardian"} has been defeated again.</p><button class="primary-button" id="restart-button">${replayArena ? "Rematch again" : "Play boss level again"} ${icon("arrow")}</button><div class="panel-links"><button id="home-button">World map</button></div></div>`;
     bindPanel();
   } else if (mode === "won") {
     const rescued = save.progress[selected].fireflies;
@@ -1573,14 +1597,17 @@ function frame(now: number) {
       }
     }
     updateHUD();
-    if (runKind === "world" && !session?.inSecret && readyForThornKing(game)) {
+    const finale =
+      runKind === "world" && !session?.inSecret ? finaleFor(game) : null;
+    if (finale) {
       // Keep world rewards and firefly progress; victory belongs to the
       // separate boss level, not to the approach.
       saveRescuedFireflies();
       bossOrigin = game;
       bossReplay = false;
       replayArena = null;
-      const bossGame = createThornKingRun(game.mode, game);
+      bossArena = finale;
+      const bossGame = createFinaleRun(finale, game.mode, game);
       session = null;
       changeScene(bossGame, "boss");
       mode = "boss-intro";

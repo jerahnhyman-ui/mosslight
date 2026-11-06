@@ -649,6 +649,11 @@ export class Renderer {
         )
           this.coin(coin.x, coin.y, time, i);
       });
+      if (game.level.chase && Number.isFinite(game.chaseX))
+        this.floodWall(game.chaseX, time);
+      for (const lantern of game.lanterns)
+        if (this.visible(lantern.x, 60))
+          this.lanternPost(lantern.x, lantern.y, lantern.lit, time);
       game.acorns.forEach((acorn, i) => {
         if (!acorn.collected && this.visible(acorn.x, 30))
           this.acorn(acorn.x, acorn.y, time, i);
@@ -842,6 +847,7 @@ export class Renderer {
       c.restore();
       if (game.starPowerRemaining > 0)
         this.starAura(center, feet, size, game.starPowerRemaining, time, true);
+      if (game.level.dark && !titleMode) this.nightDarkness(game, time);
       this.worldOverlays(game, dt);
     } else {
       this.hero(
@@ -2454,6 +2460,119 @@ export class Renderer {
     c.restore();
   }
 
+  /** The chasing flood: a churning wall of water rolling in from the left. */
+  private floodWall(front: number, time: number) {
+    const left = this.cameraX - 40;
+    if (front < left) return;
+    const c = this.ctx;
+    const top = this.cameraY - 20;
+    const bottom = this.cameraY + this.viewportHeight + 20;
+    const water = c.createLinearGradient(front - 200, 0, front, 0);
+    water.addColorStop(0, "rgba(40,120,150,.92)");
+    water.addColorStop(1, "rgba(90,180,200,.85)");
+    c.fillStyle = water;
+    c.beginPath();
+    c.moveTo(left, top);
+    for (let y = top; y <= bottom; y += 20)
+      c.lineTo(front + Math.sin(time * 6 + y * 0.05) * 10, y);
+    c.lineTo(left, bottom);
+    c.closePath();
+    c.fill();
+    // Foam along the leading edge.
+    for (let y = top; y <= bottom; y += 26)
+      this.ellipse(
+        front + Math.sin(time * 6 + y * 0.05) * 10,
+        y,
+        10 + Math.sin(time * 9 + y) * 3,
+        8,
+        "rgba(235,252,255,.85)",
+      );
+  }
+
+  private darkCanvas: HTMLCanvasElement | null = null;
+  /** Night: everything is dark except circles of light around Pip, lit
+   * lanterns and fireflies. Drawn over the scene in screen space. */
+  private nightDarkness(game: Game, time: number) {
+    const c = this.ctx;
+    const w = this.canvas.width,
+      h = this.canvas.height;
+    if (!this.darkCanvas) this.darkCanvas = document.createElement("canvas");
+    const dark = this.darkCanvas;
+    if (dark.width !== w || dark.height !== h) {
+      dark.width = w;
+      dark.height = h;
+    }
+    const d = dark.getContext("2d")!;
+    const k = w / this.viewportWidth;
+    d.setTransform(1, 0, 0, 1, 0, 0);
+    d.globalCompositeOperation = "source-over";
+    d.clearRect(0, 0, w, h);
+    d.fillStyle = "rgba(8,10,32,0.86)";
+    d.fillRect(0, 0, w, h);
+    d.globalCompositeOperation = "destination-out";
+    const light = (x: number, y: number, r: number, strength = 1) => {
+      const sx = (x - this.cameraX) * k,
+        sy = (y - this.cameraY) * k,
+        sr = r * k;
+      const g = d.createRadialGradient(sx, sy, sr * 0.15, sx, sy, sr);
+      g.addColorStop(0, `rgba(0,0,0,${strength})`);
+      g.addColorStop(0.6, `rgba(0,0,0,${strength * 0.75})`);
+      g.addColorStop(1, "rgba(0,0,0,0)");
+      d.fillStyle = g;
+      d.beginPath();
+      d.arc(sx, sy, sr, 0, Math.PI * 2);
+      d.fill();
+    };
+    const p = game.player;
+    const flicker = Math.sin(time * 7) * 4;
+    light(p.x + p.w / 2, p.y + p.h / 2, 200 + flicker);
+    for (const l of game.lanterns)
+      light(l.x, l.y - 60, l.lit ? 260 : 46, l.lit ? 1 : 0.7);
+    for (const f of game.fireflies) if (!f.collected) light(f.x, f.y, 70, 0.8);
+    for (const a of game.acorns) if (!a.collected) light(a.x, a.y, 28, 0.6);
+    if (game.boss && game.boss.state !== "defeated")
+      light(game.boss.x + game.boss.w / 2, game.boss.y + 20, 90, 0.6);
+    c.save();
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.drawImage(dark, 0, 0);
+    c.restore();
+  }
+
+  /** A garden lantern on a post: dim until lit, then warm and glowing. */
+  private lanternPost(x: number, ground: number, lit: boolean, time: number) {
+    const c = this.ctx;
+    this.line(
+      [
+        [x, ground],
+        [x, ground - 70],
+        [x + 12, ground - 78],
+      ],
+      "#5a4a3a",
+      4,
+    );
+    const glow = lit ? 0.75 + Math.sin(time * 5 + x) * 0.1 : 0.25;
+    if (lit)
+      this.ellipse(
+        x + 12,
+        ground - 62,
+        26,
+        26,
+        `rgba(255,214,120,${glow * 0.35})`,
+      );
+    this.rounded(
+      x + 3,
+      ground - 76,
+      18,
+      24,
+      6,
+      lit ? "#ffd47a" : "#6a6680",
+      "#4a3a30",
+    );
+    this.ellipse(x + 12, ground - 64, 4, 6, lit ? "#fff6cf" : "#8e8aa6");
+    c.save();
+    c.restore();
+  }
+
   /** A hidden acorn: glossy brown with a little cap and a glint. */
   private acorn(x: number, y: number, time: number, index: number) {
     const c = this.ctx;
@@ -2698,6 +2817,65 @@ export class Renderer {
         "#fff0d5",
         3,
       );
+    } else if (b.kind === "owl") {
+      const flap =
+        b.state === "warning"
+          ? Math.sin(time * 14) * 0.5
+          : recovering
+            ? -0.2
+            : 0.15;
+      for (const side of [-1, 1]) {
+        c.save();
+        c.translate(side * 18, -40);
+        c.rotate(side * (0.4 + flap));
+        this.ellipse(side * 22, 0, 26, 12, "#5b4b7a", "#352a4e", 2);
+        for (let i = 0; i < 3; i++)
+          this.ellipse(side * (34 + i * 6), 6 + i * 3, 6, 4, "#7a69a0");
+        c.restore();
+      }
+      this.ellipse(
+        0,
+        -30,
+        30,
+        30,
+        shell === "#809c70" ? "#6e5d92" : shell,
+        "#352a4e",
+        3,
+      );
+      this.ellipse(4, -22, 18, 18, "#c9bfdc");
+      // Ear tufts and a sharp little beak.
+      for (const ex of [-12, 14])
+        this.line(
+          [
+            [ex - 4, -54],
+            [ex, -66],
+            [ex + 4, -54],
+          ],
+          "#352a4e",
+          3,
+        );
+      for (const ex of [-6, 16]) {
+        this.ellipse(ex, -40, 8, 8, "#fff0b8", "#352a4e", 1.5);
+        if (!recovering) this.ellipse(ex + 1, -40, 3.5, 4, "#2a2240");
+      }
+      this.line(
+        [
+          [3, -36],
+          [6, -30],
+          [9, -36],
+        ],
+        "#e4a24b",
+        3,
+      );
+      for (const fx of [-8, 8])
+        this.line(
+          [
+            [fx, -2],
+            [fx, 4],
+          ],
+          "#e4a24b",
+          3,
+        );
     } else if (b.kind === "crab") {
       const flipped = recovering;
       if (flipped) {
@@ -2861,7 +3039,9 @@ export class Renderer {
               ? 22
               : b.kind === "crab"
                 ? 16
-                : 27,
+                : b.kind === "owl"
+                  ? 200
+                  : 27,
       eyeY =
         b.kind === "moth"
           ? -47
@@ -2872,7 +3052,9 @@ export class Renderer {
               : b.kind === "crab"
                 ? -26
                 : -26;
-    if (recovering) {
+    if (b.kind === "owl") {
+      // The owl draws its own big eyes.
+    } else if (recovering) {
       this.line(
         [
           [eyeX - 4, eyeY],
@@ -3084,6 +3266,21 @@ export class Renderer {
             "#ffe4a3",
             3,
           );
+      } else if (r.kind === "feather") {
+        // A loose owl feather drifting down, swaying as it falls.
+        c.save();
+        c.translate(cx, cy);
+        c.rotate(Math.sin(time * 4 + r.x) * 0.5);
+        this.leaf(0, r.h / 2, r.h * 0.9, 0, "#b6a7d8");
+        this.line(
+          [
+            [0, r.h / 2],
+            [0, -r.h / 2],
+          ],
+          "#6e5d92",
+          1.5,
+        );
+        c.restore();
       } else if (r.kind === "bubble") {
         // A big wobbling bubble with a bright highlight.
         const wobble = Math.sin(time * 6 + r.x * 0.1) * 1.5;

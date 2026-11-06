@@ -191,7 +191,7 @@ const routes: ((g: Game) => void)[] = [
 
 describe("challenge rooms for worlds 4–6", () => {
   it("adds one room per later world, after the first three", () => {
-    expect(challengeLevels.slice(3)).toEqual(expansionChallenges);
+    expect(challengeLevels.slice(3, 6)).toEqual(expansionChallenges);
     expect(expansionChallenges.map((l) => l.theme)).toEqual([
       "windmill",
       "marsh",
