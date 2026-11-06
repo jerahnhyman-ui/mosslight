@@ -1,9 +1,4 @@
-import {
-  CRUMBLE_WARNING,
-  ENEMY_SQUASH_DURATION,
-  STAR_POWER_DURATION,
-  type Game,
-} from "./engine";
+import { CRUMBLE_WARNING, ENEMY_SQUASH_DURATION, type Game } from "./engine";
 import type { Rect } from "./levels";
 import { CREATURES } from "./creatures";
 
@@ -268,7 +263,8 @@ export class Renderer {
     const inset = (name: string) =>
       Math.max(0, parseFloat(style.getPropertyValue(name)) || 0);
     const safeTop = inset("--scene-safe-top");
-    const safeBottom = inset("--scene-safe-bottom");
+    const safeBottom =
+      inset("--scene-safe-bottom") + inset("--scene-thumb-strip");
     const worldScale = Math.max(1, cssHeight - safeTop - safeBottom) / HEIGHT;
     this.viewportWidth = cssWidth / worldScale;
     this.viewportHeight = cssHeight / worldScale;
@@ -3975,43 +3971,54 @@ export class Renderer {
     c.save();
     c.globalAlpha = fade;
     if (!foreground) {
-      const radius = (44 + Math.sin(time * 3) * 1.5) * size;
+      // A pulsing glow around Pip's body, not a shield outline. It beats
+      // faster in the last few seconds.
+      const pulse = 0.5 + 0.5 * Math.sin(time * (urgent ? 11 : 5));
+      const radius = (38 + pulse * 9) * size;
       const glow = c.createRadialGradient(
         x,
         centerY,
-        7 * size,
+        4 * size,
         x,
         centerY,
         radius,
       );
-      glow.addColorStop(0, "rgba(255,250,158,.35)");
+      glow.addColorStop(0, `rgba(255,252,190,${0.5 + pulse * 0.2})`);
       glow.addColorStop(
-        0.65,
-        urgent ? "rgba(255,178,94,.28)" : "rgba(255,223,106,.25)",
+        0.55,
+        urgent
+          ? `rgba(255,170,90,${0.3 + pulse * 0.15})`
+          : `rgba(255,226,110,${0.28 + pulse * 0.15})`,
       );
       glow.addColorStop(1, "rgba(255,242,155,0)");
       this.ellipse(x, centerY, radius, radius, glow);
-      c.lineWidth = 1.8;
-      c.strokeStyle = "rgba(255,255,226,.28)";
-      c.beginPath();
-      c.ellipse(x, centerY, 31 * size, 40 * size, 0, 0, Math.PI * 2);
-      c.stroke();
-      // The continuous draining halo communicates expiry without a strobe.
-      c.strokeStyle = urgent ? "#ffb165" : "#fff4a5";
-      c.lineWidth = urgent ? 2.5 : 2;
+      // Short, jagged sparks crackle out from the body and re-form a few
+      // times a second, like static electricity.
+      const frame = Math.floor(time * 14);
+      c.save();
       c.lineCap = "round";
-      c.beginPath();
-      c.ellipse(
-        x,
-        centerY,
-        31 * size,
-        40 * size,
-        0,
-        -Math.PI / 2,
-        -Math.PI / 2 +
-          Math.PI * 2 * Math.min(1, remaining / STAR_POWER_DURATION),
-      );
-      c.stroke();
+      c.lineJoin = "round";
+      c.shadowColor = urgent ? "#ffb15c" : "#fff3a0";
+      c.shadowBlur = 8;
+      for (let i = 0; i < 5; i++) {
+        const seed = frame * 7 + i * 13;
+        if (hash(seed) < 0.25) continue; // some sparks blink out
+        const angle = (i / 5) * Math.PI * 2 + hash(seed + 1) * 0.9;
+        const inner = 15 * size;
+        const outer = (27 + hash(seed + 2) * 11) * size;
+        const points: [number, number][] = [];
+        for (let k = 0; k <= 3; k++) {
+          const r = inner + ((outer - inner) * k) / 3;
+          const bend =
+            k === 0 || k === 3 ? 0 : (hash(seed + 3 + k) - 0.5) * 0.7;
+          points.push([
+            x + Math.cos(angle + bend) * r,
+            centerY + Math.sin(angle + bend) * r * 1.2,
+          ]);
+        }
+        this.line(points, urgent ? "#ffc27a" : "#fffbd2", 2.2 * size);
+      }
+      c.restore();
     }
     const colors = urgent
       ? ["#ffd580", "#ffb16d", "#fff2bd"]

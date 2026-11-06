@@ -1,10 +1,13 @@
 // Follow one commit through Xcode Cloud and TestFlight using the App Store
 // Connect API. Credentials come only from the environment (GitHub secrets):
 //   ASC_KEY_ID, ASC_ISSUER_ID, ASC_PRIVATE_KEY (the full .p8 contents)
-// Optional: COMMIT_SHA (default GITHUB_SHA), BETA_GROUP (default "Beta"),
+// Optional: COMMIT_SHA (default GITHUB_SHA), BETA_GROUPS (comma-separated,
+// default "Beta"),
 // BUNDLE_ID, TIMEOUT_MINUTES (default 90), ASSIGN_GROUP ("false" to skip).
 // Prints the Xcode Cloud run, version/build number and TestFlight state, and
-// exits non-zero if the build fails or is not Testing in the group in time.
+// exits non-zero if the build fails or is not Testing in every group in time.
+// External groups need Apple's beta review; the build is submitted for it, and
+// a pending review is reported rather than waited on.
 import { createPrivateKey, sign } from "node:crypto";
 import { appendFileSync } from "node:fs";
 
@@ -20,7 +23,10 @@ if (!/^[0-9a-f]{40}$/.test(commit)) {
   process.exit(2);
 }
 const bundleId = env.BUNDLE_ID || "com.mountaineerapps.mosslight";
-const groupName = env.BETA_GROUP || "Beta";
+const groupNames = (env.BETA_GROUPS || env.BETA_GROUP || "Beta")
+  .split(",")
+  .map((name) => name.trim())
+  .filter(Boolean);
 const deadline = Date.now() + Number(env.TIMEOUT_MINUTES || 90) * 60_000;
 const key = createPrivateKey(env.ASC_PRIVATE_KEY.replace(/\\n/g, "\n"));
 
@@ -91,15 +97,20 @@ if (!app) {
   finish(1);
 }
 const product = (await api(`/v1/apps/${app.id}/ciProduct`)).data;
-const group = (
-  await api(
-    `/v1/betaGroups?filter[app]=${app.id}&filter[name]=${encodeURIComponent(groupName)}`,
-  )
-).data?.[0];
-if (!group) {
-  report(`TestFlight group "${groupName}" not found.`);
-  finish(1);
+const groups = [];
+for (const name of groupNames) {
+  const group = (
+    await api(
+      `/v1/betaGroups?filter[app]=${app.id}&filter[name]=${encodeURIComponent(name)}`,
+    )
+  ).data?.find((g) => g.attributes.name === name);
+  if (!group) {
+    report(`TestFlight group "${name}" not found.`);
+    finish(1);
+  }
+  groups.push(group);
 }
+const external = groups.filter((g) => !g.attributes.isInternalGroup);
 report(`Commit \`${commit.slice(0, 7)}\` · app ${bundleId}`);
 
 // 1. Find the Xcode Cloud run for this commit and wait for it to finish.
@@ -134,9 +145,10 @@ report(
 );
 if (run.attributes.completionStatus !== "SUCCEEDED") finish(1);
 
-// 2. Wait for Apple's processing, make sure the build is in the group, and
+// 2. Wait for Apple's processing, make sure the build is in every group, and
 //    wait for its internal TestFlight state to become Testing.
-let assigned = false;
+const assigned = new Set();
+let submitted = false;
 for (; Date.now() < deadline; await wait(60)) {
   const uploaded = (await api(`/v1/ciBuildRuns/${run.id}/builds`)).data?.[0];
   if (!uploaded) {
@@ -161,32 +173,72 @@ for (; Date.now() < deadline; await wait(60)) {
     console.log(`Build ${label}: processing ${processing}`);
     continue;
   }
-  if (!assigned) {
+  for (const group of groups) {
+    if (assigned.has(group.id)) continue;
+    const name = group.attributes.name;
     const members = await api(
       `/v1/betaGroups/${group.id}/relationships/builds?limit=200`,
     );
-    assigned = members.data.some((m) => m.id === build.id);
-    if (!assigned && env.ASSIGN_GROUP !== "false") {
+    if (members.data.some((m) => m.id === build.id)) assigned.add(group.id);
+    else if (env.ASSIGN_GROUP !== "false") {
       await api(`/v1/betaGroups/${group.id}/relationships/builds`, {
         method: "POST",
         body: JSON.stringify({ data: [{ type: "builds", id: build.id }] }),
       });
-      assigned = true;
-      console.log(`Added build ${label} to ${groupName}.`);
+      assigned.add(group.id);
+      console.log(`Added build ${label} to ${name}.`);
     }
   }
   const state = beta?.internalBuildState;
-  console.log(`Build ${label}: ${state ?? "unknown"}`);
-  if (assigned && state === "IN_BETA_TESTING") {
-    report(`Build ${label} is **Testing** in ${groupName}.`);
-    finish(0);
-  }
+  console.log(`Build ${label}: internal ${state ?? "unknown"}`);
   if (state === "MISSING_EXPORT_COMPLIANCE") {
     report(
       `Build ${label} needs the export-compliance answer in App Store Connect.`,
     );
     finish(1);
   }
+  if (assigned.size !== groups.length || state !== "IN_BETA_TESTING") continue;
+  const internalNames = groups
+    .filter((g) => g.attributes.isInternalGroup)
+    .map((g) => g.attributes.name);
+  if (internalNames.length)
+    report(`Build ${label} is **Testing** in ${internalNames.join(", ")}.`);
+  if (!external.length) finish(0);
+  // External groups: submit for beta review once, then report its state.
+  const externalState = beta?.externalBuildState;
+  if (externalState === "READY_FOR_BETA_SUBMISSION" && !submitted) {
+    await api("/v1/betaAppReviewSubmissions", {
+      method: "POST",
+      body: JSON.stringify({
+        data: {
+          type: "betaAppReviewSubmissions",
+          relationships: { build: { data: { type: "builds", id: build.id } } },
+        },
+      }),
+    });
+    submitted = true;
+    console.log(`Submitted build ${label} for TestFlight beta review.`);
+    continue;
+  }
+  const externalNames = external.map((g) => g.attributes.name).join(", ");
+  if (externalState === "IN_BETA_TESTING") {
+    report(`Build ${label} is **Testing** in ${externalNames}.`);
+    finish(0);
+  }
+  if (
+    externalState === "WAITING_FOR_BETA_REVIEW" ||
+    externalState === "IN_BETA_REVIEW"
+  ) {
+    report(
+      `Build ${label} is in ${externalNames} and waiting for Apple's beta review (${externalState}). Testers get it once Apple approves.`,
+    );
+    finish(0);
+  }
+  if (externalState === "BETA_REJECTED") {
+    report(`Apple's beta review rejected build ${label} for ${externalNames}.`);
+    finish(1);
+  }
+  console.log(`Build ${label}: external ${externalState ?? "unknown"}`);
 }
 report("Timed out before the build reached Testing.");
 finish(1);

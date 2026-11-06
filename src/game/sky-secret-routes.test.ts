@@ -233,7 +233,7 @@ describe("Hidden sky routes", () => {
     flyTo(secret, 1930, 430);
     walkTo(secret, 2050, 430);
     expect(secret.secretCompleted).toBe(true);
-    walkTo(secret, 2190, 430);
+    walkTo(secret, 2066, 430);
     tick(secret, idle, 50);
     expect(secret.portalReady).toBe("return");
     tick(secret, { ...idle, jump: true, jumpPressed: true });
@@ -391,7 +391,7 @@ describe("Hidden sky routes", () => {
     flyTo(game, 1930, 430);
     walkTo(game, 2050, 430);
     expect(game.secretCompleted).toBe(true);
-    walkTo(game, 2190, 430);
+    walkTo(game, 2066, 430);
     tick(game, idle, 50);
     expect(game.portalReady).toBe("return");
     tick(game, { ...idle, jump: true, jumpPressed: true });
@@ -443,4 +443,52 @@ describe("Hidden sky routes", () => {
       expect(game.hasWindFeather).toBe(true);
     },
   );
+});
+
+describe("Sky garden exits and feedback", () => {
+  it("uses the glowing gate as the exit, even with a thumb resting on the pad", () => {
+    const level = skySecretLevels["sky-meadow"];
+    const exit = level.portals!.find((p) => p.requires === "completion")!;
+    // The gate drawn at the goal and the exit portal are the same place.
+    expect(exit.x).toBeLessThanOrEqual(level.goal.x);
+    expect(exit.x + exit.w).toBeGreaterThanOrEqual(level.goal.x + 60);
+    const game = new Game(0, {
+      level: { ...level, enemies: [], spawn: { x: 1950, y: 392 } },
+    });
+    walkTo(game, 2050, 430);
+    expect(game.secretCompleted).toBe(true);
+    // Drift slowly, as a resting thumb does, then press Jump.
+    for (let i = 0; i < 40; i++)
+      tick(game, { ...idle, right: i % 6 === 0, left: i % 6 === 3 });
+    expect(game.portalReady).toBe("return");
+    tick(game, { ...idle, jump: true, jumpPressed: true });
+    expect(game.requestedPortal).toBe("return");
+  });
+
+  it("does not open a portal while running straight through it", () => {
+    const level = skySecretLevels["sky-meadow"];
+    const game = new Game(0, {
+      level: { ...level, enemies: [], spawn: { x: 30, y: 392 } },
+    });
+    for (let i = 0; i < 70; i++) {
+      tick(game, { ...idle, right: true });
+      expect(game.portalReady).toBeNull();
+    }
+  });
+
+  it("explains a feather block that cannot give a second feather", () => {
+    const level = skySecretLevels["sky-meadow"];
+    const game = new Game(0, { level: { ...level, enemies: [] } });
+    game.hasWindFeather = true;
+    const block = game.platforms.find((p) => p.rewardPower === "feather")!;
+    walkTo(game, block.x + 10, 430);
+    tick(game, { ...idle, jump: true, jumpPressed: true });
+    let explained = false;
+    for (let i = 0; i < 80; i++) {
+      tick(game, { ...idle, jump: true });
+      if (game.events.includes("reward-full")) explained = true;
+    }
+    expect(explained).toBe(true);
+    expect(block.rewardUsed).toBe(false);
+  });
 });

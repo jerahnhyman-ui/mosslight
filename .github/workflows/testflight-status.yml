@@ -1,7 +1,7 @@
 name: TestFlight status
 
 # Follows the Xcode Cloud archive started by a push to main through Apple's
-# processing, makes sure the build is in the internal Beta group, and reports
+# processing, makes sure the build is in the Beta and Alpha groups, and reports
 # its version and TestFlight state. Credentials live only in Actions secrets.
 on:
   push:
@@ -34,5 +34,5 @@ jobs:
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
           COMMIT_SHA: ${{ github.event.inputs.commit || github.sha }}
-          BETA_GROUP: Beta
+          BETA_GROUPS: Beta,Alpha
         run: node scripts/testflight-status.mjs
