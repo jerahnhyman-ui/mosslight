@@ -3541,3 +3541,78 @@ select:focus-visible {
     --scene-thumb-strip: 70px;
   }
 }
+
+/* Store sections: costumes, scarves and hats are worn in separate slots. */
+.shop-section {
+  grid-column: 1 / -1;
+  margin: 10px 0 0;
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  color: #3f6b4e;
+}
+.shop-section:first-child {
+  margin-top: 0;
+}
+.shop-item.worn {
+  box-shadow: 0 0 0 3px #ffd96a;
+}
+.shop-preview svg {
+  width: 38px;
+  height: 38px;
+}
+.shop-preview[data-cosmetic="cosmetic.frost_coat"] {
+  background: #dff3fa;
+}
+.shop-preview[data-cosmetic="cosmetic.frost_coat"] .icon {
+  fill: #8ccbe0;
+}
+.shop-preview[data-cosmetic="cosmetic.coral_coat"] {
+  background: #ffe3dc;
+}
+.shop-preview[data-cosmetic="cosmetic.coral_coat"] .icon {
+  fill: #ef8a8a;
+}
+.shop-preview[data-cosmetic="cosmetic.dusk_coat"] {
+  background: #e4e0f6;
+}
+.shop-preview[data-cosmetic="cosmetic.dusk_coat"] .icon {
+  fill: #6b67a8;
+}
+.shop-preview[data-cosmetic="cosmetic.ember_coat"] {
+  background: #ffe2cf;
+}
+.shop-preview[data-cosmetic="cosmetic.ember_coat"] .icon {
+  fill: #d9603a;
+}
+.shop-preview[data-cosmetic="scarf.cozy_red"] {
+  color: #d9473f;
+  background: #fbe3df;
+}
+.shop-preview[data-cosmetic="scarf.candy_stripe"] {
+  color: #ff8fb1;
+  background: #fff0f5;
+}
+.shop-preview[data-cosmetic="scarf.starry"] {
+  color: #2f3d7a;
+  background: #e3e6f6;
+}
+.shop-preview[data-cosmetic="scarf.snowflake"] {
+  color: #9fc3d9;
+  background: #f1f7fb;
+}
+.shop-preview[data-cosmetic="hat.flower_crown"] {
+  color: #ff9db5;
+  background: #fff0f4;
+}
+.shop-preview[data-cosmetic="hat.snow_beanie"] {
+  color: #5aa3d9;
+  background: #e5f1fa;
+}
+.shop-preview[data-cosmetic="hat.explorer"] {
+  color: #b48b52;
+  background: #f6ecd9;
+}
+.shop-preview[data-cosmetic="hat.lantern_cap"] {
+  color: #3e5f8a;
+  background: #fff3cf;
+}

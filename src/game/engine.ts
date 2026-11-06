@@ -22,7 +22,11 @@ export type OutfitId =
   | "moon"
   | "cosmetic.bee_scarf"
   | "cosmetic.acorn_cap"
-  | "cosmetic.golden_leaf";
+  | "cosmetic.golden_leaf"
+  | "cosmetic.frost_coat"
+  | "cosmetic.ember_coat"
+  | "cosmetic.coral_coat"
+  | "cosmetic.dusk_coat";
 export type { BossState, BossHazard } from "./bosses";
 export type RunMode = "classic" | "relaxed" | "timed";
 
@@ -202,6 +206,9 @@ export class Game {
   finalBossStarted = false;
   hazards: BossHazard[] = [];
   outfit: OutfitId = "leaf";
+  /** Scarf and hat worn over the costume (cosmetic only). */
+  scarf: string | null = null;
+  hat: string | null = null;
   character: "pip" | "poppy" = "pip";
   groveDecorations: string[] = [];
   rescuedTotal = 0;
@@ -469,6 +476,8 @@ export class Game {
   transferPlayerFrom(source: Game, anchor: { x: number; feetY: number }) {
     this.resize(source.player.form);
     this.outfit = source.outfit;
+    this.scarf = source.scarf;
+    this.hat = source.hat;
     this.character = source.character;
     this.groveDecorations = [...source.groveDecorations];
     this.rescuedTotal = source.rescuedTotal;

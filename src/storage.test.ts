@@ -360,6 +360,52 @@ describe("living garden progression", () => {
     expect(readSave()).toEqual(save);
   });
 
+  it("wears scarves and hats in their own slots over any costume", () => {
+    const save = readSave();
+    new RunCoinLedger().collect(save, 500);
+    recordFireflies(save.progress[0], [0, 1, 2]);
+    recordFireflies(save.progress[1], [0, 1, 2]);
+    recordFireflies(save.progress[2], [0, 1, 2]);
+    expect(purchaseItem(save, "scarf.cozy_red")).toBe("purchased");
+    expect(purchaseItem(save, "hat.flower_crown")).toBe("purchased");
+    expect(purchaseItem(save, "hat.snow_beanie")).toBe("purchased");
+    expect(purchaseItem(save, "berry")).toBe("purchased");
+    // One of each slot is worn at once, together with the costume.
+    expect(save.outfit).toBe("berry");
+    expect(save.scarf).toBe("scarf.cozy_red");
+    expect(save.hat).toBe("hat.snow_beanie");
+    expect(purchaseItem(save, "hat.flower_crown")).toBe("equipped");
+    expect(save.hat).toBe("hat.flower_crown");
+    // Saved in catalogue order.
+    save.hats = ["hat.snow_beanie", "hat.flower_crown"];
+    // Choosing a worn scarf or hat again takes it off, free of charge.
+    const wallet = save.wallet;
+    expect(purchaseItem(save, "scarf.cozy_red")).toBe("removed");
+    expect(save.scarf).toBeNull();
+    expect(save.wallet).toBe(wallet);
+    expect(purchaseItem(save, "scarf.starry")).toBe("locked");
+    writeSave(save);
+    expect(readSave()).toEqual(save);
+  });
+
+  it("never wears a scarf or hat the save does not own", () => {
+    writeSave(readSave());
+    items.set(
+      SAVE_KEY,
+      JSON.stringify({
+        ...JSON.parse(items.get(SAVE_KEY)!),
+        scarves: ["scarf.cozy_red", "scarf.fake"],
+        scarf: "scarf.starry",
+        hats: ["hat.explorer"],
+        hat: "hat.explorer",
+      }),
+    );
+    const save = readSave();
+    expect(save.scarves).toEqual(["scarf.cozy_red"]);
+    expect(save.scarf).toBeNull();
+    expect(save.hat).toBe("hat.explorer");
+  });
+
   it("keeps decorations permanent and lifetime earnings intact after purchases", () => {
     const save = readSave();
     new RunCoinLedger().collect(save, 400);

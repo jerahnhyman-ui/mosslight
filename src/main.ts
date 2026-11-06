@@ -41,6 +41,8 @@ import {
   challengeUnlocked,
   ownsItem,
   purchaseItem,
+  wearingItem,
+  type ShopItem,
   recordGardenRun,
   recordAcorns,
   acornTotal,
@@ -116,6 +118,8 @@ const modeName = (value: PlayMode) =>
   ({ classic: "Classic", relaxed: "Relaxed", timed: "Timed" })[value];
 function dressGame(next: Game) {
   next.outfit = save.outfit;
+  next.scarf = save.scarf;
+  next.hat = save.hat;
   next.groveDecorations = [...save.decorations];
   next.rescuedTotal = rescuedTotal(save);
   next.rescuedCreatures = [...save.rescuedCreatures];
@@ -821,40 +825,85 @@ function renderShop() {
   $("#wallet-count").textContent = `${save.wallet} coins`;
   $("#lifetime-count").textContent =
     `${save.lifetimeCoins} collected · ${rescuedTotal(save)} fireflies home · ${acornTotal(save)} acorns found`;
-  $("#shop-items").innerHTML = SHOP_ITEMS.map((item) => {
+  const sections: { kind: ShopItem["kind"]; title: string; tag: string }[] = [
+    { kind: "outfit", title: "Costumes", tag: "PIP’S WARDROBE" },
+    { kind: "scarf", title: "Scarves", tag: "WEAR WITH ANY COSTUME" },
+    { kind: "hat", title: "Hats", tag: "WEAR WITH ANY COSTUME" },
+    { kind: "decoration", title: "Home grove", tag: "HOME GROVE" },
+  ];
+  const card = (item: ShopItem, tag: string) => {
     const owned = ownsItem(save, item);
     const locked =
       !owned && (Boolean(item.reward) || rescuedTotal(save) < item.fireflies);
     const affordable = save.wallet >= item.coins;
-    const equipped = item.kind === "outfit" ? save.outfit === item.id : owned;
+    const worn = wearingItem(save, item);
+    // Scarves and hats can be taken off again; costumes and grove items stay.
+    const removable = worn && (item.kind === "scarf" || item.kind === "hat");
     const label = owned
-      ? equipped
-        ? item.kind === "outfit"
-          ? "Wearing"
-          : "In your grove"
-        : "Wear outfit"
+      ? worn
+        ? removable
+          ? "Take off"
+          : item.kind === "outfit"
+            ? "Wearing"
+            : "In your grove"
+        : item.kind === "outfit"
+          ? "Wear outfit"
+          : "Wear"
       : item.reward
         ? item.id === "cosmetic.bee_scarf"
           ? "Complete Lantern Beehive"
-          : "Earn a Petal Post medal"
+          : item.id === "cosmetic.acorn_cap"
+            ? "Find 10 acorns"
+            : item.id === "cosmetic.golden_leaf"
+              ? "Find every acorn"
+              : "Earn a Petal Post medal"
         : locked
           ? `${item.fireflies} fireflies needed`
           : `${item.coins} coins`;
-    return `<article class="shop-item" data-item="${item.id}"><div class="shop-preview ${item.kind}" data-cosmetic="${item.id}" aria-hidden="true">${item.kind === "outfit" ? icon("pip") : item.id === "lanterns" ? icon("firefly") : item.id === "flowers" ? "✿" : "♧"}</div><div><small>${item.kind === "outfit" ? "PIP’S WARDROBE" : "HOME GROVE"}</small><h3>${item.name}</h3><p>${item.description}</p><button data-buy="${item.id}" ${equipped || (!owned && (locked || !affordable)) ? "disabled" : ""}>${label}</button>${!owned && !locked && !affordable ? `<span class="shop-shortfall">${item.coins - save.wallet} more coins</span>` : ""}</div></article>`;
-  }).join("");
+    const preview =
+      item.kind === "outfit"
+        ? icon("pip")
+        : item.kind === "scarf"
+          ? `<svg viewBox="0 0 40 40"><path d="M6 14q14 6 28 0v6q-14 6-28 0z" fill="currentColor"/><path d="M22 18l3 16h-7z" fill="currentColor"/></svg>`
+          : item.kind === "hat"
+            ? `<svg viewBox="0 0 40 40"><path d="M8 28q12-26 24 0z" fill="currentColor"/><rect x="4" y="27" width="32" height="5" rx="2.5" fill="currentColor" opacity=".75"/></svg>`
+            : item.id === "lanterns"
+              ? icon("firefly")
+              : item.id === "flowers"
+                ? "✿"
+                : "♧";
+    return `<article class="shop-item ${worn && item.kind !== "decoration" ? "worn" : ""}" data-item="${item.id}"><div class="shop-preview ${item.kind}" data-cosmetic="${item.id}" aria-hidden="true">${preview}</div><div><small>${tag}</small><h3>${item.name}</h3><p>${item.description}</p><button data-buy="${item.id}" ${(worn && !removable) || (!owned && (locked || !affordable)) ? "disabled" : ""}>${label}</button>${!owned && !locked && !affordable ? `<span class="shop-shortfall">${item.coins - save.wallet} more coins</span>` : ""}</div></article>`;
+  };
+  $("#shop-items").innerHTML = sections
+    .map(
+      ({ kind, title, tag }) =>
+        `<h3 class="shop-section">${title}</h3>` +
+        SHOP_ITEMS.filter((item) => item.kind === kind)
+          .map((item) => card(item, tag))
+          .join(""),
+    )
+    .join("");
   document.querySelectorAll<HTMLButtonElement>("[data-buy]").forEach((button) =>
     button.addEventListener("click", () => {
       const item = SHOP_ITEMS.find((item) => item.id === button.dataset.buy)!;
       const result = purchaseItem(save, item.id);
-      if (result === "purchased" || result === "equipped") {
+      if (result === "removed") {
+        dressGame(game);
+        writeSave(save);
+        audio.unlock();
+        audio.play("equip");
+        $("#shop-status").textContent = `${item.name} taken off.`;
+        renderShop();
+        updateAdventureChoices();
+      } else if (result === "purchased" || result === "equipped") {
         dressGame(game);
         writeSave(save);
         audio.unlock();
         audio.play(result === "purchased" ? "purchase" : "equip");
         $("#shop-status").textContent =
-          item.kind === "outfit"
-            ? `Pip is wearing ${item.name}.`
-            : `${item.name} added to your grove.`;
+          item.kind === "decoration"
+            ? `${item.name} added to your grove.`
+            : `Pip is wearing ${item.name}.`;
         renderShop();
         updateAdventureChoices();
       }
