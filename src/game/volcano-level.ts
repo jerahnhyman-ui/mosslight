@@ -58,6 +58,17 @@ const basalt = (id: string, x: number, y: number, w = 120): Platform => ({
 });
 const row = (x: number, y: number, count: number, gap = 35) =>
   Array.from({ length: count }, (_, i) => ({ x: x + i * gap, y }));
+/** Coins that bob back and forth along one axis. */
+const bobbing = (
+  coins: { x: number; y: number }[],
+  axis: "x" | "y",
+  range: number,
+  period: number,
+) =>
+  coins.map((c, i) => ({
+    ...c,
+    move: { axis, range, period, phase: i * 0.5 },
+  }));
 const bug = (
   kind: EnemyKind,
   x: number,
@@ -124,14 +135,14 @@ export const volcanoLevel: Level = withRewardBlocks({
   coins: [
     ...row(365, 318, 3),
     ...row(605, 268, 3),
-    ...row(1410, 340, 3),
+    ...bobbing(row(1410, 340, 3), "x", 40, 2.4),
     ...row(2500, 388, 2),
     ...row(2700, 388, 2),
     ...row(2900, 388, 2),
     ...row(3470, 308, 3),
     ...row(3670, 228, 3),
     ...row(3870, 148, 3),
-    ...row(4520, 300, 3),
+    ...bobbing(row(4520, 300, 3), "y", 18, 1.8),
     ...row(4720, 248, 3),
     ...row(4920, 268, 3),
     ...row(5530, 300, 2),
@@ -147,6 +158,14 @@ export const volcanoLevel: Level = withRewardBlocks({
   ],
   stars: [],
   diamonds: [],
+  coinRings: [
+    {
+      x: 5280,
+      y: 395,
+      time: 6,
+      coins: [...row(5330, 392, 4, 40), ...row(5620, 392, 15, 60)],
+    },
+  ],
   fireflies: [
     { x: 3920, y: 145, id: "volcano.firefly.smoke-spire" },
     { x: 5930, y: 85, id: "volcano.firefly.fumarole" },

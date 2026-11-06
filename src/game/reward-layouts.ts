@@ -83,6 +83,7 @@ const layouts: Record<string, readonly Placement[]> = {
     ["feather", 200, 300],
     ["diamond", 1800, 300],
     ["star", 4300, 300],
+    ["magnet", 2150, 300],
     ["diamond", 5300, 300],
     // Recovery Sunseed before Grumble's gate.
     ["diamond", 8700, 300],
@@ -91,6 +92,7 @@ const layouts: Record<string, readonly Placement[]> = {
     ["feather", 200, 300],
     ["diamond", 2000, 300],
     ["star", 3200, 300],
+    ["spring", 4250, 300],
     ["diamond", 5300, 300],
     // Recovery Sunseed before Shellshock's gate.
     ["diamond", 8500, 300],
@@ -99,6 +101,7 @@ const layouts: Record<string, readonly Placement[]> = {
     ["feather", 200, 300],
     ["diamond", 1800, 300],
     ["star", 3200, 300],
+    ["shield", 4250, 300],
     ["diamond", 5300, 300],
     // Recovery Sunseed before Cinder's gate.
     ["diamond", 8820, 300],

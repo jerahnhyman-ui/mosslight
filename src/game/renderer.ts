@@ -282,6 +282,20 @@ const hash = (n: number) => {
 };
 
 /** Resolution-independent cartoon artwork, drawn locally for offline play. */
+/** New costumes: body, highlight and scarf colours. */
+const COSTUMES: Record<string, [string, string, string]> = {
+  "cosmetic.frost_coat": ["#8ccbe0", "#d4f1fa", "#ffffff"],
+  "cosmetic.ember_coat": ["#d9603a", "#ffb071", "#ffd36b"],
+  "cosmetic.coral_coat": ["#ef8a8a", "#ffc2b0", "#6fd0c8"],
+  "cosmetic.dusk_coat": ["#6b67a8", "#aaa0dd", "#ffd98a"],
+};
+/** Scarves: colour and pattern accent. */
+const SCARVES: Record<string, [string, string]> = {
+  "scarf.cozy_red": ["#d9473f", "#d9473f"],
+  "scarf.candy_stripe": ["#ff8fb1", "#ffffff"],
+  "scarf.starry": ["#2f3d7a", "#ffe38a"],
+  "scarf.snowflake": ["#f4f8fb", "#7fb6d6"],
+};
 export class Renderer {
   readonly canvas: HTMLCanvasElement;
   readonly ctx: CanvasRenderingContext2D;
@@ -290,6 +304,9 @@ export class Renderer {
   cameraX = 0;
   cameraY = 0;
   private shake = 0;
+  /** The scarf and hat on the hero being drawn. */
+  private wornScarf: string | null = null;
+  private wornHat: string | null = null;
   private popups: {
     x: number;
     y: number;
@@ -382,6 +399,8 @@ export class Renderer {
   }
 
   render(game: Game, time: number, titleMode = false, restoration = 0) {
+    this.wornScarf = game.scarf;
+    this.wornHat = game.hat;
     if (
       this.needsResize ||
       this.pixelRatio !== Math.min(window.devicePixelRatio || 1, 2)
@@ -702,11 +721,12 @@ export class Renderer {
       game.coins.forEach((coin, i) => {
         if (
           !coin.collected &&
-          !hidden.has(`${coin.x},${coin.y}`) &&
+          !hidden.has(`${coin.baseX ?? coin.x},${coin.baseY ?? coin.y}`) &&
           this.visible(coin.x, 24)
         )
           this.coin(coin.x, coin.y, time, i);
       });
+      for (const ring of game.coinRings) this.coinRing(ring, time);
       if (game.level.chase && Number.isFinite(game.chaseX))
         this.floodWall(game.chaseX, time);
       for (const lantern of game.lanterns)
@@ -908,6 +928,7 @@ export class Renderer {
       c.restore();
       if (game.starPowerRemaining > 0)
         this.starAura(center, feet, size, game.starPowerRemaining, time, true);
+      this.powerEffects(game, center, feet, size, time);
       if (game.level.dark && !titleMode) this.nightDarkness(game, time);
       this.worldOverlays(game, dt);
     } else {
@@ -4793,6 +4814,9 @@ export class Renderer {
       diamond: { face: "#f0a463", edge: "#9a5a34", glyph: "#fff1c9" },
       feather: { face: "#a6d786", edge: "#568457", glyph: "#fff8d6" },
       star: { face: "#f9cf68", edge: "#a6793e", glyph: "#fff8ce" },
+      magnet: { face: "#e98a8a", edge: "#9c4646", glyph: "#fff1f1" },
+      shield: { face: "#8fc7ee", edge: "#3f7aa8", glyph: "#f2faff" },
+      spring: { face: "#b8e070", edge: "#5f8a32", glyph: "#fbffe8" },
     } as const;
     if (!rewardPower) return;
     const tone = colors[rewardPower];
@@ -4816,6 +4840,43 @@ export class Renderer {
     if (rewardPower === "star") {
       this.starPath(0, 0, 10);
       c.fill();
+      c.stroke();
+    } else if (rewardPower === "magnet") {
+      // A horseshoe magnet.
+      c.lineWidth = 5;
+      c.lineCap = "butt";
+      c.strokeStyle = rewardUsed ? "#8b8980" : tone.glyph;
+      c.beginPath();
+      c.arc(0, -1, 6.5, Math.PI, 0, true);
+      c.lineTo(6.5, 7);
+      c.moveTo(-6.5, -1);
+      c.lineTo(-6.5, 7);
+      c.stroke();
+      if (!rewardUsed) {
+        this.rounded(-9, 5, 5, 4, 1, "#d8dde4");
+        this.rounded(4, 5, 5, 4, 1, "#d8dde4");
+      }
+    } else if (rewardPower === "shield") {
+      this.ellipse(
+        0,
+        0,
+        10,
+        10,
+        rewardUsed ? "#8b8980" : "rgba(242,250,255,.85)",
+        edge,
+        1.5,
+      );
+      this.ellipse(-3, -4, 3, 2, "#ffffff");
+    } else if (rewardPower === "spring") {
+      // A coiled spring.
+      c.lineWidth = 2.4;
+      c.strokeStyle = rewardUsed ? "#8b8980" : tone.glyph;
+      c.beginPath();
+      for (let i = 0; i <= 4; i++) {
+        const yy = 8 - i * 4;
+        c.moveTo(-7, yy);
+        c.lineTo(7, yy - 2);
+      }
       c.stroke();
     } else if (rewardPower === "diamond") {
       // A Sunseed glyph: a seed with a small leaf.
@@ -4952,6 +5013,132 @@ export class Renderer {
     c.fill();
     this.ellipse(x - 4, y - 14, 3, 2, "#fff2d1");
     this.ellipse(x + 5, y - 11, 2, 1.5, "#fff2d1");
+  }
+
+  /** A shield bubble, magnet glow and spring sparkle around the hero. */
+  private powerEffects(
+    game: Game,
+    center: number,
+    feet: number,
+    size: number,
+    time: number,
+  ) {
+    const c = this.ctx;
+    const cy = feet - 26 * size;
+    if (game.magnetRemaining > 0) {
+      const fading = game.magnetRemaining < 2 && Math.sin(time * 20) > 0;
+      if (!fading) {
+        c.save();
+        c.strokeStyle = "rgba(233,120,120,.45)";
+        c.lineWidth = 2;
+        c.setLineDash([6, 8]);
+        c.lineDashOffset = -time * 40;
+        c.beginPath();
+        c.arc(center, cy, 60 + Math.sin(time * 4) * 4, 0, Math.PI * 2);
+        c.stroke();
+        c.restore();
+      }
+    }
+    if (game.shield) {
+      const g = c.createRadialGradient(
+        center - 8,
+        cy - 10,
+        4,
+        center,
+        cy,
+        40 * size,
+      );
+      g.addColorStop(0, "rgba(255,255,255,.25)");
+      g.addColorStop(0.75, "rgba(143,199,238,.18)");
+      g.addColorStop(1, "rgba(143,199,238,.5)");
+      this.ellipse(
+        center,
+        cy,
+        34 * size,
+        38 * size,
+        g as unknown as string,
+        "rgba(120,180,230,.7)",
+        2,
+      );
+      this.ellipse(
+        center - 12 * size,
+        cy - 16 * size,
+        6,
+        4,
+        "rgba(255,255,255,.8)",
+      );
+    }
+    if (game.springRemaining > 0) {
+      const fading = game.springRemaining < 2 && Math.sin(time * 20) > 0;
+      if (!fading)
+        for (const dx of [-9, 9]) {
+          this.ellipse(
+            center + dx * size,
+            feet - 2,
+            6,
+            3,
+            "#b8e070",
+            "#5f8a32",
+            1.2,
+          );
+          this.ellipse(
+            center + dx * size,
+            feet + 3 + Math.sin(time * 12 + dx) * 2,
+            2,
+            2,
+            "rgba(255,255,200,.8)",
+          );
+        }
+    }
+  }
+
+  /** A timed coin ring and, while it runs, its blue coins and timer. */
+  private coinRing(ring: Game["coinRings"][number], time: number) {
+    const c = this.ctx;
+    if (ring.state === "active")
+      ring.coins.forEach((coin, i) => {
+        if (coin.collected || !this.visible(coin.x, 24)) return;
+        const bob = Math.sin(time * 4 + i * 0.6) * 2.5;
+        this.ellipse(coin.x, coin.y + bob, 13, 15, "rgba(140,210,255,.22)");
+        this.ellipse(
+          coin.x,
+          coin.y + 1 + bob,
+          8,
+          11,
+          "#3f86c6",
+          "#2c6aa3",
+          1.5,
+        );
+        this.ellipse(coin.x, coin.y - 1 + bob, 7, 10, "#7cc4f5");
+        this.ellipse(coin.x - 1.5, coin.y - 3 + bob, 4, 6, "#c8ecff");
+      });
+    if (ring.state === "done" || !this.visible(ring.x, 40)) return;
+    const pulse = ring.state === "ready" ? Math.sin(time * 3) * 2 : 0;
+    c.save();
+    c.globalAlpha = ring.state === "cooldown" ? 0.35 : 1;
+    c.lineWidth = 6;
+    c.strokeStyle = "#5fb3ee";
+    c.beginPath();
+    c.ellipse(ring.x, ring.y, 16 + pulse, 26 + pulse, 0, 0, Math.PI * 2);
+    c.stroke();
+    c.lineWidth = 2;
+    c.strokeStyle = "#e6f6ff";
+    c.stroke();
+    if (ring.state === "active") {
+      // The timer drains around the ring.
+      c.lineWidth = 5;
+      c.strokeStyle = "#ffd96a";
+      c.beginPath();
+      c.arc(
+        ring.x,
+        ring.y - 44,
+        10,
+        -Math.PI / 2,
+        -Math.PI / 2 + (ring.remaining / ring.time) * Math.PI * 2,
+      );
+      c.stroke();
+    }
+    c.restore();
   }
 
   private coin(x: number, y: number, time: number, index: number) {
@@ -5474,7 +5661,7 @@ export class Renderer {
             ? "#a8743f"
             : outfit === "cosmetic.golden_leaf"
               ? "#e0ad3a"
-              : "#69b86c";
+              : (COSTUMES[outfit]?.[0] ?? "#69b86c");
     const outfitLight =
       outfit === "berry"
         ? "#e4a1b9"
@@ -5484,8 +5671,8 @@ export class Renderer {
             ? "#d6a56a"
             : outfit === "cosmetic.golden_leaf"
               ? "#ffe28a"
-              : "#8cce79";
-    const scarf =
+              : (COSTUMES[outfit]?.[1] ?? "#8cce79");
+    const costumeScarf =
       outfit === "cosmetic.bee_scarf"
         ? "#f2c552"
         : outfit === "cosmetic.golden_leaf"
@@ -5496,7 +5683,8 @@ export class Renderer {
               ? "#e3b86a"
               : outfit === "moon"
                 ? "#e6dba7"
-                : "#eb745d";
+                : (COSTUMES[outfit]?.[2] ?? "#eb745d");
+    const scarf = this.scarfColor(costumeScarf);
     const stride = running ? Math.sin(time * 19) : 0;
     const celebration = pose === "won";
     const hurt = pose === "hurt" || pose === "lost";
@@ -5571,7 +5759,8 @@ export class Renderer {
     c.closePath();
     c.fillStyle = scarf;
     c.fill();
-    if (outfit === "cosmetic.bee_scarf") {
+    this.scarfPattern(bob);
+    if (outfit === "cosmetic.bee_scarf" && !this.wornScarf) {
       this.line(
         [
           [-16, -24],
@@ -5704,7 +5893,7 @@ export class Renderer {
       24,
       5,
       2.5,
-      outfit === "leaf" ? "#ff9d76" : scarf,
+      outfit === "leaf" && !this.wornScarf ? "#ff9d76" : scarf,
     );
     this.ellipse(10, -21 + bob, 3, 3, scarf);
     const leafSway =
@@ -5739,6 +5928,7 @@ export class Renderer {
       this.ellipse(-7, -43 + bob, 4, 4, "#fff0b3");
       this.ellipse(-5, -44 + bob, 3.3, 3.3, outfitColor);
     }
+    this.hatArt(bob - (danger ? 3 : 0), time);
     // A slightly tucked pose communicates rising/falling without moving the feet origin.
     if (!grounded && vy < -100) {
       this.ellipse(-8, -3, 5, 3, "#386a53");
@@ -5778,19 +5968,20 @@ export class Renderer {
         ? "#829ac5"
         : outfit === "berry"
           ? "#a95e89"
-          : "#d87892";
+          : (COSTUMES[outfit]?.[0] ?? "#d87892");
     const outfitLight =
       outfit === "moon"
         ? "#c4d8ed"
         : outfit === "berry"
           ? "#e4a1b9"
-          : "#f4bdc1";
-    const scarf =
+          : (COSTUMES[outfit]?.[1] ?? "#f4bdc1");
+    const scarf = this.scarfColor(
       outfit === "cosmetic.bee_scarf"
         ? "#f2c552"
         : outfit === "moon"
           ? "#e6dba7"
-          : "#e6bd72";
+          : (COSTUMES[outfit]?.[2] ?? "#e6bd72"),
+    );
     c.save();
     c.translate(x, y);
     c.scale(size, size);
@@ -5854,7 +6045,8 @@ export class Renderer {
     c.closePath();
     c.fillStyle = scarf;
     c.fill();
-    if (outfit === "cosmetic.bee_scarf") {
+    this.scarfPattern(bob);
+    if (outfit === "cosmetic.bee_scarf" && !this.wornScarf) {
       this.line(
         [
           [-16, -24],
@@ -6014,7 +6206,72 @@ export class Renderer {
       );
     }
     this.ellipse(sway, -53 + crownBob, 2.5, 2.5, "#f4c65e");
+    this.hatArt(bob - (danger ? 3 : 0), time);
     c.restore();
+  }
+
+  /** The worn scarf's colour, or the costume's own scarf. */
+  private scarfColor(costume: string) {
+    return this.wornScarf ? (SCARVES[this.wornScarf]?.[0] ?? costume) : costume;
+  }
+  /** Stripes, stars or snowflakes on the worn scarf's tail. */
+  private scarfPattern(bob: number) {
+    const style = this.wornScarf;
+    if (!style) return;
+    const accent = SCARVES[style]?.[1] ?? "#ffffff";
+    if (style === "scarf.candy_stripe")
+      for (const x of [-12, -17, -22])
+        this.line(
+          [
+            [x, -26 + bob],
+            [x - 3, -16 + bob],
+          ],
+          accent,
+          2.2,
+        );
+    else if (style === "scarf.starry" || style === "scarf.snowflake")
+      for (const [x, y] of [
+        [-13, -22],
+        [-19, -19],
+        [-23, -15],
+      ] as const)
+        this.ellipse(x, y + bob, 1.4, 1.4, accent);
+  }
+  /** The worn hat, drawn over the head in the hero's local frame. */
+  private hatArt(bob: number, time: number) {
+    const hat = this.wornHat;
+    if (!hat) return;
+    if (hat === "hat.snow_beanie") {
+      this.ellipse(0, -44 + bob, 15, 10, "#5aa3d9", "#3d79a8", 1.5);
+      this.rounded(-15, -45 + bob, 30, 6, 3, "#eef6fb", "#b9cfe0");
+      this.ellipse(0, -55 + bob, 5, 5, "#ffffff", "#c9d8e4", 1);
+    } else if (hat === "hat.flower_crown") {
+      const blooms = ["#ff9db5", "#ffd86b", "#b6a6ff", "#ff9db5", "#ffd86b"];
+      blooms.forEach((color, i) => {
+        const bx = -12 + i * 6;
+        const by = -45 + bob - (i === 2 ? 2 : i % 2 ? 1 : 0);
+        this.ellipse(bx, by, 3.6, 3.6, color, "#ffffff", 0.8);
+        this.ellipse(bx, by, 1.3, 1.3, "#fff6d8");
+      });
+    } else if (hat === "hat.explorer") {
+      this.rounded(-10, -57 + bob, 20, 13, 5, "#d8b47a", "#8a6a3e");
+      this.rounded(-10, -48 + bob, 20, 3, 1, "#7a4f2e");
+      this.ellipse(0, -45 + bob, 21, 4, "#c9a36b", "#8a6a3e");
+    } else if (hat === "hat.lantern_cap") {
+      this.ellipse(0, -45 + bob, 14, 8, "#3e5f8a", "#2a4466", 1.5);
+      this.ellipse(9, -42 + bob, 9, 3, "#2f4a6e");
+      this.line(
+        [
+          [0, -52 + bob],
+          [0, -57 + bob],
+        ],
+        "#2a4466",
+        1.6,
+      );
+      const glow = 0.35 + Math.sin(time * 4) * 0.12;
+      this.ellipse(0, -62 + bob, 9, 9, `rgba(255,220,120,${glow})`);
+      this.rounded(-3, -66 + bob, 6, 8, 2, "#ffd36b", "#b8862f");
+    }
   }
 
   private checkpoint(

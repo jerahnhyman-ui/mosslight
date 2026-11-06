@@ -120,7 +120,19 @@ animated characters, and collectible/landing effects.
 
 Visit the safe, playable home grove from the menu. Rescued fireflies become
 residents; a frog, cloud bird, and moth can also be found in optional areas
-and welcomed home. Earned coins buy optional outfits and decorations. Coins count
+and welcomed home. Earned coins buy optional costumes, scarves, hats and
+decorations. Scarves and hats are worn in their own slots over any costume, so
+looks can be mixed and matched; choose a worn scarf or hat again to take it
+off. The world map is a winding trail: the opened part glows gold, locked
+worlds sit under fog, boss levels wear a crown, and Pip walks the trail. The
+first visit after a world opens clears its fog and walks Pip over.
+
+New block powers appear in the latest worlds: a Coin Magnet (nearby coins fly
+to Pip for 12 seconds), a Bubble Shield (pops instead of Pip being hurt) and
+Spring Shoes (higher jumps for 15 seconds). Some coins bob back and forth, and
+coin rings release a trail of blue coins: catch them all before the timer runs
+out for 10 bonus coins. Each blue coin pays only once, however many tries it
+takes. Coins count
 toward both the run's extra-life counter and a persistent cosmetic wallet;
 purchases never change movement or combat strength. Rescue all three fireflies
 in each of the original three worlds to unlock its separate challenge room and earn time medals.

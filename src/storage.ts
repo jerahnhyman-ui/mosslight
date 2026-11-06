@@ -5,7 +5,34 @@ export type Outfit =
   | "moon"
   | "cosmetic.bee_scarf"
   | "cosmetic.acorn_cap"
-  | "cosmetic.golden_leaf";
+  | "cosmetic.golden_leaf"
+  | "cosmetic.frost_coat"
+  | "cosmetic.ember_coat"
+  | "cosmetic.coral_coat"
+  | "cosmetic.dusk_coat";
+/** Scarves and hats are worn in their own slots, over any costume. */
+export type Scarf =
+  | "scarf.cozy_red"
+  | "scarf.candy_stripe"
+  | "scarf.starry"
+  | "scarf.snowflake";
+export type Hat =
+  | "hat.snow_beanie"
+  | "hat.flower_crown"
+  | "hat.explorer"
+  | "hat.lantern_cap";
+export const SCARF_IDS: Scarf[] = [
+  "scarf.cozy_red",
+  "scarf.candy_stripe",
+  "scarf.starry",
+  "scarf.snowflake",
+];
+export const HAT_IDS: Hat[] = [
+  "hat.snow_beanie",
+  "hat.flower_crown",
+  "hat.explorer",
+  "hat.lantern_cap",
+];
 export type Decoration =
   | "lanterns"
   | "flowers"
@@ -19,8 +46,8 @@ export interface ChallengeRecord extends RunRecord {
   medal: "none" | "bronze" | "silver" | "gold";
 }
 export interface ShopItem {
-  id: Outfit | Decoration;
-  kind: "outfit" | "decoration";
+  id: Outfit | Decoration | Scarf | Hat;
+  kind: "outfit" | "decoration" | "scarf" | "hat";
   name: string;
   description: string;
   coins: number;
@@ -51,6 +78,102 @@ export const SHOP_ITEMS: ShopItem[] = [
     description: "A silver-blue glow for the garden’s guardian.",
     coins: 200,
     fireflies: 6,
+  },
+  {
+    id: "cosmetic.frost_coat",
+    kind: "outfit",
+    name: "Frost Pip",
+    description: "An icy blue coat with a snow-white scarf.",
+    coins: 250,
+    fireflies: 9,
+  },
+  {
+    id: "cosmetic.coral_coat",
+    kind: "outfit",
+    name: "Coral Pip",
+    description: "Warm coral from the deep lagoon.",
+    coins: 300,
+    fireflies: 15,
+  },
+  {
+    id: "cosmetic.dusk_coat",
+    kind: "outfit",
+    name: "Dusk Pip",
+    description: "Twilight purple with a lantern-gold trim.",
+    coins: 350,
+    fireflies: 21,
+  },
+  {
+    id: "cosmetic.ember_coat",
+    kind: "outfit",
+    name: "Ember Pip",
+    description: "A fiery coat for braving the caldera.",
+    coins: 400,
+    fireflies: 27,
+  },
+  {
+    id: "scarf.cozy_red",
+    kind: "scarf",
+    name: "Cozy Red Scarf",
+    description: "A classic knitted scarf. Wear it with anything.",
+    coins: 60,
+    fireflies: 2,
+  },
+  {
+    id: "scarf.candy_stripe",
+    kind: "scarf",
+    name: "Candy Stripe Scarf",
+    description: "Bright stripes that flutter as you run.",
+    coins: 90,
+    fireflies: 5,
+  },
+  {
+    id: "scarf.starry",
+    kind: "scarf",
+    name: "Starry Night Scarf",
+    description: "Deep blue, sprinkled with tiny stars.",
+    coins: 140,
+    fireflies: 12,
+  },
+  {
+    id: "scarf.snowflake",
+    kind: "scarf",
+    name: "Snowflake Scarf",
+    description: "Soft white wool with frosty flakes.",
+    coins: 180,
+    fireflies: 20,
+  },
+  {
+    id: "hat.flower_crown",
+    kind: "hat",
+    name: "Flower Crown",
+    description: "Meadow blooms woven into a little crown.",
+    coins: 80,
+    fireflies: 3,
+  },
+  {
+    id: "hat.snow_beanie",
+    kind: "hat",
+    name: "Snow Beanie",
+    description: "A warm knitted beanie with a fluffy pom.",
+    coins: 120,
+    fireflies: 8,
+  },
+  {
+    id: "hat.explorer",
+    kind: "hat",
+    name: "Explorer Hat",
+    description: "A wide brim for long trails and sunny days.",
+    coins: 200,
+    fireflies: 14,
+  },
+  {
+    id: "hat.lantern_cap",
+    kind: "hat",
+    name: "Lantern Cap",
+    description: "A cap with a tiny glowing lantern on top.",
+    coins: 300,
+    fireflies: 24,
   },
   {
     id: "lanterns",
@@ -192,6 +315,10 @@ export interface Save {
   lifetimeCoins: number;
   outfits: Outfit[];
   outfit: Outfit;
+  scarves: Scarf[];
+  scarf: Scarf | null;
+  hats: Hat[];
+  hat: Hat | null;
   selectedCharacter: CharacterId;
   decorations: Decoration[];
   challenges: ChallengeRecord[];
@@ -265,6 +392,10 @@ const blank = (): Save => ({
   lifetimeCoins: 0,
   outfits: ["leaf"],
   outfit: "leaf",
+  scarves: [],
+  scarf: null,
+  hats: [],
+  hat: null,
   selectedCharacter: "pip",
   decorations: [],
   challenges: Array.from({ length: CHALLENGE_IDS.length }, () => ({
@@ -430,12 +561,24 @@ export function readSave(): Save {
           "cosmetic.bee_scarf",
           "cosmetic.acorn_cap",
           "cosmetic.golden_leaf",
+          "cosmetic.frost_coat",
+          "cosmetic.ember_coat",
+          "cosmetic.coral_coat",
+          "cosmetic.dusk_coat",
         ] as Outfit[]
       ).filter((id) => Array.isArray(raw.outfits) && raw.outfits.includes(id)),
     ];
     defaults.outfit = defaults.outfits.includes(raw.outfit)
       ? raw.outfit
       : "leaf";
+    defaults.scarves = SCARF_IDS.filter(
+      (id) => Array.isArray(raw.scarves) && raw.scarves.includes(id),
+    );
+    defaults.scarf = defaults.scarves.includes(raw.scarf) ? raw.scarf : null;
+    defaults.hats = HAT_IDS.filter(
+      (id) => Array.isArray(raw.hats) && raw.hats.includes(id),
+    );
+    defaults.hat = defaults.hats.includes(raw.hat) ? raw.hat : null;
     defaults.selectedCharacter =
       raw.selectedCharacter === "poppy" ? "poppy" : "pip";
     defaults.decorations = (
@@ -641,16 +784,50 @@ export class RunCoinLedger {
 export function ownsItem(save: Save, item: ShopItem) {
   return item.kind === "outfit"
     ? save.outfits.includes(item.id as Outfit)
-    : save.decorations.includes(item.id as Decoration);
+    : item.kind === "scarf"
+      ? save.scarves.includes(item.id as Scarf)
+      : item.kind === "hat"
+        ? save.hats.includes(item.id as Hat)
+        : save.decorations.includes(item.id as Decoration);
+}
+/** Whether Pip is wearing this item right now. */
+export function wearingItem(save: Save, item: ShopItem) {
+  return item.kind === "outfit"
+    ? save.outfit === item.id
+    : item.kind === "scarf"
+      ? save.scarf === item.id
+      : item.kind === "hat"
+        ? save.hat === item.id
+        : ownsItem(save, item);
 }
 export function purchaseItem(
   save: Save,
   id: string,
-): "purchased" | "equipped" | "locked" | "unaffordable" | "invalid" {
+):
+  | "purchased"
+  | "equipped"
+  | "removed"
+  | "locked"
+  | "unaffordable"
+  | "invalid" {
   const item = SHOP_ITEMS.find((item) => item.id === id);
   if (!item) return "invalid";
   if (ownsItem(save, item)) {
     if (item.kind === "outfit") save.outfit = item.id as Outfit;
+    // A worn scarf or hat comes off; otherwise it goes on in its slot.
+    else if (item.kind === "scarf") {
+      if (save.scarf === item.id) {
+        save.scarf = null;
+        return "removed";
+      }
+      save.scarf = item.id as Scarf;
+    } else if (item.kind === "hat") {
+      if (save.hat === item.id) {
+        save.hat = null;
+        return "removed";
+      }
+      save.hat = item.id as Hat;
+    }
     return "equipped";
   }
   if (item.reward || rescuedTotal(save) < item.fireflies) return "locked";
@@ -659,6 +836,12 @@ export function purchaseItem(
   if (item.kind === "outfit") {
     save.outfits.push(item.id as Outfit);
     save.outfit = item.id as Outfit;
+  } else if (item.kind === "scarf") {
+    save.scarves.push(item.id as Scarf);
+    save.scarf = item.id as Scarf;
+  } else if (item.kind === "hat") {
+    save.hats.push(item.id as Hat);
+    save.hat = item.id as Hat;
   } else save.decorations.push(item.id as Decoration);
   return "purchased";
 }
