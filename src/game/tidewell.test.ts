@@ -31,12 +31,22 @@ function swimTo(g: Game, x: number, y: number) {
         Math.abs(e.y - p.y) < 70,
     );
     if (fish) {
-      // Pass over or under it; only hold back when it is level with Pip.
-      rise = fish.y > p.y;
-      if (Math.abs(fish.y - p.y) < 36)
-        delta = p.x + p.w / 2 < fish.x + fish.w / 2 ? -10 : 10;
+      // Like a player: never stroke into it, and let it swim past before
+      // going on. Back off if it is heading this way.
+      rise = false;
+      const ahead = fish.x + fish.w / 2 - (p.x + p.w / 2);
+      const coming = Math.sign(fish.vx) === -Math.sign(ahead);
+      delta = coming ? -Math.sign(ahead) * 10 : 0;
     }
-    tick(g, { ...idle, left: delta < -4, right: delta > 4, jump: rise });
+    // Swim with strokes: tap Jump when it should rise and the last kick faded.
+    const stroke = rise && p.vy > -40;
+    tick(g, {
+      ...idle,
+      left: delta < -4,
+      right: delta > 4,
+      jump: stroke,
+      jumpPressed: stroke,
+    });
   }
   throw new Error(
     `could not swim to ${x},${y}: at ${g.player.x.toFixed(0)},${g.player.y.toFixed(0)}`,
@@ -106,7 +116,8 @@ function defeatPinch(g: Game) {
       ...idle,
       left: delta < -4,
       right: delta > 4,
-      jump: p.y > ty,
+      jump: p.y > ty && p.vy > -40,
+      jumpPressed: p.y > ty && p.vy > -40,
     });
     if (g.events.includes("boss-hit")) hits.push(g.boss!.health);
   }

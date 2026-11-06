@@ -3317,3 +3317,42 @@ select:focus-visible {
   flex: 0 0 min(210px, 44vw);
   scroll-snap-align: start;
 }
+
+/* Gulp's tongue: a pink round button beside Jump, shown only while riding. */
+.touch-tongue {
+  position: absolute;
+  right: calc(100% + 14px);
+  bottom: calc(10px + var(--jump-total, 87px) * 0.2);
+  width: calc(var(--jump-total, 87px) * 0.72);
+  height: calc(var(--jump-total, 87px) * 0.72);
+  min-width: 52px;
+  min-height: 52px;
+  border-radius: 50%;
+  border: 3px solid #ffe1e8;
+  background: linear-gradient(#ff9fb4, #f0718f);
+  box-shadow:
+    0 4px 0 #b04a63,
+    0 8px 18px #4c23302e;
+  color: #5a1f2e;
+  touch-action: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.touch-tongue[hidden] {
+  display: none;
+}
+.touch-tongue span {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  pointer-events: none;
+}
+.touch-tongue.pressed {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 #b04a63;
+}
+.game-app[data-controls-swapped="true"] .touch-tongue {
+  right: auto;
+  left: calc(100% + 14px);
+}

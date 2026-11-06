@@ -60,18 +60,32 @@ describe("new secret area playthrough", () => {
         const p = g.player;
         const dx = x - (p.x + p.w / 2) - (p.vx * Math.abs(p.vx)) / 6400;
         if (Math.abs(x - center(g)) < 16 && Math.abs(y - p.y) < 22) return;
-        tick(g, { ...idle, left: dx < -4, right: dx > 4, jump: p.y > y });
+        {
+          // Swim with strokes: tap Jump when too low and the last kick faded.
+          const stroke = p.y > y && p.vy > -40;
+          tick(g, {
+            ...idle,
+            left: dx < -4,
+            right: dx > 4,
+            jump: stroke,
+            jumpPressed: stroke,
+          });
+        }
       }
       throw new Error(
         `Could not swim to ${x}, ${y}: ${g.player.x}, ${g.player.y}`,
       );
     }
-    // Above the first rock and below the hanging reef, then hit the second checkpoint.
+    // Walk into the water first (tapping Jump on the shore would fly), then
+    // go above the first rock and below the hanging reef to the checkpoint.
     for (const [x, y] of [
+      [300, 452],
       [900, 250],
       [1200, 260],
       [1290, 330],
       [1530, 330],
+      // Pip now glides with momentum; settle onto the checkpoint flag.
+      [1490, 452],
     ])
       swimTo(x!, y!);
     for (let n = 0; n < 400 && g.activeCheckpointIndex !== 1; n++) tick(g);

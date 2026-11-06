@@ -51,8 +51,11 @@ describe("rebalanced encounters", () => {
     for (let i = 0; i < 1100; i++) tick(game, { ...idle, right: true });
     expect(game.player.x + game.player.w).toBeLessThanOrEqual(rock.x + 0.01);
     expect(game.player.x + game.player.w).toBeGreaterThan(rock.x - 5);
-    for (let i = 0; i < 600 && game.player.x < rock.x + rock.w; i++)
-      tick(game, { ...idle, jump: true, right: true });
+    // Swim over it with repeated strokes.
+    for (let i = 0; i < 600 && game.player.x < rock.x + rock.w; i++) {
+      const stroke = i % 30 === 0;
+      tick(game, { ...idle, jump: stroke, jumpPressed: stroke, right: true });
+    }
     expect(game.player.x).toBeGreaterThanOrEqual(rock.x + rock.w);
     expect(game.deaths).toBe(0);
   });

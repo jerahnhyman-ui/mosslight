@@ -232,7 +232,9 @@ describe("Reedwater Marsh", () => {
   });
 
   it("can be crossed with ordinary jumps, and Gloam defeated by stomping", () => {
-    const g = new Game(0, { level: { ...marshLevel, enemies: [] } });
+    const g = new Game(0, {
+      level: { ...marshLevel, enemies: [], mounts: [] },
+    });
     runTrail(g);
     expect(g.activeCheckpointIndex).toBe(marshLevel.checkpoints.length - 1);
     defeatGloam(g);
@@ -240,7 +242,9 @@ describe("Reedwater Marsh", () => {
   });
 
   it("rescues the hidden Heron's Loft firefly with a mushroom bounce", () => {
-    const g = new Game(0, { level: { ...marshLevel, enemies: [] } });
+    const g = new Game(0, {
+      level: { ...marshLevel, enemies: [], mounts: [] },
+    });
     walk(g, 1250);
     ridePad(g, "marsh.lily.ford", 1290, 1530);
     jump(g, 1660, 430);
@@ -261,7 +265,9 @@ describe("Reedwater Marsh", () => {
   });
 
   it("rescues the Glowworm and Kingfisher fireflies on optional climbs", () => {
-    const g = new Game(0, { level: { ...marshLevel, enemies: [] } });
+    const g = new Game(0, {
+      level: { ...marshLevel, enemies: [], mounts: [] },
+    });
     walk(g, 1250);
     ridePad(g, "marsh.lily.ford", 1290, 1530);
     jump(g, 1660, 430);

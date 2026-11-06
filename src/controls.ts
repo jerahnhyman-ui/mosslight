@@ -8,6 +8,8 @@ const movementKeys = new Map<string, Direction>([
   ["KeyD", 1],
 ]);
 const jumpKeys = new Set(["Space", "ArrowUp", "KeyW"]);
+/** The action button: Gulp's tongue while riding. */
+const actionKeys = new Set(["KeyX", "KeyJ", "KeyE", "ShiftLeft", "ShiftRight"]);
 
 /** One captured movement surface lets a thumb change direction without lifting. */
 export class Controls {
@@ -18,6 +20,8 @@ export class Controls {
   private aggregateJump = false;
   private padJump = false;
   private padPause = false;
+  private padAction = false;
+  private actionPressed = false;
 
   constructor(
     private movementPad: HTMLElement,
@@ -25,7 +29,19 @@ export class Controls {
     private active: () => boolean,
     private unlock: () => void,
     private togglePause: () => void,
+    private actionButton?: HTMLButtonElement,
   ) {
+    actionButton?.addEventListener("pointerdown", (event) => {
+      if (!this.active()) return;
+      event.preventDefault();
+      this.actionPressed = true;
+      actionButton.classList.add("pressed");
+      this.unlock();
+    });
+    for (const type of ["pointerup", "pointercancel", "pointerleave"])
+      actionButton?.addEventListener(type, () =>
+        actionButton.classList.remove("pressed"),
+      );
     movementPad.addEventListener("pointerdown", (event) => {
       if (
         !this.active() ||
@@ -82,6 +98,11 @@ export class Controls {
       if ((event.code === "KeyP" || event.code === "Escape") && !event.repeat) {
         event.preventDefault();
         this.togglePause();
+      }
+      if (actionKeys.has(event.code) && this.active()) {
+        event.preventDefault();
+        if (!event.repeat) this.actionPressed = true;
+        return;
       }
       if (
         !this.active() ||
@@ -145,6 +166,7 @@ export class Controls {
     this.movement.clear();
     this.jumps.clear();
     this.jumpEdges = [];
+    this.actionPressed = false;
     // Sample even if rendering stopped while the page was hidden.
     const pad = navigator.getGamepads?.().find((item) => item?.connected);
     this.padJump = !!pad?.buttons[0]?.pressed;
@@ -166,6 +188,10 @@ export class Controls {
     const pad = navigator.getGamepads?.().find((item) => item?.connected);
     const padJump = !!pad?.buttons[0]?.pressed;
     const padPause = !!pad?.buttons[9]?.pressed;
+    // B or X on a gamepad is the action button.
+    const padAction = !!(pad?.buttons[1]?.pressed || pad?.buttons[2]?.pressed);
+    if (padAction && !this.padAction) this.actionPressed = true;
+    this.padAction = padAction;
     if (padJump && !this.padJump) this.unlock();
     this.padJump = padJump;
     this.captureJump();
@@ -186,8 +212,10 @@ export class Controls {
         padJump,
       jumpPressed: this.jumpEdges.includes(true),
       jumpEdges: this.jumpEdges,
+      action: this.actionPressed,
     };
     this.jumpEdges = [];
+    this.actionPressed = false;
     return result;
   }
 }

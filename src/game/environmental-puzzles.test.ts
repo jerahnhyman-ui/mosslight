@@ -107,7 +107,17 @@ describe("environmental traversal", () => {
         const dx = x - (p.x + p.w / 2) - (p.vx * Math.abs(p.vx)) / 6400;
         if (Math.abs(x - (p.x + p.w / 2)) < 16 && Math.abs(y - p.y) < 22)
           return;
-        tick(game, { ...idle, left: dx < -4, right: dx > 4, jump: p.y > y });
+        {
+          // Swim with strokes: tap Jump when too low and the last kick faded.
+          const stroke = p.y > y && p.vy > -40;
+          tick(game, {
+            ...idle,
+            left: dx < -4,
+            right: dx > 4,
+            jump: stroke,
+            jumpPressed: stroke,
+          });
+        }
         if (game.deaths) throw new Error(`Lost a life swimming to ${x}, ${y}`);
       }
       throw new Error(

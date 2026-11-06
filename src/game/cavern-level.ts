@@ -80,6 +80,8 @@ export const cavernLevel: Level = withRewardBlocks({
   theme: "cavern",
   width: 9300,
   spawn: { x: 80, y: 392 },
+  // Gulp waits near the entrance. Its flutter helps across the chasms.
+  mounts: [{ x: 620, y: 430 }],
   platforms: [
     // Lantern Mouth: a calm entrance with two easy steps.
     ground(0, 1300),

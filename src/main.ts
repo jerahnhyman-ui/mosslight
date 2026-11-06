@@ -180,7 +180,7 @@ $("#app").innerHTML = `
   <div class="world-strip" id="world-strip" aria-label="Choose a world"></div>
   <div class="touch-controls" hidden>
     <div class="movement-control"><div class="touch-dpad" data-direction="0"><button data-control="left" data-direction="-1" aria-label="Move left" aria-pressed="false">${icon("left")}</button><span class="dpad-divider"></span><button data-control="right" data-direction="1" aria-label="Move right" aria-pressed="false">${icon("right")}</button></div><span class="control-caption">SLIDE TO MOVE</span></div>
-    <div class="jump-control"><button class="touch-jump" data-control="jump" aria-label="Jump" aria-pressed="false">${icon("jump")}<span>JUMP</span></button><span class="control-caption">HOLD TO GO HIGHER</span></div>
+    <div class="jump-control"><button class="touch-tongue" data-control="tongue" aria-label="Gulp's tongue" hidden><span>TONGUE</span></button><button class="touch-jump" data-control="jump" aria-label="Jump" aria-pressed="false">${icon("jump")}<span>JUMP</span></button><span class="control-caption">HOLD TO GO HIGHER</span></div>
   </div>
   <div class="checkpoint-toast" id="game-toast" role="status" hidden></div>
   <p id="save-status" role="status" hidden>Progress is kept for this session. Device storage is unavailable.</p>
@@ -284,6 +284,7 @@ const controls = new Controls(
     else if (mode === "paused") resume();
     else if (mode === "tip") continueFromTip();
   },
+  $<HTMLButtonElement>(".touch-tongue"),
 );
 const formatTime = (seconds: number) =>
   `${Math.floor(seconds / 60)
@@ -978,6 +979,9 @@ let lastLives = -1;
 let lastCoinProgress = -1;
 let lastPowerSeconds = -1;
 function updateHUD() {
+  // The tongue button appears only while riding Gulp.
+  const tongue = $(".touch-tongue");
+  if (tongue.hidden !== !game.riding) tongue.hidden = !game.riding;
   setText("#coin-count", String(game.coinsTowardLife).padStart(2, "0"));
   setText("#coin-total", `/ ${COINS_PER_LIFE}`);
   if (lastCoinProgress !== game.coinsTowardLife) {

@@ -59,6 +59,9 @@ export const tidewellLevel: Level = withRewardBlocks({
   spawn: { x: 80, y: SEABED - 38 },
   platforms: [
     { x: 0, y: SEABED, w: 6400, h: 170, kind: "ground" },
+    // A rock ceiling seals the water: Pip swims beneath it and can never
+    // pop out to run along the reef tops.
+    slab("ceiling", 220, -200, 6180, SURFACE + 200),
     // Kelp Garden: swim over rising rocks and under hanging reefs.
     pillar("kelp.a", 700, 330),
     reef("kelp.b", 950, 350),

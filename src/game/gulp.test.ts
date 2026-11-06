@@ -77,8 +77,10 @@ describe("Gulp, the rideable tree frog", () => {
     mountUp(g);
     const bug = g.enemies[0]!;
     let gulped = false;
+    // Walk toward the bug and press the tongue button once it is in reach.
     for (let i = 0; i < 600 && bug.alive; i++) {
-      tick(g, { ...idle, right: true });
+      const gap = bug.x - (g.player.x + g.player.w);
+      tick(g, { ...idle, right: gap > 60, action: gap < 90 });
       if (g.events.includes("gulp")) gulped = true;
     }
     expect(gulped).toBe(true);
@@ -89,11 +91,40 @@ describe("Gulp, the rideable tree frog", () => {
     expect(g.deaths).toBe(0);
   });
 
-  it("does not eat a bug behind Pip", () => {
+  it("only eats when the tongue button is pressed, and never behind Pip", () => {
     const g = new Game(0, { level: meadow([{ kind: "beetle", x: 40 }]) });
     mountUp(g);
     tick(g, { ...idle, right: true }, 30);
+    tick(g, { ...idle, action: true });
     expect(g.enemies[0]!.alive).toBe(true);
+    // A miss still flicks the tongue out.
+    expect(g.tongue).toBeGreaterThan(0);
+  });
+
+  it("flutters: holding Jump while falling hangs in the air", () => {
+    const airtime = (hold: boolean) => {
+      const g = new Game(0, { level: meadow() });
+      mountUp(g);
+      tick(g, { ...idle, jump: true, jumpPressed: true });
+      let frames = 0;
+      for (; frames < 600; frames++) {
+        tick(g, { ...idle, jump: hold || g.player.vy < 0 });
+        if (g.player.grounded) break;
+      }
+      return frames;
+    };
+    expect(airtime(true)).toBeGreaterThan(airtime(false) + 60);
+  });
+
+  it("gives a coin for each bug Gulp swallows", () => {
+    const g = new Game(0, { level: meadow([{ kind: "beetle", x: 400 }]) });
+    mountUp(g);
+    const before = g.collectedCoins;
+    for (let i = 0; i < 400 && g.enemies[0]!.alive; i++) {
+      const gap = g.enemies[0]!.x - (g.player.x + g.player.w);
+      tick(g, { ...idle, right: gap > 60, action: gap < 90 });
+    }
+    expect(g.collectedCoins).toBe(before + 1);
   });
 
   it("takes a hit for Pip: Pip falls off unhurt and Gulp hops away", () => {

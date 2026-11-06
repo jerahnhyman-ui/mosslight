@@ -51,13 +51,17 @@ animated characters, and collectible/landing effects.
   toward Pip and bursts up where the floor cracks; step away, jump its shards,
   and stomp it while it is dazed.
 - **Tidewell Depths** opens after Glimmerdeep Caverns. It is almost entirely
-  underwater: hold Jump to swim up and release to sink. Bubble columns lift
+  underwater, under a rock ceiling: tap Jump to kick upward, glide between
+  strokes, and hold Jump to slow your sink. Bubble columns lift
   Pip, a current channel pushes back, a sunken tunnel pulls down, and fish
   weave through the water. Pinch, the Hermit Crab, scuttles and puffs
   bubbles; swim clear, then sink onto its shell when it flips over.
-- **Gulp the tree frog** waits on the first bank of Reedwater Marsh. Walk
-  into it to ride: Pip jumps higher, and Gulp snaps up bugs ahead with its
-  tongue. A hit knocks Pip off unhurt, and Gulp hops away to be caught again.
+- **Gulp the tree frog** waits near the start of Reedwater Marsh and
+  Glimmerdeep Caverns. Walk into it to ride. Press the pink **Tongue** button
+  (X, J or Shift on a keyboard; B or X on a gamepad) to snatch a bug ahead for
+  a coin. Pip jumps higher, and holding Jump while falling makes Gulp
+  flutter to stretch a jump. A hit knocks Pip off unhurt, and Gulp hops away
+  to be caught again.
 - **Hidden sky gardens** sit above Sunlit Meadow, Firefly Hollow, and Cloudtop
   Crossing. Look for drifting petals, earn a Wind Feather, and land on the
   cloud ledges to recharge. Stand still at a glowing SKY portal, then press
