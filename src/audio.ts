@@ -8,7 +8,10 @@ type Theme =
   | "windmill"
   | "hive"
   | "marsh"
-  | "cavern";
+  | "cavern"
+  | "snow"
+  | "ice"
+  | "volcano";
 type MusicScene = "trail" | "boss" | "grove";
 type ScoreName = Theme | "star" | "boss" | "grove";
 type Score = {
@@ -140,6 +143,81 @@ const scores: Record<ScoreName, Score> = {
       [48, 52, 55],
       [38, 42, 45],
       [43, 47, 50],
+    ],
+  },
+  // Bright and twinkling, like sleigh bells, for the snowy peaks.
+  snow: {
+    bpm: 108,
+    voice: "triangle",
+    melody: [
+      [84, null, 88, 91, 88, null, 84, null],
+      [86, null, 89, null, 86, 84, null, null],
+      [81, null, 84, 88, 86, null, 84, null],
+      [83, 86, 91, null, 88, null, null, null],
+      [84, null, 88, 91, 93, null, 91, 88],
+      [89, null, 88, 86, 84, null, 81, null],
+      [83, null, 86, 89, 88, 86, 83, null],
+      [84, null, 88, 84, 79, null, null, null],
+    ].flat(),
+    chords: [
+      [48, 52, 55],
+      [50, 53, 57],
+      [45, 48, 52],
+      [43, 47, 50],
+      [48, 52, 55],
+      [41, 45, 48],
+      [43, 47, 50],
+      [48, 52, 55],
+    ],
+  },
+  // Glassy and still, for the frozen lake.
+  ice: {
+    bpm: 84,
+    voice: "sine",
+    melody: [
+      [76, null, 83, null, 88, null, 86, null],
+      [83, null, null, null, 81, null, 79, null],
+      [76, null, 81, null, 84, null, 83, null],
+      [79, null, null, null, 76, null, null, null],
+      [81, null, 84, null, 88, null, 91, null],
+      [88, null, 86, null, 84, null, 83, null],
+      [81, null, 79, null, 83, null, 79, null],
+      [76, null, null, null, null, null, null, null],
+    ].flat(),
+    chords: [
+      [52, 55, 59],
+      [48, 52, 55],
+      [45, 48, 52],
+      [47, 50, 54],
+      [45, 48, 52],
+      [48, 52, 55],
+      [50, 54, 57],
+      [52, 55, 59],
+    ],
+  },
+  // Low, driving and hot, for the volcano.
+  volcano: {
+    bpm: 124,
+    voice: "sawtooth",
+    melody: [
+      [62, 65, 69, null, 68, null, 65, 62],
+      [63, null, 62, 60, 62, null, null, null],
+      [62, 65, 69, 72, 70, null, 69, 65],
+      [68, null, 65, 63, 62, null, null, null],
+      [69, null, 72, 74, 72, null, 69, null],
+      [70, null, 69, 65, 68, null, 65, null],
+      [62, 65, 68, null, 65, 63, 62, 60],
+      [62, null, null, 57, 62, null, null, null],
+    ].flat(),
+    chords: [
+      [38, 41, 45],
+      [39, 43, 46],
+      [38, 41, 45],
+      [44, 48, 51],
+      [41, 45, 48],
+      [46, 50, 53],
+      [44, 48, 51],
+      [38, 41, 45],
     ],
   },
   // Slow and echoing, with a hint of mystery, for the crystal caves.

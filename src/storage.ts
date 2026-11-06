@@ -232,6 +232,9 @@ export const WORLD_IDS = [
   "world.glimmerdeep-caverns",
   "world.tidewell-depths",
   "world.nightglow-woods",
+  "world.snowdrift-peaks",
+  "world.frostglass-lake",
+  "world.ember-caldera",
 ] as const;
 /** Worlds every v3 save already contains; later worlds may be missing. */
 const ORIGINAL_WORLD_COUNT = 4;
@@ -712,10 +715,8 @@ const gardenCompleted = (save: Save, world: number) =>
 export function worldUnlocked(save: Save, index: number): boolean {
   if (index < 0 || index >= WORLD_IDS.length) return false;
   if (index === 3) return gardenCompleted(save, 0);
-  if (index === 4) return gardenCompleted(save, 3);
-  if (index === 5) return gardenCompleted(save, 4);
-  if (index === 6) return gardenCompleted(save, 5);
-  if (index === 7) return gardenCompleted(save, 6);
+  // From world 5 on, each world opens when the one before it is finished.
+  if (index >= 4) return gardenCompleted(save, index - 1);
   return true;
 }
 export function discoverFeather(save: Save): boolean {

@@ -3,6 +3,9 @@ import { marshLevel } from "./marsh-level";
 import { cavernLevel } from "./cavern-level";
 import { tidewellLevel } from "./tidewell-level";
 import { nightglowLevel } from "./nightglow-level";
+import { snowLevel } from "./snow-level";
+import { iceLevel } from "./ice-level";
+import { volcanoLevel } from "./volcano-level";
 import { expansionChallenges } from "./challenge-expansion";
 import { floodgateDash, leafboatRiver } from "./special-stages";
 import { cloudAscentPlatforms } from "./cloud-garden";
@@ -35,6 +38,8 @@ export type Platform = Rect & {
     | "curled";
   motion?: { axis: "x" | "y"; range: number; period: number; phase?: number };
   rewardCoins?: number;
+  /** Ice: Pip slides on it, slow to start and slow to stop. */
+  slippery?: boolean;
   /** A boat: once Pip boards, it cruises right at `speed` until `until`. */
   cruise?: { speed: number; until: number };
   /** Power released by bumping this solid block from below. */
@@ -42,7 +47,13 @@ export type Platform = Rect & {
   wakeRadius?: number;
   enemyBreakable?: boolean;
 };
-export type EnemyKind = "beetle" | "hopper" | "charger" | "fish";
+export type EnemyKind =
+  | "beetle"
+  | "hopper"
+  | "charger"
+  | "fish"
+  /** A fire sprite that leaps out of lava. It can't be stomped. */
+  | "ember";
 export type EnemySpawn = {
   kind: EnemyKind;
   x: number;
@@ -59,6 +70,9 @@ export type BossKind =
   | "mole"
   | "crab"
   | "owl"
+  | "bear"
+  | "tortoise"
+  | "salamander"
   | "millkeeper"
   | "heartwood";
 export type BossSpec = {
@@ -96,7 +110,10 @@ export interface Level {
     | "cloud"
     | "grotto"
     | "marsh"
-    | "cavern";
+    | "cavern"
+    | "snow"
+    | "ice"
+    | "volcano";
   spawn: { x: number; y: number };
   platforms: Platform[];
   coins: { x: number; y: number }[];
@@ -114,6 +131,10 @@ export interface Level {
    * seconds, starting `lead` pixels behind the spawn or checkpoint. Being
    * caught by it costs a life. */
   chase?: { speed: number; delay: number; lead: number };
+  /** Icicles hanging at (x, y): they shake, then fall when Pip passes under. */
+  icicles?: { x: number; y: number }[];
+  /** Gaps are filled with lava (drawn glowing; falling in costs a life). */
+  lava?: boolean;
   /** Night levels: only Pip's glow and lit lanterns light the scene. */
   dark?: boolean;
   /** Lanterns (y is the ground they stand on). They light for good when
@@ -1129,6 +1150,9 @@ export const levels: Level[] = [
   cavernLevel,
   tidewellLevel,
   nightglowLevel,
+  snowLevel,
+  iceLevel,
+  volcanoLevel,
 ];
 
 /** A real, safe platforming space: all residents and purchased furnishings are

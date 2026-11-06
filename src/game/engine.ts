@@ -158,6 +158,17 @@ export class Game {
   /** A ghost of a previous best run to race (drawn only; never collides). */
   ghost: { step: number; time: number; xs: number[]; ys: number[] } | null =
     null;
+  /** Icicles in this run. */
+  icicles: {
+    x: number;
+    y: number;
+    baseY: number;
+    vy: number;
+    state: "hang" | "shake" | "fall" | "gone";
+    t: number;
+  }[] = [];
+  /** Whether Pip is standing on ice this step. */
+  onIce = false;
   /** The chasing flood's front edge, and seconds since it was set. */
   chaseX = -Infinity;
   private chaseClock = 0;
@@ -370,6 +381,14 @@ export class Game {
       collected: false,
     }));
     this.combo = 0;
+    this.icicles = (this.level.icicles ?? []).map((i) => ({
+      x: i.x,
+      y: i.y,
+      baseY: i.y,
+      vy: 0,
+      state: "hang" as const,
+      t: 0,
+    }));
     this.lanterns = (this.level.lanterns ?? []).map((l) => ({
       x: l.x,
       y: l.y,
@@ -560,6 +579,8 @@ export class Game {
       else if (p.vx * direction < 0) acceleration = p.grounded ? 4800 : 3600;
       // In water Pip builds speed with each kick and glides to a stop.
       if (swimming && !p.grounded) acceleration = direction ? 700 : 260;
+      // Ice: slow to get going and slow to stop.
+      if (p.grounded && this.onIce) acceleration = direction ? 900 : 160;
       // Just after a wall kick, the push carries Pip away from the wall.
       if (this.wallLock > 0) acceleration = 0;
       // Star power makes Pip noticeably faster as well as invincible.
@@ -746,6 +767,7 @@ export class Game {
     const oldTop = p.y;
     p.y += p.vy * STEP;
     p.grounded = false;
+    this.onIce = false;
     let rechargeSupport = false;
     for (const tile of this.platforms) {
       if (!active(tile) || this.blockedCarriers.has(tile) || !overlaps(p, tile))
@@ -773,6 +795,7 @@ export class Game {
         p.y = tile.y - p.h;
         p.vy = 0;
         p.grounded = true;
+        this.onIce = !!tile.slippery;
         rechargeSupport = tile.kind !== "mushroom" && tile.kind !== "crumble";
         if (tile.kind !== "mushroom") {
           this.liftActive = false;
@@ -888,6 +911,44 @@ export class Game {
         return this.loseLife();
       }
     }
+    // Icicles shake when Pip passes beneath, then fall; they regrow later.
+    for (const icicle of this.icicles) {
+      const under = Math.abs(icicle.x - (p.x + p.w / 2)) < 70 && p.y > icicle.y;
+      if (icicle.state === "hang" && under) {
+        icicle.state = "shake";
+        icicle.t = 0.45;
+        this.events.push("icicle-shake");
+      } else if (icicle.state === "shake") {
+        icicle.t -= STEP;
+        if (icicle.t <= 0) icicle.state = "fall";
+      } else if (icicle.state === "fall") {
+        icicle.vy = Math.min(900, icicle.vy + 1600 * STEP);
+        icicle.y += icicle.vy * STEP;
+        const box = { x: icicle.x - 8, y: icicle.y, w: 16, h: 36 };
+        const landed =
+          icicle.y > 660 ||
+          this.platforms.some(
+            (t) =>
+              active(t) &&
+              solid(t) &&
+              overlaps(box, t) &&
+              t.y > icicle.baseY + 10,
+          );
+        if (overlaps(p, box) && this.hurt(box)) return true;
+        if (landed || overlaps(p, box)) {
+          icicle.state = "gone";
+          icicle.t = 4;
+          this.events.push("icicle-break");
+        }
+      } else if (icicle.state === "gone") {
+        icicle.t -= STEP;
+        if (icicle.t <= 0 && !under) {
+          icicle.state = "hang";
+          icicle.y = icicle.baseY;
+          icicle.vy = 0;
+        }
+      }
+    }
     // A lantern lights for good as Pip passes it.
     for (const lantern of this.lanterns) {
       if (
@@ -983,6 +1044,9 @@ export class Game {
       if (!overlaps(p, enemy)) continue;
       if (this.starPowerRemaining > 0) {
         this.squash(enemy);
+      } else if (enemy.kind === "ember") {
+        // Too hot to stomp.
+        if (this.hurt(enemy)) return true;
       } else if (p.vy > 0 && oldBottom <= previousEnemyY + 10) {
         this.squash(enemy);
         p.y = enemy.y - p.h;
@@ -1371,8 +1435,22 @@ export class Game {
     }
     for (const hazard of this.hazards) {
       hazard.remaining = Math.max(0, hazard.remaining - STEP);
+      // Fireballs arc under gravity; everything else flies straight.
+      if (hazard.kind === "fireball" || hazard.kind === "icicle")
+        hazard.vy = Math.min(900, hazard.vy + 900 * STEP);
       hazard.x += hazard.vx * STEP;
       hazard.y += hazard.vy * STEP;
+      // Icicles shatter and fireballs splash when they reach the floor.
+      if (
+        (hazard.kind === "fireball" || hazard.kind === "icicle") &&
+        hazard.vy > 0 &&
+        hazard.y + hazard.h >= boss.groundY + 4
+      ) {
+        hazard.remaining = 0;
+        this.events.push(
+          hazard.kind === "icicle" ? "icicle-break" : "fireball-splash",
+        );
+      }
       if (
         hazard.remaining <= 0 ||
         (hazard.kind === "sweep"
@@ -1503,6 +1581,26 @@ export class Game {
     const sameFloor =
       onFloor && center > enemy.minX && center < enemy.maxX + enemy.w;
     const toward = dx >= 0 ? 1 : -1;
+    if (enemy.kind === "ember") {
+      // Leaps out of the lava, arcs, and drops back in; it waits below
+      // the surface between leaps.
+      if (enemy.grounded && enemy.stateTime === 0) {
+        enemy.vy = -660;
+        enemy.grounded = false;
+      }
+      enemy.vx = 0;
+      if (!enemy.grounded) {
+        enemy.vy += GRAVITY * STEP;
+        enemy.y += enemy.vy * STEP;
+        if (enemy.vy > 0 && enemy.y >= enemy.baseY + 40) {
+          enemy.y = enemy.baseY + 40;
+          enemy.vy = 0;
+          enemy.grounded = true;
+          enemy.stateTime = 1.6;
+        }
+      }
+      return;
+    }
     if (enemy.kind === "fish") {
       // A fish weaves up and down along a steady patrol, so its path can be
       // read and timed (or stomped by sinking onto it).

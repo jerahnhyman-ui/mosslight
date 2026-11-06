@@ -1,7 +1,7 @@
 # Mosslight
 
 An original side-scrolling platformer for iPhone, iPad, and the browser.
-Guide Pip or Poppy through Sunlit Meadow, Firefly Hollow, Cloudtop Crossing, Windmill Garden, Reedwater Marsh, Glimmerdeep Caverns, Tidewell Depths, and Nightglow Woods:
+Guide Pip or Poppy through Sunlit Meadow, Firefly Hollow, Cloudtop Crossing, Windmill Garden, Reedwater Marsh, Glimmerdeep Caverns, Tidewell Depths, Nightglow Woods, Snowdrift Peaks, Frostglass Lake, and Ember Caldera:
 collect golden coins, grow with Sunseeds, power up with stars, rescue hidden
 fireflies, and bring light back to the forest. Four extended trails include
 multiple checkpoints, optional routes, light-activated plants, and three-phase
@@ -68,6 +68,23 @@ animated characters, and collectible/landing effects.
   with a checkpoint and recovery blocks. Gloomwing, the Night Owl, circles
   above Pip, locks a mark and dives; step clear, jump its landing shards and
   falling feathers, and stomp it six times over three phases.
+- **Snowdrift Peaks** opens after Nightglow Woods. Icicles hang from rocky
+  overhangs and shake loose when Pip passes beneath, snow bridges crumble,
+  and sliding ledges cross the gorges. It ends at Grumble's Den, a dedicated
+  boss level: Grumble, the Snow Bear, slams the snow, sending shockwaves
+  both ways and shaking icicles down where Pip stands (their shadows show
+  where they will land).
+- **Frostglass Lake** opens after Snowdrift Peaks. Glassy ice keeps Pip
+  sliding after they let go; every ice sheet ends in firm snow before a gap.
+  Drifting floes and thin ice cross the water. It ends at Shellshock's Rink:
+  Shellshock, the Frost Tortoise, spins across the ice and rebounds off the
+  walls; hop the shell, then stomp it while it's dizzy.
+- **Ember Caldera** opens after Frostglass Lake. Lava fills the gaps, and
+  ember sprites leap from it on a steady beat (too hot to stomp). It ends at
+  Cinder's Crater: Cinder, the Magma Salamander, surfaces on an island,
+  away from Pip, and spits arcing fireballs; dodge, hop the stepping stones
+  and stomp it. Each of these dedicated bosses takes five hits over three
+  phases, with a checkpoint and recovery blocks first.
 - **Special stages** join the challenge rooms: Floodgate Dash (outrun a flood
   rolling in behind you) for Tidewell Depths, and Leafboat River (ride leaf
   boats downstream and hop the rocks) for Nightglow Woods.

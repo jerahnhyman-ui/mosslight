@@ -21,6 +21,8 @@ export type BossState = Rect & {
   /** Highest entered phase, retained across Relaxed retries. */
   phaseCheckpoint?: number;
   millNextDirection?: number;
+  /** Where the guardian starts; the salamander keeps to its island here. */
+  homeX: number;
 };
 export type MillState =
   | "settle"
@@ -32,7 +34,15 @@ export type MillState =
   | "recover"
   | "transition";
 export type BossHazard = Rect & {
-  kind: "web" | "gust" | "sweep" | "bubble" | "feather";
+  kind:
+    | "web"
+    | "gust"
+    | "sweep"
+    | "bubble"
+    | "feather"
+    | "icicle"
+    | "fireball"
+    | "shard";
   vx: number;
   vy: number;
   remaining: number;
@@ -43,6 +53,10 @@ export type BossHazard = Rect & {
 export const OWL_HOVER = 2;
 export const OWL_LOCK = 0.6;
 export const OWL_DIVE = 0.55;
+/** Guardians of the snow, ice and fire worlds fight in their own arenas
+ * and take five hits over three phases. */
+export const arenaKind = (kind: BossSpec["kind"]) =>
+  kind === "bear" || kind === "tortoise" || kind === "salamander";
 /** Major guardians take six hits over three phases. */
 export const majorKind = (kind: BossSpec["kind"]) =>
   kind === "millkeeper" || kind === "heartwood" || kind === "owl";
@@ -80,13 +94,19 @@ export function createBoss(spec: BossSpec): BossState {
                   ? { w: 104, h: 56 }
                   : spec.kind === "owl"
                     ? { w: 120, h: 90 }
-                    : { w: 92, h: 64 };
+                    : spec.kind === "bear"
+                      ? { w: 130, h: 100 }
+                      : spec.kind === "tortoise"
+                        ? { w: 112, h: 66 }
+                        : spec.kind === "salamander"
+                          ? { w: 120, h: 58 }
+                          : { w: 92, h: 64 };
   return {
     ...spec,
     ...size,
     y: spec.y - size.h,
-    health: majorKind(spec.kind) ? 6 : 4,
-    maxHealth: majorKind(spec.kind) ? 6 : 4,
+    health: majorKind(spec.kind) ? 6 : arenaKind(spec.kind) ? 5 : 4,
+    maxHealth: majorKind(spec.kind) ? 6 : arenaKind(spec.kind) ? 5 : 4,
     phase: 1,
     state: "dormant",
     stateTime: 0,
@@ -97,6 +117,7 @@ export function createBoss(spec: BossSpec): BossState {
     attackOriginX: spec.x,
     attackTargetX: spec.x,
     shotsFired: 0,
+    homeX: spec.x,
     ...(spec.kind === "millkeeper"
       ? {
           millState: "settle" as const,
@@ -301,6 +322,14 @@ export function warnBoss(boss: BossState, player: Rect, events: string[]) {
     boss.minX,
     boss.maxX,
   );
+  if (boss.kind === "salamander") {
+    // It surfaces on its own island, on the side away from Pip, and takes
+    // a little longer under the lava so Pip can hop clear after a stomp.
+    const away = player.x + player.w / 2 < boss.homeX + boss.w / 2 ? 1 : -1;
+    boss.attackTargetX = clamp(boss.homeX + away * 70, boss.minX, boss.maxX);
+    boss.stateTime += 0.4;
+  }
+  if (boss.kind === "tortoise") boss.stateTime = 1.0;
   boss.attackElapsed = 0;
   boss.shotsFired = 0;
   events.push("boss-warning");
@@ -315,7 +344,10 @@ function recover(boss: BossState) {
       ? 2.4 - (boss.phase - 1) * 0.2
       : boss.kind === "crab"
         ? 3.2 - (boss.phase - 1) * 0.2
-        : 2.2 - (boss.phase - 1) * 0.25;
+        : // Reaching the salamander's island takes two hops over lava.
+          boss.kind === "salamander"
+          ? 3.2 - (boss.phase - 1) * 0.1
+          : 2.2 - (boss.phase - 1) * 0.25;
   boss.y = boss.groundY - boss.h;
 }
 
@@ -387,6 +419,23 @@ export function stepBoss(
           });
         boss.shotsFired++;
       }
+    } else if (boss.kind === "bear") {
+      roam(boss, dt, Math.sin(boss.stateTime * 10) * 40);
+    } else if (boss.kind === "tortoise") {
+      // It tucks into its shell and spins up, facing Pip.
+    } else if (boss.kind === "salamander") {
+      // It sinks below the lava and swims to the side of its island away
+      // from Pip, settling on that spot for the last moments.
+      if (boss.stateTime > 0.5) {
+        const away = player.x + player.w / 2 < boss.homeX + boss.w / 2 ? 1 : -1;
+        boss.attackTargetX = clamp(
+          boss.homeX + away * 70,
+          boss.minX,
+          boss.maxX,
+        );
+      }
+      boss.y = approach(boss.y, boss.groundY + 10, 240 * dt);
+      boss.x = approach(boss.x, boss.attackTargetX, 260 * dt);
     } else if (boss.kind === "crab")
       // It clacks its claws and sidles on the spot before scuttling.
       roam(boss, dt, Math.sin(boss.stateTime * 16) * 50);
@@ -421,11 +470,17 @@ export function stepBoss(
               ? TOAD_LEAP
               : boss.kind === "owl"
                 ? OWL_DIVE
-                : boss.kind === "mole"
-                  ? MOLE_EMERGE
-                  : boss.kind === "crab"
-                    ? CRAB_SCUTTLE
-                    : 1.3;
+                : boss.kind === "bear"
+                  ? 1.1
+                  : boss.kind === "tortoise"
+                    ? 4
+                    : boss.kind === "salamander"
+                      ? 1.2
+                      : boss.kind === "mole"
+                        ? MOLE_EMERGE
+                        : boss.kind === "crab"
+                          ? CRAB_SCUTTLE
+                          : 1.3;
     boss.attackElapsed = 0;
   }
   if (boss.state === "attack") {
@@ -491,6 +546,89 @@ export function stepBoss(
           vx: direction * (165 + boss.phase * 25),
           vy: 0,
           remaining: 4,
+        });
+        boss.shotsFired++;
+      }
+    } else if (boss.kind === "bear") {
+      // A heavy ground slam: a shockwave each way, and icicles shaken loose
+      // from the ceiling high above, falling where Pip and nearby stand.
+      if (boss.shotsFired === 0 && boss.attackElapsed >= 0.45) {
+        boss.shotsFired = 1;
+        for (const direction of [-1, 1])
+          hazards.push({
+            kind: "gust",
+            x: boss.x + boss.w / 2 + direction * (boss.w / 2 + 4) - 12,
+            y: boss.groundY - 22,
+            w: 24,
+            h: 22,
+            vx: direction * (170 + boss.phase * 20),
+            vy: 0,
+            remaining: 4,
+          });
+        const spots =
+          boss.phase === 1
+            ? [0]
+            : boss.phase === 2
+              ? [-170, 170]
+              : [-220, 0, 220];
+        for (const dx of spots)
+          hazards.push({
+            kind: "icicle",
+            x: clamp(
+              player.x + player.w / 2 + dx - 10,
+              boss.minX,
+              boss.maxX + boss.w,
+            ),
+            y: boss.groundY - 560,
+            w: 20,
+            h: 40,
+            vx: 0,
+            vy: 0,
+            remaining: 3,
+          });
+      }
+    } else if (boss.kind === "tortoise") {
+      // Spinning in its shell, it slides across the ice and rebounds off the
+      // walls (more times each phase), chipping off a shard at each wall.
+      boss.x += boss.facing * (330 + boss.phase * 40) * dt;
+      if (boss.x <= boss.minX || boss.x >= boss.maxX) {
+        boss.x = clamp(boss.x, boss.minX, boss.maxX);
+        boss.facing *= -1;
+        boss.shotsFired++;
+        hazards.push({
+          kind: "shard",
+          x: boss.facing > 0 ? boss.x + boss.w + 2 : boss.x - 26,
+          y: boss.groundY - 22,
+          w: 24,
+          h: 22,
+          vx: boss.facing * (200 + boss.phase * 20),
+          vy: 0,
+          remaining: 3,
+        });
+        if (boss.shotsFired > boss.phase) boss.stateTime = 0;
+      }
+    } else if (boss.kind === "salamander") {
+      // It bursts up onto its island and spits arcing fireballs at Pip.
+      boss.y = approach(boss.y, boss.groundY - boss.h, 500 * dt);
+      if (
+        boss.shotsFired < Math.min(3, boss.phase + 1) &&
+        boss.attackElapsed >= 0.25 + boss.shotsFired * 0.22
+      ) {
+        const fromX = boss.x + boss.w / 2;
+        const dx = clamp(player.x + player.w / 2 - fromX, -620, 620);
+        // Aim so the arc lands near Pip, spreading the later shots.
+        const spread =
+          (boss.shotsFired - (Math.min(3, boss.phase + 1) - 1) / 2) * 70;
+        const flight = 1;
+        hazards.push({
+          kind: "fireball",
+          x: fromX - 11,
+          y: boss.groundY - boss.h - 10,
+          w: 22,
+          h: 22,
+          vx: (dx + spread) / flight,
+          vy: -(900 * flight) / 2 + (boss.h + 10) / flight,
+          remaining: 2.4,
         });
         boss.shotsFired++;
       }
@@ -571,8 +709,21 @@ export function stepBoss(
     // be chased and aimed, but the opening stays generous and the next
     // attack never starts on top of Pip.
     // (The crab lies still on its shell.)
-    if (boss.kind !== "crab")
+    const before = boss.x;
+    // (The crab lies on its shell; the salamander basks where it surfaced.)
+    if (boss.kind !== "crab" && boss.kind !== "salamander")
       roam(boss, dt, -towardPlayer * (22 + boss.phase * 8));
+    // Arena guardians never stagger into a wall, so there is always room
+    // to land beside them after a stomp.
+    if (arenaKind(boss.kind)) {
+      const lo = boss.minX + 100,
+        hi = boss.maxX - 100;
+      if (boss.x > hi && boss.x > before) boss.x = Math.max(before, hi);
+      if (boss.x < lo && boss.x < before) boss.x = Math.min(before, lo);
+    }
+    // The salamander never staggers off its island into the lava.
+    if (boss.kind === "salamander")
+      boss.x = clamp(boss.x, boss.homeX - 80, boss.homeX + 80);
     if (boss.stateTime === 0) warnBoss(boss, player, events);
   }
 }
