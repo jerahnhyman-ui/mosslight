@@ -34,6 +34,8 @@ export type GameInput = {
   jumpEdges?: boolean[];
   /** The action button (Gulp's tongue) was pressed this frame. */
   action?: boolean;
+  /** Down was pressed this frame (ground pound in the air). */
+  downPressed?: boolean;
 };
 export type Player = Rect & {
   form: "small" | "big";
@@ -119,6 +121,13 @@ const COYOTE_TIME = 0.12;
 /** Upward kick from one swim stroke, and the fastest a stroke can push. */
 const SWIM_STROKE = -230;
 const SWIM_STROKE_MAX = -260;
+/** Ground pound: a short hang in the air, then a fast drop. */
+const POUND_HANG = 0.12;
+const POUND_SPEED = 950;
+/** Wall jump: how long a wall counts after touching it, and the push. */
+const WALL_GRACE = 0.06;
+const WALL_SLIDE = 120;
+const WALL_KICK = 300;
 /** Gulp's flutter: how long Pip can hang in the air per jump. */
 export const FLUTTER_TIME = 0.75;
 /** How far a bug on Pip's floor notices and reacts to Pip. */
@@ -144,6 +153,9 @@ export class Game {
   readonly mode: RunMode;
   boss: BossState | null = null;
   mounts: Mount[] = [];
+  /** A ghost of a previous best run to race (drawn only; never collides). */
+  ghost: { step: number; time: number; xs: number[]; ys: number[] } | null =
+    null;
   /** Hidden acorns in this run (sitting on top of high coins). */
   acorns: { x: number; y: number; collected: boolean }[] = [];
   /** Stomps in the current chain without touching the ground. */
@@ -153,6 +165,13 @@ export class Game {
   /** True while Pip is in water, and the fading timer of the last stroke. */
   swimming = false;
   swimStroke = 0;
+  /** Ground pound state: hanging before the drop, or dropping. */
+  pound: "none" | "hang" | "drop" = "none";
+  private poundTimer = 0;
+  /** Which side a wall touched Pip on (−1 left, 1 right) and for how long. */
+  wallSide = 0;
+  private wallTime = 0;
+  private wallLock = 0;
   /** Seconds of Gulp's flutter used in this jump; and whether it is active. */
   flutterUsed = 0;
   fluttering = false;
@@ -525,6 +544,8 @@ export class Game {
       else if (p.vx * direction < 0) acceleration = p.grounded ? 4800 : 3600;
       // In water Pip builds speed with each kick and glides to a stop.
       if (swimming && !p.grounded) acceleration = direction ? 700 : 260;
+      // Just after a wall kick, the push carries Pip away from the wall.
+      if (this.wallLock > 0) acceleration = 0;
       // Star power makes Pip noticeably faster as well as invincible.
       const starred = this.starPowerRemaining > 0;
       if (starred && direction) acceleration *= STAR_SPEED_BOOST;
@@ -535,7 +556,25 @@ export class Game {
           (starred ? STAR_SPEED_BOOST : 1),
         acceleration * STEP,
       );
-      if (direction) p.facing = direction;
+      if (direction && this.wallLock === 0) p.facing = direction;
+      if (this.pound !== "none") p.vx = 0;
+    }
+    this.wallLock = Math.max(0, this.wallLock - STEP);
+    this.wallTime = Math.max(0, this.wallTime - STEP);
+    // Ground pound: press Down in the air.
+    if (
+      input.downPressed &&
+      !p.grounded &&
+      !swimming &&
+      this.pound === "none" &&
+      this.hurtLock === 0
+    ) {
+      this.pound = "hang";
+      this.poundTimer = POUND_HANG;
+      this.liftActive = false;
+      this.glideArmed = false;
+      this.jumpCanShorten = false;
+      this.events.push("pound-start");
     }
     for (const edge of this.pendingEdges.splice(0)) {
       this.jumpHeld = edge;
@@ -568,6 +607,24 @@ export class Game {
           }
           continue;
         }
+        if (
+          !p.grounded &&
+          this.coyote <= 0 &&
+          this.wallTime > 0 &&
+          this.pound === "none" &&
+          this.hurtLock === 0
+        ) {
+          // Wall jump: kick off the wall Pip is touching.
+          p.vy = JUMP * 0.95;
+          p.vx = -this.wallSide * WALL_KICK;
+          p.facing = -this.wallSide;
+          this.wallLock = 0.16;
+          this.wallTime = 0;
+          this.jumpBuffer = 0;
+          this.jumpCanShorten = true;
+          this.events.push("wall-jump");
+          continue;
+        }
         this.jumpBuffer = JUMP_BUFFER_TIME;
         if (p.grounded || this.coyote > 0)
           this.tryJump({ ...input, jump: input.jump });
@@ -592,7 +649,14 @@ export class Game {
       this.jumpCanShorten = false;
     }
     if (p.vy >= 0) this.jumpCanShorten = false;
-    if (swimming) {
+    if (this.pound !== "none" && swimming) this.pound = "none";
+    if (this.pound !== "none") {
+      if (this.pound === "hang") {
+        p.vy = 0;
+        this.poundTimer -= STEP;
+        if (this.poundTimer <= 0) this.pound = "drop";
+      } else p.vy = POUND_SPEED;
+    } else if (swimming) {
       // Holding jump is a swim stroke. Releasing it lets Pip sink gently.
       // Bubble streams add a natural upward current in every water area.
       this.liftActive = false;
@@ -639,6 +703,15 @@ export class Game {
       if (this.glideArmed && this.hurtLock === 0) p.vy = Math.min(p.vy, 180);
     }
 
+    // Sliding down a wall while pushing into it is slower.
+    if (
+      this.wallTime > 0 &&
+      !p.grounded &&
+      this.pound === "none" &&
+      direction === this.wallSide &&
+      p.vy > WALL_SLIDE
+    )
+      p.vy = WALL_SLIDE;
     // A sideways current carries Pip along while swimming.
     const drift = swimming
       ? water.reduce((sum, zone) => sum + (zone.currentX ?? 0), 0)
@@ -664,6 +737,17 @@ export class Game {
       const previousTop =
         tile.kind === "moving" ? Math.max(tile.previousY, tile.y) : tile.y;
       if (p.vy >= 0 && oldBottom <= previousTop + 1) {
+        if (
+          this.pound === "drop" &&
+          tile.kind === "brick" &&
+          !tile.rewardPower
+        ) {
+          // A ground pound smashes straight through cracked blocks.
+          tile.broken = true;
+          this.events.push("break");
+          this.awardCoins(tile.rewardCoins ?? 0);
+          continue;
+        }
         if (!p.grounded && this.airborneMin <= tile.y - 1)
           this.activateActuators(
             tile.y,
@@ -679,8 +763,17 @@ export class Game {
           this.glideArmed = false;
         }
         this.jumpCanShorten = false;
+        const pounded = this.pound === "drop";
+        if (pounded) {
+          this.pound = "none";
+          if (tile.kind !== "mushroom") {
+            this.events.push("pound");
+            this.poundShockwave(tile.y);
+          }
+        }
         if (tile.kind === "mushroom") {
-          p.vy = MUSHROOM_BOUNCE;
+          // A pound onto a mushroom launches Pip much higher.
+          p.vy = MUSHROOM_BOUNCE * (pounded ? 1.3 : 1);
           p.grounded = false;
           this.coyote = 0;
           this.jumpBuffer = 0;
@@ -857,6 +950,7 @@ export class Game {
         this.squash(enemy);
         p.y = enemy.y - p.h;
         p.vy = -440;
+        this.pound = "none";
         p.grounded = false;
         this.coyote = 0;
         this.jumpCanShorten = false;
@@ -1264,6 +1358,7 @@ export class Game {
   }
 
   private bounceOffBoss(boss: BossState) {
+    this.pound = "none";
     this.cancelFlightForBounce();
     this.player.y = boss.y - this.player.h;
     this.player.vy = -490;
@@ -1344,6 +1439,11 @@ export class Game {
       if (vx > 0) p.x = tile.x - p.w;
       else if (vx < 0) p.x = tile.x + tile.w;
       p.vx = 0;
+      // A tall wall touched in the air can be kicked off.
+      if (!p.grounded && vx !== 0 && tile.kind === "ground" && tile.h >= 60) {
+        this.wallSide = Math.sign(vx);
+        this.wallTime = WALL_GRACE;
+      }
     }
   }
 
@@ -1485,7 +1585,21 @@ export class Game {
       enemy.facing = Math.sign(enemy.vx);
   }
 
+  /** A ground pound's landing squashes bugs right beside Pip. */
+  private poundShockwave(floorY: number) {
+    const p = this.player;
+    const cx = p.x + p.w / 2;
+    for (const e of this.enemies) {
+      if (!e.alive) continue;
+      if (Math.abs(e.x + e.w / 2 - cx) < 70 && Math.abs(e.y + e.h - floorY) < 8)
+        this.squash(e);
+    }
+  }
+
   private resetMounts() {
+    this.pound = "none";
+    this.wallTime = 0;
+    this.wallLock = 0;
     this.riding = null;
     this.tongue = 0;
     this.tongueTarget = null;

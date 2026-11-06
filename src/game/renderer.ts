@@ -7,6 +7,7 @@ import {
 } from "./engine";
 import type { Rect } from "./levels";
 import { CREATURES } from "./creatures";
+import { ghostAt } from "../ghost";
 
 type Theme =
   | "meadow"
@@ -680,6 +681,31 @@ export class Renderer {
             time,
             mount.state === "fleeing",
           );
+      if (game.ghost) {
+        // The ghost of the best Timed run: a pale, see-through Pip.
+        const ghost = ghostAt(game.ghost, game.elapsed);
+        if (ghost && !ghost.done && this.visible(ghost.x, 60)) {
+          c.save();
+          c.globalAlpha = 0.32;
+          this.hero(
+            ghost.x + 14,
+            ghost.y + 38,
+            0,
+            0,
+            1,
+            true,
+            time,
+            0,
+            1,
+            "normal",
+            "moon",
+            false,
+            "none",
+            game.character,
+          );
+          c.restore();
+        }
+      }
       const player = game.player;
       const center = player.x + player.w / 2;
       // Riding Gulp, Pip sits up on its back; it hops as it runs.
@@ -740,6 +766,18 @@ export class Renderer {
       // Damage grace is visually distinct from star power and never hides Pip.
       if (player.invulnerable > 0 && game.starPowerRemaining <= 0)
         c.globalAlpha = 0.55 + (Math.sin(time * 9) + 1) * 0.18;
+      if (game.pound === "drop") {
+        // Speed lines streak above a ground pound.
+        for (const dx of [-10, 0, 10])
+          this.line(
+            [
+              [center + dx, feet - 48 * size],
+              [center + dx, feet - 80 * size],
+            ],
+            "rgba(255,255,240,.7)",
+            2.5,
+          );
+      }
       if (game.swimming && !player.grounded) {
         // Swimming: Pip leans into the stroke, legs kicking behind, and
         // straightens up as each kick fades.
@@ -5539,6 +5577,18 @@ export class Renderer {
         size: 20,
         life: 1.1,
       });
+    if (game.events.includes("pound")) {
+      this.shake = Math.max(this.shake, 0.14);
+      this.burst(pp.x + pp.w / 2, pp.y + pp.h, "#e9d9b8", 12, 110);
+    }
+    if (game.events.includes("wall-jump"))
+      this.burst(
+        pp.x + pp.w / 2 - pp.facing * 16,
+        pp.y + pp.h / 2,
+        "#f3ecd6",
+        6,
+        70,
+      );
     if (game.events.includes("boss-hit")) this.shake = 0.22;
     if (game.events.includes("boss-defeat")) this.shake = 0.4;
     if (game.events.includes("boss-start") && game.boss)
