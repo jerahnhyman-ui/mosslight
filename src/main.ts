@@ -22,6 +22,7 @@ import { moonpoolLevel } from "./game/moonpool-level";
 import { cloudGardenLevel } from "./game/cloud-garden";
 import { skySecretLevels } from "./game/sky-secrets";
 import { createThornKingRun, readyForThornKing } from "./game/boss-level";
+import { guardianArena } from "./game/guardian-replays";
 import { Renderer } from "./game/renderer";
 import { Controls } from "./controls";
 import { AudioPlayer } from "./audio";
@@ -98,6 +99,8 @@ let session: AdventureSession | null = null;
 let replaySecretLevel: Level | null = null;
 let bossOrigin: Game | null = null;
 let bossReplay = false;
+/** The arena for a journal guardian rematch; null means the Thorn King. */
+let replayArena: Level | null = null;
 const seenTutorials = new Set<string>();
 const modeName = (value: PlayMode) =>
   ({ classic: "Classic", relaxed: "Relaxed", timed: "Timed" })[value];
@@ -185,9 +188,9 @@ $("#app").innerHTML = `
   <div class="keyboard-hint"><span><kbd>←</kbd><kbd>→</kbd> move</span><span><kbd>SPACE</kbd> jump</span><span><kbd>P</kbd> pause</span></div>
 </main>
 <dialog id="menu-dialog" aria-labelledby="menu-title"><button class="round-button menu-close" aria-label="Close game menu">${icon("close")}</button><p class="eyebrow">THE FIREFLY TRAILS</p><h2 id="menu-title">Choose your adventure.</h2><p class="dialog-description">Rescue fireflies. Bring the forest back to light.</p><div id="forest-map" aria-label="Forest world map"><svg class="map-trails map-desktop" viewBox="0 0 680 255" preserveAspectRatio="none" aria-hidden="true"><path class="map-route" d="M110 145Q210 10 340 100T570 145"/><path class="map-route-light" d="M110 145Q210 10 340 100T570 145"/></svg><svg class="map-trails map-mobile" viewBox="0 0 320 480" preserveAspectRatio="none" aria-hidden="true"><path class="map-route" d="M95 80C280 40 290 230 230 240S30 290 95 400"/><path class="map-route-light" d="M95 80C280 40 290 230 230 240S30 290 95 400"/></svg><div class="map-decoration" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div><div id="menu-worlds"></div></div><div class="forest-progress"><div><strong id="restoration-count"></strong><span id="journey-progress"></span></div><div class="restoration-track"><span></span></div><p id="restoration-caption"></p></div><div class="adventure-choices"><div class="mode-choice"><label for="play-mode">Adventure mode</label><select id="play-mode"><option value="classic">Classic · 3 lives</option><option value="relaxed">Relaxed · unlimited retries</option><option value="timed">Timed · race your best</option></select><small id="mode-description"></small></div><button class="grove-entry" id="visit-grove">${icon("leaf")}<span><strong>Visit your home grove</strong><small id="grove-summary"></small></span>${icon("arrow")}</button></div><div class="journal-list" id="journal-list"></div><div class="challenge-list" id="challenge-list"></div><div class="menu-settings"><button class="menu-sound"></button><button class="menu-controls">${icon("settings")} Settings</button><button class="menu-help">${icon("help")} How to play</button></div></dialog>
-<dialog id="help-dialog" aria-labelledby="help-title"><button class="round-button dialog-close" aria-label="Close instructions">${icon("close")}</button><p class="eyebrow">MEET YOUR MOVES</p><h2 id="help-title">Little hero. Big leaps.</h2><div class="guide-grid"><div><span class="guide-symbol">↔</span><h3>Move & jump</h3><p>Slide your left thumb to steer. Tap jump for a short hop; hold for a higher leap. Keyboard: arrows or A/D, and Space. Gamepad: stick and A. Make the touch controls your own in Settings.</p></div><div><span class="guide-symbol diamond-guide">${icon("diamond")}</span><h3>Grow & discover</h3><p>Jump into a seed-marked block from below, then collect the golden Sunseed it releases to grow. Big Pip can break cracked blocks to discover coin caches. Collect another Sunseed while big to store one in the HUD. A hit releases it; catch it to grow again. A hit while small costs a life.</p></div><div><span class="guide-symbol gold">★</span><h3>Star power</h3><p>Jump into a star-marked block from below for ${STAR_POWER_DURATION} seconds of protection from bugs. Touch bugs to squash them while powered. Falling in a gap still costs a life.</p></div><div><span class="guide-symbol">${icon("firefly")}</span><h3>Rescue the light</h3><p>Find three hidden fireflies in each world. Every rescue is saved, even if you lose your lives. Their light restores the forest and welcomes residents to your playable home grove. The first three worlds each have a challenge room unlocked by rescuing all three fireflies.</p></div><div><span class="guide-symbol coral">${icon("pip")}</span><h3>Make every life count</h3><p>Start with ${MAX_LIVES} lives. Every ${COINS_PER_LIFE} coins earns one life, up to ${MAX_LIVES}. A lost life returns small Pip to the latest checkpoint. Zero lives ends a Classic or Timed run. Relaxed mode gives unlimited checkpoint retries.</p></div><div><span class="guide-symbol">↑</span><h3>A living forest</h3><p>Mushrooms bounce, leaves carry you, and cloud bridges crumble after you land. Jump on beetles and grasshoppers to squash them. Charging beetles pause and flash before rushing—time your jump!</p></div><div><span class="guide-symbol">${icon("leaf")}</span><h3>Wake the garden</h3><p>Walk near sleeping flowers and curled leaves. Pip’s glow opens new footholds. Follow golden cracks, footprints, and moving grass to discover secrets.</p></div><div><span class="guide-symbol coral">${icon("pip")}</span><h3>Meet the guardians</h3><p>Watch each guardian’s warning and avoid the attack. When it rests, jump on its back. The first three guardian sub-bosses need four hits. At the end of Windmill Garden, Briarheart launches thorn seeds; jump over them, then stomp its glowing crown. A checkpoint awaits before the fight. In Reedwater Marsh, Gloam the Bog Toad shows where it will land; move away and jump its ripples.</p></div><div><span class="guide-symbol gold">${icon("leaf")}</span><h3>A home for your light</h3><p>Every collected coin is saved for outfits and grove decorations, even at full lives. Visit your home grove from the world map. Cosmetics never change Pip’s powers.</p></div><div><span class="guide-symbol">➶</span><h3>Take flight</h3><p>Jump into a feather-marked block from below to earn a Wind Feather. Jump, let go, then hold Jump again to rise. Let go to glide. Land briefly to refill. A lost life drops the feather; feather blocks can be used again after a retry.</p></div><div><span class="guide-symbol">☁</span><h3>Find the cloud garden</h3><p>Look above the Home Grove for soft cloud ledges. Use a Wind Feather to climb, and land on each ledge to recharge before flying higher.</p></div><div><span class="guide-symbol">≈</span><h3>Explore Moonpool</h3><p>Find the Moonpool entrance in the Home Grove. Hold Jump to swim up, release to sink, and steer left or right. Follow the rising bubbles, swim around the rocks, and explore the high cove.</p></div><div><span class="guide-symbol">✿</span><h3>Find hidden paths</h3><p>Ride moving platforms and follow the garden’s hidden routes. At a glowing portal, stand still and press Jump when its prompt appears. Discover the beehive to replay it from your journal.</p></div></div><button class="primary-button close-guide">Got it ${icon("arrow")}</button></dialog>
+<dialog id="help-dialog" aria-labelledby="help-title"><button class="round-button dialog-close" aria-label="Close instructions">${icon("close")}</button><p class="eyebrow">MEET YOUR MOVES</p><h2 id="help-title">Little hero. Big leaps.</h2><div class="guide-grid"><div><span class="guide-symbol">↔</span><h3>Move & jump</h3><p>Slide your left thumb to steer. Tap jump for a short hop; hold for a higher leap. Keyboard: arrows or A/D, and Space. Gamepad: stick and A. Make the touch controls your own in Settings.</p></div><div><span class="guide-symbol diamond-guide">${icon("diamond")}</span><h3>Grow & discover</h3><p>Jump into a seed-marked block from below, then collect the golden Sunseed it releases to grow. Big Pip can break cracked blocks to discover coin caches. Collect another Sunseed while big to store one in the HUD. A hit releases it; catch it to grow again. A hit while small costs a life.</p></div><div><span class="guide-symbol gold">★</span><h3>Star power</h3><p>Jump into a star-marked block from below for ${STAR_POWER_DURATION} seconds of protection from bugs. Touch bugs to squash them while powered. Falling in a gap still costs a life.</p></div><div><span class="guide-symbol">${icon("firefly")}</span><h3>Rescue the light</h3><p>Find three hidden fireflies in each world. Every rescue is saved, even if you lose your lives. Their light restores the forest and welcomes residents to your playable home grove. Every world has a timed challenge room, unlocked by rescuing all three of its fireflies.</p></div><div><span class="guide-symbol coral">${icon("pip")}</span><h3>Make every life count</h3><p>Start with ${MAX_LIVES} lives. Every ${COINS_PER_LIFE} coins earns one life, up to ${MAX_LIVES}. A lost life returns small Pip to the latest checkpoint. Zero lives ends a Classic or Timed run. Relaxed mode gives unlimited checkpoint retries.</p></div><div><span class="guide-symbol">↑</span><h3>A living forest</h3><p>Mushrooms bounce, leaves carry you, and cloud bridges crumble after you land. Jump on beetles and grasshoppers to squash them. Charging beetles pause and flash before rushing—time your jump!</p></div><div><span class="guide-symbol">${icon("leaf")}</span><h3>Wake the garden</h3><p>Walk near sleeping flowers and curled leaves. Pip’s glow opens new footholds. Follow golden cracks, footprints, and moving grass to discover secrets.</p></div><div><span class="guide-symbol coral">${icon("pip")}</span><h3>Meet the guardians</h3><p>Watch each guardian’s warning and avoid the attack. When it rests, jump on its back. The first three guardian sub-bosses need four hits. At the end of Windmill Garden, Briarheart launches thorn seeds; jump over them, then stomp its glowing crown. A checkpoint awaits before the fight. In Reedwater Marsh, Gloam the Bog Toad shows where it will land; move away and jump its ripples.</p></div><div><span class="guide-symbol gold">${icon("leaf")}</span><h3>A home for your light</h3><p>Every collected coin is saved for outfits and grove decorations, even at full lives. Visit your home grove from the world map. Cosmetics never change Pip’s powers.</p></div><div><span class="guide-symbol">➶</span><h3>Take flight</h3><p>Jump into a feather-marked block from below to earn a Wind Feather. Jump, let go, then hold Jump again to rise. Let go to glide. Land briefly to refill. A lost life drops the feather; feather blocks can be used again after a retry.</p></div><div><span class="guide-symbol">☁</span><h3>Find the cloud garden</h3><p>Look above the Home Grove for soft cloud ledges. Use a Wind Feather to climb, and land on each ledge to recharge before flying higher.</p></div><div><span class="guide-symbol">≈</span><h3>Explore Moonpool</h3><p>Find the Moonpool entrance in the Home Grove. Hold Jump to swim up, release to sink, and steer left or right. Follow the rising bubbles, swim around the rocks, and explore the high cove.</p></div><div><span class="guide-symbol">✿</span><h3>Find hidden paths</h3><p>Ride moving platforms and follow the garden’s hidden routes. At a glowing portal, stand still and press Jump when its prompt appears. Discover the beehive to replay it from your journal.</p></div></div><button class="primary-button close-guide">Got it ${icon("arrow")}</button></dialog>
 <dialog id="grove-dialog" aria-labelledby="grove-title"><button class="round-button" id="grove-close" aria-label="Close grove shop">${icon("close")}</button><p class="eyebrow">A LITTLE PLACE TO CALL HOME</p><h2 id="grove-title">Make the garden yours.</h2><p class="dialog-description">Your coins decorate the grove and dress Pip. Every rescue brings a new neighbor home.</p><div class="grove-wallet"><strong id="wallet-count"></strong><span id="lifetime-count"></span></div><div id="shop-items" class="shop-items"></div><p id="shop-status" role="status"></p><button class="primary-button" id="grove-done">Back to the grove ${icon("arrow")}</button></dialog>
-<dialog id="settings-dialog" aria-labelledby="settings-title"><button class="round-button" id="settings-close" aria-label="Close settings">${icon("close")}</button><p class="eyebrow">PLAY YOUR WAY</p><h2 id="settings-title">Made for your thumbs.</h2><p class="dialog-description">Your choices stay saved. Controls fit safely within your screen.</p><div class="control-preview" aria-label="Touch control layout preview"><span class="preview-label">LAYOUT PREVIEW</span><div class="preview-pip">${icon("pip")}</div><div class="preview-controls"><span class="preview-dpad">${icon("left")}${icon("right")}</span><span class="preview-jump">${icon("jump")}</span></div></div><div class="control-settings"><label for="control-size"><span>Button size</span><select id="control-size"><option value="0.85">Compact</option><option value="1">Standard</option><option value="1.15">Large</option><option value="1.3">Extra large</option></select></label><label for="control-inset"><span>Move inward <output id="inset-value"></output></span><input id="control-inset" type="range" min="0" max="40" step="5" aria-label="Move controls inward" /></label><label for="control-height"><span>Move upward <output id="height-value"></output></span><input id="control-height" type="range" min="0" max="80" step="8" aria-label="Move controls upward" /></label><label class="switch-row" for="control-swap"><span>Jump on the left</span><input id="control-swap" type="checkbox" role="switch" /></label><button id="controls-reset" class="text-button">Reset control layout</button></div><div class="audio-settings"><label class="switch-row" for="sfx-toggle"><span>Sound effects</span><input id="sfx-toggle" type="checkbox" role="switch" /></label><label class="switch-row" for="music-toggle"><span>Music</span><input id="music-toggle" type="checkbox" role="switch" /></label><label class="switch-row" for="haptics-toggle"><span>Touch feedback<small>Gentle vibrations on supported devices</small></span><input id="haptics-toggle" type="checkbox" role="switch" /></label><label class="switch-row" for="messages-toggle"><span>Game messages &amp; tips<small>Pop-up messages, and a pause card the first time each tip appears</small></span><input id="messages-toggle" type="checkbox" role="switch" /></label></div><button class="primary-button" id="settings-done">Done ${icon("arrow")}</button></dialog>
+<dialog id="settings-dialog" aria-labelledby="settings-title"><button class="round-button" id="settings-close" aria-label="Close settings">${icon("close")}</button><p class="eyebrow">PLAY YOUR WAY</p><h2 id="settings-title">Made for your thumbs.</h2><p class="dialog-description">Your choices stay saved. Controls fit safely within your screen.</p><div class="control-preview" aria-label="Touch control layout preview"><span class="preview-label">LAYOUT PREVIEW</span><div class="preview-pip">${icon("pip")}</div><div class="preview-controls"><span class="preview-dpad">${icon("left")}${icon("right")}</span><span class="preview-jump">${icon("jump")}</span></div></div><div class="control-settings"><label for="control-size"><span>Button size</span><select id="control-size"><option value="0.85">Compact</option><option value="1">Standard</option><option value="1.15">Large</option><option value="1.3">Extra large</option></select></label><label for="control-inset"><span>Move inward <output id="inset-value"></output></span><input id="control-inset" type="range" min="0" max="40" step="5" aria-label="Move controls inward" /></label><label for="control-height"><span>Move upward <output id="height-value"></output></span><input id="control-height" type="range" min="0" max="80" step="8" aria-label="Move controls upward" /></label><label class="switch-row" for="control-swap"><span>Jump on the left</span><input id="control-swap" type="checkbox" role="switch" /></label><button id="controls-reset" class="text-button">Reset control layout</button></div><div class="audio-settings"><label class="switch-row" for="sfx-toggle"><span>Sound effects</span><input id="sfx-toggle" type="checkbox" role="switch" /></label><label class="switch-row" for="music-toggle"><span>Music</span><input id="music-toggle" type="checkbox" role="switch" /></label><label class="switch-row" for="haptics-toggle"><span>Touch feedback<small>Gentle vibrations on supported devices</small></span><input id="haptics-toggle" type="checkbox" role="switch" /></label><label for="game-speed"><span>Game speed<small>Slower speeds give more time to react</small></span><select id="game-speed"><option value="1">Normal</option><option value="0.85">Gentle</option><option value="0.7">Slow</option></select></label><label class="switch-row" for="messages-toggle"><span>Game messages &amp; tips<small>Pop-up messages, and a pause card the first time each tip appears</small></span><input id="messages-toggle" type="checkbox" role="switch" /></label></div><button class="primary-button" id="settings-done">Done ${icon("arrow")}</button></dialog>
 `;
 const app = $(".game-app");
 const canvas = $<HTMLCanvasElement>("#game");
@@ -465,13 +468,42 @@ function updateJournal() {
       return `<button type="button" class="challenge-entry" data-secret="${id}" ${record.discovered ? "" : "disabled"}><span><strong>${record.discovered ? place.level.name : "Undiscovered place"}</strong><small>${record.discovered ? (record.completed ? "Explored · visit again" : "Discovered · visit again") : place.hint}</small></span><span>☁</span></button>`;
     }).join("") +
     `<button class="challenge-entry" id="journal-hoops" ${save.unlocks.windFeatherDiscovered ? "" : "disabled"}><span><strong>Petal Post</strong><small>${save.unlocks.windFeatherDiscovered ? (hoops.best ? `${hoops.bestMedal === "none" ? "Practice" : hoops.bestMedal + " medal"} · best ${hoops.best.score} points` : "A little flight. Sixteen flower hoops.") : "Bump a feather block near a trail entrance"}</small></span><span>✿</span></button>` +
-    `<button class="challenge-entry" id="journal-thorn-king" ${bossUnlocked ? "" : "disabled"}><span><strong>The Thorn King's Grove</strong><small>${bossUnlocked ? "Replay the major boss level" : "Finish Windmill Garden to unlock a replay"}</small></span><span>♛</span></button>`;
+    `<button class="challenge-entry" id="journal-thorn-king" ${bossUnlocked ? "" : "disabled"}><span><strong>The Thorn King's Grove</strong><small>${bossUnlocked ? "Replay the major boss level" : "Finish Windmill Garden to unlock a replay"}</small></span><span>♛</span></button>` +
+    `<h3>Guardian rematches</h3>` +
+    levels
+      .map((level, index) => {
+        if (!level.boss) return "";
+        const beaten = Object.values(save.progress[index]?.garden ?? {}).some(
+          (record) => record.completed,
+        );
+        return `<button class="challenge-entry" data-guardian="${index}" ${beaten ? "" : "disabled"}><span><strong>${level.boss.name}</strong><small>${beaten ? `Rematch the ${level.name} guardian` : `Finish ${level.name} to unlock a rematch`}</small></span><span aria-hidden="true">${beaten ? "→" : "◇"}</span></button>`;
+      })
+      .join("");
   $("#journal-hive").addEventListener("click", replayBeehive);
   $("#journal-hoops").addEventListener("click", playPetalPost);
+  document
+    .querySelectorAll<HTMLButtonElement>("[data-guardian]")
+    .forEach((button) =>
+      button.addEventListener("click", () => {
+        const index = Number(button.dataset.guardian);
+        const arena = levels[index] && guardianArena(levels[index]);
+        if (!arena || button.disabled) return;
+        selected = index;
+        bossReplay = true;
+        replayArena = arena;
+        bossOrigin = null;
+        runKind = "boss";
+        menuDialog.close();
+        groveDialog.close();
+        coinLedger = new RunCoinLedger();
+        start();
+      }),
+    );
   $("#journal-thorn-king").addEventListener("click", () => {
     if (!bossUnlocked) return;
     selected = 3;
     bossReplay = true;
+    replayArena = null;
     bossOrigin = null;
     runKind = "boss";
     menuDialog.close();
@@ -621,6 +653,7 @@ function updateSound() {
   $<HTMLInputElement>("#music-toggle").checked = audio.musicEnabled;
   $<HTMLInputElement>("#haptics-toggle").checked = audio.hapticsEnabled;
   $<HTMLInputElement>("#messages-toggle").checked = save.messages;
+  $<HTMLSelectElement>("#game-speed").value = String(save.gameSpeed);
 }
 function chooseWorld(index: number) {
   if (!worldUnlocked(save, index)) return;
@@ -636,7 +669,9 @@ function chooseWorld(index: number) {
 }
 function start() {
   if (runKind === "boss") {
-    game = createThornKingRun(save.playMode, bossOrigin ?? undefined);
+    game = replayArena
+      ? new Game(0, { level: replayArena, mode: save.playMode })
+      : createThornKingRun(save.playMode, bossOrigin ?? undefined);
     // Running out of lives in the boss level retries the arena, not the trail.
     game.lives = MAX_LIVES;
     dressGame(game);
@@ -794,7 +829,7 @@ function updateUI() {
     overlay.innerHTML = `<div class="title-content"><p class="eyebrow"><span class="eyebrow-dot"></span> THE SUNSEED TRAILS</p><h1>A little hero.<br><span>A wild adventure.</span></h1><p class="title-description">Find a Wind Feather. Take flight.<br>Bring the garden’s tiny lights back home.</p><button class="primary-button" id="start-button">${icon("play")}<span>Play ${game.level.name}</span></button><div class="title-footnote">${icon("firefly")} ${modeName(save.playMode)} · 3 fireflies · a garden guardian</div></div><div class="hero-callout"><span>Hey, I’m Pip!</span><svg viewBox="0 0 70 50" aria-hidden="true"><path d="M5 5q42-6 48 32m-12-7 13 10 7-15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg></div>`;
     $("#start-button").addEventListener("click", start);
   } else if (mode === "boss-intro") {
-    overlay.innerHTML = `<div class="result-panel"><p class="eyebrow">BOSS LEVEL</p><h2>The Thorn King's Grove</h2><p>Briarheart waits ahead. A checkpoint and power blocks are ready before the fight.</p><button class="primary-button" id="boss-start">Enter the grove ${icon("arrow")}</button><div class="panel-links"><button id="home-button">Choose a world</button></div></div>`;
+    overlay.innerHTML = `<div class="result-panel"><p class="eyebrow">${replayArena ? "GUARDIAN REMATCH" : "BOSS LEVEL"}</p><h2>${game.level.name}</h2><p>${replayArena ? `${game.boss?.name ?? "The guardian"} waits ahead. Power blocks are ready before the fight.` : "Briarheart waits ahead. A checkpoint and power blocks are ready before the fight."}</p><button class="primary-button" id="boss-start">${replayArena ? "Start the rematch" : "Enter the grove"} ${icon("arrow")}</button><div class="panel-links"><button id="home-button">Choose a world</button></div></div>`;
     $("#boss-start").addEventListener("click", resume);
     $("#home-button").addEventListener("click", showMenu);
   } else if (mode === "tip") {
@@ -825,7 +860,7 @@ function updateUI() {
     $("#petal-grove").addEventListener("click", visitGrove);
     $("#petal-menu").addEventListener("click", showMenu);
   } else if (mode === "won" && runKind === "boss" && bossReplay) {
-    overlay.innerHTML = `<div class="result-panel"><p class="eyebrow">BOSS LEVEL COMPLETE</p><h2>The Thorn King rests.</h2><p>Briarheart has been defeated again.</p><button class="primary-button" id="restart-button">Play boss level again ${icon("arrow")}</button><div class="panel-links"><button id="home-button">World map</button></div></div>`;
+    overlay.innerHTML = `<div class="result-panel"><p class="eyebrow">${replayArena ? "REMATCH WON" : "BOSS LEVEL COMPLETE"}</p><h2>${replayArena ? `${game.boss?.name.split(",")[0] ?? "The guardian"} rests.` : "The Thorn King rests."}</h2><p>${replayArena ? `${game.boss?.name ?? "The guardian"} has been defeated again.` : "Briarheart has been defeated again."}</p><button class="primary-button" id="restart-button">${replayArena ? "Rematch again" : "Play boss level again"} ${icon("arrow")}</button><div class="panel-links"><button id="home-button">World map</button></div></div>`;
     bindPanel();
   } else if (mode === "won") {
     const rescued = save.progress[selected].fireflies;
@@ -1205,6 +1240,12 @@ for (const selector of ["#sfx-toggle", "#music-toggle", "#haptics-toggle"]) {
     updateSound();
   });
 }
+$("#game-speed").addEventListener("change", () => {
+  save.gameSpeed = Number(
+    $<HTMLSelectElement>("#game-speed").value,
+  ) as typeof save.gameSpeed;
+  writeSave(save);
+});
 $("#messages-toggle").addEventListener("change", () => {
   save.messages = $<HTMLInputElement>("#messages-toggle").checked;
   if (!save.messages) toastUntil = 0;
@@ -1221,7 +1262,9 @@ const reducedMotion = window.matchMedia(
   "(prefers-reduced-motion: reduce)",
 ).matches;
 function frame(now: number) {
-  let delta = (now - last) / 1000;
+  // Game time runs at the chosen speed; records use game time, so a slower
+  // speed never changes how a run is scored.
+  let delta = ((now - last) / 1000) * save.gameSpeed;
   last = now;
   let input = controls.read();
   if (mode === "tip" && input.jumpPressed) continueFromTip();
@@ -1413,6 +1456,7 @@ function frame(now: number) {
       saveRescuedFireflies();
       bossOrigin = game;
       bossReplay = false;
+      replayArena = null;
       const bossGame = createThornKingRun(game.mode, game);
       session = null;
       changeScene(bossGame, "boss");
