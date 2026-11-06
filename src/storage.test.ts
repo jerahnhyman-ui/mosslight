@@ -229,7 +229,13 @@ describe("adventure progress", () => {
     save.sound = false;
     save.music = true;
     save.haptics = false;
-    save.controls = { size: 1.15, inset: 30, height: 40, swapped: true };
+    save.controls = {
+      size: 1.3,
+      inset: 30,
+      height: 72,
+      swapped: true,
+      layout: 2,
+    };
     save.progress[1].adventureCompleted = true;
     save.progress[1].adventureBestTime = 108.7;
     writeSave(save);
@@ -248,10 +254,11 @@ describe("adventure progress", () => {
     );
     const save = readSave();
     expect(save.controls).toEqual({
-      size: 1,
+      size: 1.15,
       inset: 0,
-      height: 40,
+      height: 80,
       swapped: false,
+      layout: 2,
     });
     expect(save.progress[0].fireflies).toEqual([0, 2]);
     expect(save.progress[0].adventureBestTime).toBeNull();
@@ -611,5 +618,45 @@ describe("Reedwater Marsh progress", () => {
     recordFireflies(save.progress[4]!, [1]);
     writeSave(save);
     expect(readSave().progress[4]!.fireflies).toEqual([1]);
+  });
+});
+
+describe("comfort settings from player feedback", () => {
+  it("moves an untouched old control layout to the larger default, keeping custom ones", () => {
+    items.set(
+      "mosslight-save-v2",
+      JSON.stringify({
+        controls: { size: 1, inset: 0, height: 0, swapped: false },
+        progress: [],
+      }),
+    );
+    expect(readSave().controls).toEqual(DEFAULT_CONTROLS);
+    items.clear();
+    items.set(
+      "mosslight-save-v2",
+      JSON.stringify({
+        controls: { size: 0.85, inset: 10, height: 16, swapped: true },
+        progress: [],
+      }),
+    );
+    expect(readSave().controls).toEqual({
+      size: 0.85,
+      inset: 10,
+      height: 16,
+      swapped: true,
+      layout: 2,
+    });
+  });
+
+  it("remembers the tip-card setting and which tips were shown", () => {
+    const save = readSave();
+    expect(save.tipCards).toBe(true);
+    expect(save.tipsSeen).toEqual([]);
+    save.tipCards = false;
+    save.tipsSeen.push("world.sunlit-meadow:0");
+    writeSave(save);
+    const loaded = readSave();
+    expect(loaded.tipCards).toBe(false);
+    expect(loaded.tipsSeen).toEqual(["world.sunlit-meadow:0"]);
   });
 });

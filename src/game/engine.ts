@@ -82,6 +82,8 @@ const SHORT_JUMP = -370;
 const MUSHROOM_BOUNCE = -820;
 const MAX_SPEED = 300;
 const COYOTE_TIME = 0.12;
+/** Walking pace or slower lets Pip use a portal; a full run passes through. */
+const PORTAL_MAX_SPEED = 90;
 const JUMP_BUFFER_TIME = 0.16;
 const overlaps = (a: Rect, b: Rect) =>
   a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
@@ -465,7 +467,11 @@ export class Game {
         this.liftActive = false;
         this.flightNeedsRelease = false;
       } else {
-        if (this.portalReady && p.grounded && Math.abs(p.vx) <= 20) {
+        if (
+          this.portalReady &&
+          p.grounded &&
+          Math.abs(p.vx) <= PORTAL_MAX_SPEED
+        ) {
           this.requestedPortal = this.portalReady;
           this.portalReady = null;
           this.portalTicks = 0;
@@ -584,6 +590,13 @@ export class Game {
           p.y = tile.y + tile.h;
           p.vy = 0;
           if (
+            !tile.rewardUsed &&
+            tile.rewardPower === "feather" &&
+            this.hasWindFeather
+          ) {
+            // Tell the player why nothing came out, rather than looking broken.
+            this.events.push("reward-full");
+          } else if (
             !tile.rewardUsed &&
             (tile.rewardPower !== "feather" || !this.hasWindFeather)
           ) {
@@ -928,9 +941,11 @@ export class Game {
       this.portalBlocked = false;
       this.portalTicks = 0;
       this.portalReady = null;
-    } else if (!this.portalBlocked && Math.abs(p.vx) <= 20) {
+    } else if (!this.portalBlocked && Math.abs(p.vx) <= PORTAL_MAX_SPEED) {
+      // A short pause inside the portal is enough. A resting thumb on the
+      // touch pad still counts, but running straight through does not.
       this.portalTicks++;
-      this.portalReady = this.portalTicks >= 42 ? near.target : null;
+      this.portalReady = this.portalTicks >= 12 ? near.target : null;
     } else {
       this.portalTicks = 0;
       this.portalReady = null;

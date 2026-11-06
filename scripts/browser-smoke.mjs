@@ -516,6 +516,18 @@ try {
     headless: true,
     args: ["--no-sandbox"],
   });
+  // New tips pause play on a card. These routes test movement, not tips, so
+  // continue past each card as soon as it appears.
+  const openPage = browser.newPage.bind(browser);
+  browser.newPage = async (...options) => {
+    const page = await openPage(...options);
+    await page.addInitScript(() => {
+      new MutationObserver(() =>
+        document.getElementById("tip-continue")?.click(),
+      ).observe(document, { childList: true, subtree: true });
+    });
+    return page;
+  };
   await checkFlightCamera(browser);
   mkdirSync("artifacts", { recursive: true });
   // Fresh installations can discover flight without first beating a guardian.
@@ -1194,7 +1206,7 @@ try {
   await openSettings(settings);
   await expect(settings.locator("#control-size")).toHaveValue("1.15");
   await expect(settings.locator("#control-inset")).toHaveValue("40");
-  await expect(settings.locator("#control-height")).toHaveValue("40");
+  await expect(settings.locator("#control-height")).toHaveValue("80");
   await expect(settings.locator("#control-swap")).toBeChecked();
   await expect(settings.locator("#music-toggle")).not.toBeChecked();
   await expect(settings.locator("#haptics-toggle")).not.toBeChecked();

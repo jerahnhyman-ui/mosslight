@@ -218,11 +218,12 @@ function skySecret(
         w: 80,
         target: "return",
       },
+      // The exit is the glowing gate itself, so reaching it is enough.
       {
         id: `${target}.return.exit`,
-        x: 2160,
+        x: 2030,
         y: 430,
-        w: 90,
+        w: 100,
         target: "return",
         requires: "completion",
       },

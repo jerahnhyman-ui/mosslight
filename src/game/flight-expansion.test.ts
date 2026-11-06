@@ -65,11 +65,11 @@ describe("wind feather and expansion simulation", () => {
     expect(g.puzzleState.hiveDiscovered).toBe(false);
   });
 
-  it("arms a portal only after a stationary wait and consumes a fresh jump", () => {
+  it("arms a portal only after a short pause and consumes a fresh jump", () => {
     const g = new Game(0, { level: beehiveLevel });
     g.player.x = 145;
     tick(g, idle, 3);
-    tick(g, idle, 35);
+    tick(g, idle, 5);
     expect(g.portalReady).toBeNull();
     tick(g, idle, 10);
     expect(g.portalReady).toBe("return");

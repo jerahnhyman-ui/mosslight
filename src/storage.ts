@@ -107,10 +107,12 @@ export interface Progress {
   garden: Record<PlayMode, RunRecord>;
 }
 export interface TouchSettings {
-  size: 0.85 | 1 | 1.15;
+  size: 0.85 | 1 | 1.15 | 1.3;
   inset: number;
   height: number;
   swapped: boolean;
+  /** 2 = the larger, higher default layout. Older layouts lack it. */
+  layout?: 2;
 }
 export interface HoopResult {
   score: number;
@@ -179,12 +181,18 @@ export interface Save {
     seedStack: { bestScore: number | null; bestLines: number | null };
   };
   claimedRewards: string[];
+  /** Pause and show a large card the first time each tip appears. */
+  tipCards: boolean;
+  /** Tips already shown as a card on this device ("level:index"). */
+  tipsSeen: string[];
 }
+/** Larger, higher thumb controls: players found the old ones small and low. */
 export const DEFAULT_CONTROLS: TouchSettings = {
-  size: 1,
+  size: 1.15,
   inset: 0,
-  height: 0,
+  height: 16,
   swapped: false,
+  layout: 2,
 };
 export const SAVE_KEY = "mosslight-save-v3";
 export const WORLD_IDS = [
@@ -236,6 +244,8 @@ const blank = (): Save => ({
     seedStack: { bestScore: null, bestLines: null },
   },
   claimedRewards: [],
+  tipCards: true,
+  tipsSeen: [],
   progress: Array.from({ length: WORLD_IDS.length }, () => ({
     completed: false,
     stars: 0,
@@ -266,7 +276,7 @@ const readRecord = (value: unknown): RunRecord => {
 };
 const distance = (value: unknown) =>
   typeof value === "number" && Number.isFinite(value)
-    ? Math.round(Math.max(0, Math.min(40, value)))
+    ? Math.round(Math.max(0, Math.min(80, value)))
     : 0;
 export function rescuedIndices(value: unknown): number[] {
   return Array.isArray(value)
@@ -394,14 +404,35 @@ export function readSave(): Save {
     });
     if (raw.controls && typeof raw.controls === "object") {
       defaults.controls = {
-        size: [0.85, 1, 1.15].includes(raw.controls.size)
+        size: [0.85, 1, 1.15, 1.3].includes(raw.controls.size)
           ? raw.controls.size
-          : 1,
+          : DEFAULT_CONTROLS.size,
         inset: distance(raw.controls.inset),
         height: distance(raw.controls.height),
         swapped: raw.controls.swapped === true,
+        layout: 2,
       };
+      // A save still on the old untouched default moves to the new one;
+      // any layout the player customised is kept.
+      if (
+        raw.controls.layout !== 2 &&
+        raw.controls.size === 1 &&
+        !raw.controls.inset &&
+        !raw.controls.height
+      ) {
+        defaults.controls.size = DEFAULT_CONTROLS.size;
+        defaults.controls.height = DEFAULT_CONTROLS.height;
+      }
     }
+    defaults.tipCards = raw.tipCards !== false;
+    if (Array.isArray(raw.tipsSeen))
+      defaults.tipsSeen = [
+        ...new Set(
+          raw.tipsSeen.filter(
+            (id: unknown) => typeof id === "string" && id.length < 80,
+          ),
+        ),
+      ].slice(0, 500) as string[];
     if (version === 3) {
       defaults.unlocks.windFeatherDiscovered =
         raw.unlocks?.windFeatherDiscovered === true;
