@@ -276,6 +276,9 @@ const effects: Record<string, number[]> = {
   "combo-5": [784, 988, 1319],
   "firefly-near": [1568],
   "swim-stroke": [300, 380],
+  "pound-start": [520, 390],
+  pound: [140, 90, 70],
+  "wall-jump": [360, 560],
   flutter: [440, 494, 440],
   tongue: [400, 260],
   // Gulp the frog: a happy croak, a quick tongue snap, and a startled hop.

@@ -107,13 +107,13 @@ function ridePad(g: Game, id: string, boardAt: number, leaveAt: number) {
 /** Travel the main trail to the guardian's bank. */
 function runTrail(g: Game) {
   walk(g, 1250);
-  ridePad(g, "marsh.lily.ford", 1290, 1530);
+  ridePad(g, "marsh.lily.ford", 1280, 1540);
   jump(g, 1660, 430);
   walk(g, 2200);
   for (const [x, y] of [
-    [2330, 390],
-    [2500, 370],
-    [2670, 390],
+    [2350, 390],
+    [2530, 360],
+    [2710, 390],
     [2860, 430],
   ] as const)
     jump(g, x, y);
@@ -135,7 +135,7 @@ function runTrail(g: Game) {
   walk(g, 8150, 490);
   jump(g, 8400, 430);
   walk(g, 9960);
-  ridePad(g, "marsh.lily.reeds", 9990, 10225);
+  ridePad(g, "marsh.lily.reeds", 9985, 10235);
   jump(g, 10340, 430);
   walk(g, MARSH_FINAL_CHECKPOINT + 20);
 }
@@ -246,13 +246,13 @@ describe("Reedwater Marsh", () => {
       level: { ...marshLevel, enemies: [], mounts: [] },
     });
     walk(g, 1250);
-    ridePad(g, "marsh.lily.ford", 1290, 1530);
+    ridePad(g, "marsh.lily.ford", 1280, 1540);
     jump(g, 1660, 430);
     walk(g, 2200);
     for (const [x, y] of [
-      [2330, 390],
-      [2500, 370],
-      [2670, 390],
+      [2350, 390],
+      [2530, 360],
+      [2710, 390],
       [2860, 430],
     ] as const)
       jump(g, x, y);
@@ -269,13 +269,13 @@ describe("Reedwater Marsh", () => {
       level: { ...marshLevel, enemies: [], mounts: [] },
     });
     walk(g, 1250);
-    ridePad(g, "marsh.lily.ford", 1290, 1530);
+    ridePad(g, "marsh.lily.ford", 1280, 1540);
     jump(g, 1660, 430);
     walk(g, 2200);
     for (const [x, y] of [
-      [2330, 390],
-      [2500, 370],
-      [2670, 390],
+      [2350, 390],
+      [2530, 360],
+      [2710, 390],
       [2860, 430],
     ] as const)
       jump(g, x, y);

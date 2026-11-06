@@ -23,6 +23,7 @@ import { cloudGardenLevel } from "./game/cloud-garden";
 import { skySecretLevels } from "./game/sky-secrets";
 import { createThornKingRun, readyForThornKing } from "./game/boss-level";
 import { guardianArena } from "./game/guardian-replays";
+import { GhostRecorder, loadGhost, saveGhost } from "./ghost";
 import { Renderer } from "./game/renderer";
 import { Controls } from "./controls";
 import { AudioPlayer } from "./audio";
@@ -339,6 +340,45 @@ function forestRestoration() {
     (levels.length * 4)
   );
 }
+/** Centre of each world's island inside the map, in map coordinates. */
+function mapNodes() {
+  const map = $("#menu-worlds").getBoundingClientRect();
+  return [
+    ...document.querySelectorAll<HTMLElement>(".menu-world .map-island"),
+  ].map((island) => {
+    const r = island.getBoundingClientRect();
+    return {
+      x: r.left - map.left + r.width / 2,
+      y: r.top - map.top + r.height / 2,
+    };
+  });
+}
+/** Draw the dotted trail through the worlds in order and place Pip. */
+function layoutMapPath() {
+  const svg = document.querySelector<SVGSVGElement>("#menu-worlds .map-path");
+  if (!svg) return;
+  const map = $("#menu-worlds");
+  svg.setAttribute("width", String(map.clientWidth));
+  svg.setAttribute("height", String(map.clientHeight));
+  svg.querySelector("polyline")!.setAttribute(
+    "points",
+    mapNodes()
+      .map((n) => `${n.x.toFixed(0)},${n.y.toFixed(0)}`)
+      .join(" "),
+  );
+  moveMapWalker(selected, false);
+}
+function moveMapWalker(index: number, walk: boolean) {
+  const walker = document.querySelector<HTMLElement>(
+    "#menu-worlds .map-walker",
+  );
+  const node = mapNodes()[index];
+  if (!walker || !node) return;
+  walker.classList.toggle("walking", walk);
+  walker.style.transition = walk ? "" : "none";
+  walker.style.transform = `translate(${node.x - 18}px, ${node.y - 52}px)`;
+}
+window.addEventListener("resize", () => requestAnimationFrame(layoutMapPath));
 function updateWorlds() {
   $("#world-strip").innerHTML = levels
     .map(
@@ -373,6 +413,19 @@ function updateWorlds() {
       return `<button class="menu-world ${selected === i ? "selected" : ""} ${light > 0 ? "restored" : ""}" data-menu-world="${i}" ${worldUnlocked(save, i) ? "" : "disabled"} data-light="${light}" style="--world-light:${light}" aria-label="${level.name}, ${progress.fireflies.length} of 3 fireflies rescued, ${completed ? "trail completed" : "explore trail"}"><span class="map-island">${worldArt(i)}<span class="map-node-number">${completed ? "✓" : `0${i + 1}`}</span></span><span class="menu-world-info"><strong>${level.name}</strong><span>${!worldUnlocked(save, i) ? lockedHint(i) : completed ? "Trail completed" : ["Bouncing mushrooms", "Ride the leaves", "Brave the cloud bridges", "Take flight. Turn the garden.", "Hop the lily pads", "Explore the glowing caves", "Swim the deep lagoon"][i]}</span><span class="map-fireflies" aria-hidden="true">${fireflyMarks(progress.fireflies)}</span><small class="map-acorns" aria-label="${progress.acorns.length} of 5 acorns found">🌰 ${progress.acorns.length}/5</small><small class="world-best">${best}</small></span></button>`;
     })
     .join("");
+  $("#menu-worlds").insertAdjacentHTML(
+    "beforeend",
+    `<svg class="map-path" aria-hidden="true"><polyline /></svg><span class="map-walker" aria-hidden="true">${icon("pip")}</span>`,
+  );
+  requestAnimationFrame(layoutMapPath);
+  // Pip walks the trail to whichever world is pointed at or focused.
+  document
+    .querySelectorAll<HTMLButtonElement>("[data-menu-world]")
+    .forEach((button) => {
+      const walk = () => moveMapWalker(Number(button.dataset.menuWorld), true);
+      button.addEventListener("pointerenter", walk);
+      button.addEventListener("focus", walk);
+    });
   document
     .querySelectorAll<HTMLButtonElement>("[data-menu-world]")
     .forEach((button) =>
@@ -696,6 +749,10 @@ function start() {
   if (runKind === "world" && !worldUnlocked(save, selected)) return;
   if (runKind === "challenge" && !challengeUnlocked(save, selected)) return;
   game = createGame(selected);
+  // Timed world runs race a ghost of the best run and record a new one.
+  const timedWorld = runKind === "world" && game.mode === "timed";
+  ghostRecorder = timedWorld ? new GhostRecorder() : null;
+  game.ghost = timedWorld ? loadGhost(levels[selected]!.contentId!) : null;
   session =
     runKind === "world" || runKind === "grove"
       ? new AdventureSession(game)
@@ -743,6 +800,7 @@ function resume() {
   canvas.focus({ preventScroll: true });
 }
 let hitStopUntil = 0;
+let ghostRecorder: GhostRecorder | null = null;
 let nextChimeAt = 0;
 /** A soft chime that quickens as Pip nears an unrescued firefly. */
 function fireflyChime(now: number) {
@@ -817,6 +875,17 @@ function finish() {
       );
     } else if (runKind === "world" || (runKind === "boss" && !bossReplay)) {
       newBest = recordGardenRun(save, selected, game.mode, game.elapsed);
+      // A new best Timed run becomes the ghost to race next time.
+      if (
+        newBest &&
+        runKind === "world" &&
+        game.mode === "timed" &&
+        ghostRecorder
+      )
+        saveGhost(
+          levels[selected]!.contentId!,
+          ghostRecorder.finish(game.elapsed),
+        );
       save.progress[selected].coins = Math.max(
         save.progress[selected].coins,
         game.collectedCoins,
@@ -932,6 +1001,7 @@ function bindPanel() {
   $("#home-button").addEventListener("click", showMenu);
 }
 function showMenu() {
+  requestAnimationFrame(layoutMapPath);
   groveDialog.close();
   pause();
   controls.reset();
@@ -1328,6 +1398,8 @@ function frame(now: number) {
     // A landed boss hit freezes the action for a few frames, for impact.
     if (now < hitStopUntil) delta = 0;
     game.update(delta, input);
+    if (ghostRecorder && runKind === "world" && !session?.inSecret)
+      ghostRecorder.sample(game.elapsed, game.player.x, game.player.y);
     if (game.events.includes("boss-hit") || game.events.includes("boss-defeat"))
       hitStopUntil = now + (reducedMotion ? 0 : 90);
     if (runKind === "world" && !session?.inSecret) fireflyChime(now);

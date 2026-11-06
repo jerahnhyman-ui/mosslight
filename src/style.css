@@ -3356,3 +3356,87 @@ select:focus-visible {
   right: auto;
   left: calc(100% + 14px);
 }
+
+/* The walkable map: a dotted trail through the worlds and a walking Pip. */
+.map-path {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 0;
+}
+.map-path polyline {
+  fill: none;
+  stroke: #fff3c8;
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 2 13;
+  opacity: 0.85;
+}
+#forest-map .menu-world {
+  z-index: 1;
+}
+.map-walker {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 3;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #fffbe7;
+  color: #2f8a5b;
+  box-shadow: 0 3px 0 #2f6e5040;
+  pointer-events: none;
+  transition: transform 0.55s cubic-bezier(0.45, 0, 0.25, 1);
+}
+.map-walker .icon {
+  width: 24px;
+  height: 24px;
+}
+.map-walker.walking .icon {
+  animation: map-walk 0.18s ease-in-out infinite alternate;
+}
+@keyframes map-walk {
+  to {
+    transform: translateY(-4px) rotate(6deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .map-walker {
+    transition: none;
+  }
+}
+
+/* Tablets: larger thumb controls and messages to match the bigger screen. */
+@media (min-width: 1000px) and (min-height: 700px) and (pointer: coarse) {
+  :root {
+    --dpad-width: 92px;
+    --dpad-height: 86px;
+    --jump-size: 116px;
+    --control-edge: 40px;
+    --control-bottom: 32px;
+  }
+  .game-app .checkpoint-toast {
+    font-size: 19px;
+    padding: 14px 24px;
+  }
+  .touch-jump span,
+  .touch-tongue span {
+    font-size: 12px;
+  }
+  .portal-prompt {
+    font-size: 18px;
+  }
+  .result-panel.tip-card .tip-text {
+    font-size: 26px;
+  }
+}
+@media (min-width: 1000px) and (min-height: 700px) and (pointer: coarse) {
+  canvas {
+    --scene-thumb-strip: 70px;
+  }
+}

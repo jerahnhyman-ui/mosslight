@@ -97,12 +97,12 @@ export const marshLevel: Level = withRewardBlocks({
     ledge(300, 350, 160),
     ledge(560, 300, 160),
     // Lilypad Ford: one sliding pad over the first channel.
-    lily("ford", 1330, 390, 150, 60, 4.6),
+    lily("ford", 1330, 390, 150, 70, 3.8),
     ground(1580, 640),
     // Sinking Shallows: keep hopping; each pad dips under after landing.
-    sinkpad("shallows.a", 2270, 390),
-    sinkpad("shallows.b", 2440, 370),
-    sinkpad("shallows.c", 2610, 390),
+    sinkpad("shallows.a", 2290, 390),
+    sinkpad("shallows.b", 2470, 360),
+    sinkpad("shallows.c", 2650, 390),
     // Cattail Rise and Willow Run share one long bank. A mushroom at the
     // cattails launches Pip toward the hidden Heron's Loft.
     ground(2780, 1060),
@@ -114,9 +114,9 @@ export const marshLevel: Level = withRewardBlocks({
     ledge(4320, 280, 170),
     ledge(4580, 350, 150),
     // Drift Channel: two sliding pads with a steady stump between them.
-    lily("drift.a", 5110, 390, 140, 50, 4.2),
+    lily("drift.a", 5110, 390, 140, 50, 3.6),
     ledge(5330, 340, 100),
-    lily("drift.b", 5500, 380, 140, 50, 4.8, 1.6),
+    lily("drift.b", 5500, 380, 140, 50, 4, 1.6),
     // Glowworm Hollow: Pip's light wakes a climbing route.
     ground(5720, 1000),
     plant(5950, 340, 150),
@@ -139,7 +139,7 @@ export const marshLevel: Level = withRewardBlocks({
     lily("perch", 9260, 170, 140, 110, 5.5),
     ledge(9560, 120, 140),
     // Lantern Reeds: a final sliding pad, then the guardian's bank.
-    lily("reeds", 10030, 390, 150, 55, 4.4),
+    lily("reeds", 10030, 390, 150, 65, 3.8),
     ground(10280, 1420),
   ],
   coins: [
@@ -191,6 +191,9 @@ export const marshLevel: Level = withRewardBlocks({
     bug("charger", 8500, 8400, 8580),
     bug("charger", 9300, 9200, 9450),
     bug("beetle", 9850, 9760, 9950),
+    // Extra pressure on the long runs before the later crossings.
+    bug("charger", 4250, 4170, 4330),
+    bug("beetle", 10380, 10320, 10440),
   ],
   checkpoints: [
     { x: 1180, y: 430 },

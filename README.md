@@ -20,6 +20,12 @@ npm run dev
 Open the local URL Vite prints. In landscape, the game fills the display edge to edge and shows more of the world on wider screens, with proportional artwork and controls inside the safe areas. A trail picker sits on the title screen; worlds, sound, and instructions are in the game menu.
 For parallel work with Claude Code and Codex, see the [collaboration guide](docs/CLAUDE_COLLABORATION.md).
 Move with **← / →** or **A / D**; jump with **Space**, **W**, or **↑**.
+In the air, press **↓** / **S** (or drag down on the touch pad) to **ground
+pound**: it smashes cracked blocks from above, squashes bugs beside you and
+bounces you extra high off mushrooms. Jump while sliding down a tall wall to
+**wall jump**. Chained stomps without landing pay a growing coin bonus, and
+each world hides five **acorns** (10 unlock the Acorn Cap, all of them the
+Golden Leaf). In Timed mode you race a **ghost** of your best run.
 Tap jump for a short hop, or hold it for a higher leap. **P / Esc** pauses.
 On touch screens, slide your left thumb across the direction pad without lifting,
 and use your right thumb to jump. Both touches work at the same time. A gamepad's

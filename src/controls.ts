@@ -8,6 +8,8 @@ const movementKeys = new Map<string, Direction>([
   ["KeyD", 1],
 ]);
 const jumpKeys = new Set(["Space", "ArrowUp", "KeyW"]);
+/** Down: a ground pound in the air. */
+const downKeys = new Set(["ArrowDown", "KeyS"]);
 /** The action button: Gulp's tongue while riding. */
 const actionKeys = new Set(["KeyX", "KeyJ", "KeyE", "ShiftLeft", "ShiftRight"]);
 
@@ -21,6 +23,9 @@ export class Controls {
   private padJump = false;
   private padPause = false;
   private padAction = false;
+  /** Pointers dragged down on the movement pad. */
+  private downPointers = new Set<number>();
+  private downWas = false;
   private actionPressed = false;
 
   constructor(
@@ -61,6 +66,7 @@ export class Controls {
     });
     const releaseMove = (event: PointerEvent) => {
       this.movement.delete(event.pointerId);
+      this.downPointers.delete(event.pointerId);
       this.paint();
     };
     for (const type of ["pointerup", "pointercancel", "lostpointercapture"])
@@ -98,6 +104,11 @@ export class Controls {
       if ((event.code === "KeyP" || event.code === "Escape") && !event.repeat) {
         event.preventDefault();
         this.togglePause();
+      }
+      if (downKeys.has(event.code) && this.active()) {
+        event.preventDefault();
+        this.keys.add(event.code);
+        return;
       }
       if (actionKeys.has(event.code) && this.active()) {
         event.preventDefault();
@@ -139,6 +150,11 @@ export class Controls {
     const outside =
       event.clientY < rect.top - 55 || event.clientY > rect.bottom + 55;
     const direction = outside || Math.abs(x) < 7 ? 0 : x < 0 ? -1 : 1;
+    // Dragging the thumb well below the pad's middle means Down.
+    const y = event.clientY - (rect.top + rect.height / 2);
+    if (!outside && y > rect.height * 0.45)
+      this.downPointers.add(event.pointerId);
+    else this.downPointers.delete(event.pointerId);
     // The most recently moved finger owns the axis; releasing it restores the other.
     this.movement.delete(event.pointerId);
     this.movement.set(event.pointerId, direction);
@@ -164,6 +180,7 @@ export class Controls {
     const jumpIDs = [...this.jumps];
     this.keys.clear();
     this.movement.clear();
+    this.downPointers.clear();
     this.jumps.clear();
     this.jumpEdges = [];
     this.actionPressed = false;
@@ -213,7 +230,15 @@ export class Controls {
       jumpPressed: this.jumpEdges.includes(true),
       jumpEdges: this.jumpEdges,
       action: this.actionPressed,
+      downPressed: false,
     };
+    const down =
+      this.downPointers.size > 0 ||
+      [...this.keys].some((key) => downKeys.has(key)) ||
+      !!pad?.buttons[13]?.pressed ||
+      (pad?.axes[1] ?? 0) > 0.6;
+    result.downPressed = down && !this.downWas;
+    this.downWas = down;
     this.jumpEdges = [];
     this.actionPressed = false;
     return result;
