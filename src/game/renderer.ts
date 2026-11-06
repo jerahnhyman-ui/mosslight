@@ -653,8 +653,12 @@ export class Renderer {
           );
       const player = game.player;
       const center = player.x + player.w / 2;
-      // Riding Gulp, Pip sits on its back.
-      const feet = player.y + player.h - (game.riding ? 18 : 0);
+      // Riding Gulp, Pip sits up on its back; it hops as it runs.
+      const hop =
+        game.riding && player.grounded && Math.abs(player.vx) > 30
+          ? Math.abs(Math.sin(time * 12)) * 5
+          : 0;
+      const feet = player.y + player.h - (game.riding ? 26 + hop : 0);
       if (game.riding) {
         if (game.tongueTarget) {
           const mouthX = center + player.facing * 24;
@@ -675,7 +679,15 @@ export class Renderer {
             "#f28fa3",
           );
         }
-        this.gulpFrog(center, player.y + player.h, player.facing, time, false);
+        this.gulpFrog(
+          center,
+          player.y + player.h - hop,
+          player.facing,
+          time,
+          false,
+          1.45,
+          game.fluttering,
+        );
       }
       const size = player.h / 38;
       if (game.starPowerRemaining <= 0) {
@@ -699,6 +711,29 @@ export class Renderer {
       // Damage grace is visually distinct from star power and never hides Pip.
       if (player.invulnerable > 0 && game.starPowerRemaining <= 0)
         c.globalAlpha = 0.55 + (Math.sin(time * 9) + 1) * 0.18;
+      if (game.swimming && !player.grounded) {
+        // Swimming: Pip leans into the stroke, legs kicking behind, and
+        // straightens up as each kick fades.
+        const pivotY = feet - 19 * size;
+        const lean =
+          player.facing *
+          (0.25 + Math.min(1, Math.abs(player.vx) / 190) * 0.45) *
+          (Math.abs(player.vx) > 20 ? 1 : 0.4);
+        const kick = game.swimStroke / 0.32;
+        c.translate(center, pivotY);
+        c.rotate(lean - player.facing * kick * 0.25);
+        c.translate(-center, -pivotY);
+        for (const side of [-1, 1]) {
+          const swing = Math.sin(time * 9 + side) * 5 + kick * 10 * side;
+          this.leaf(
+            center - player.facing * 12,
+            feet - 6 + side * 4,
+            11 * size,
+            Math.PI / 2 + player.facing * (0.9 + swing * 0.05),
+            "#6fcf86",
+          );
+        }
+      }
       this.hero(
         center,
         feet,
@@ -3753,11 +3788,28 @@ export class Renderer {
     facing: number,
     time: number,
     startled: boolean,
+    scale = 1.3,
+    fluttering = false,
   ) {
     const c = this.ctx;
     c.save();
     c.translate(cx, feet);
-    c.scale(facing < 0 ? -1 : 1, 1);
+    c.scale(facing < 0 ? -scale : scale, scale);
+    if (fluttering) {
+      // Legs pedal fast under it during a flutter.
+      for (const side of [-1, 1]) {
+        const kick = Math.sin(time * 40 + side) * 6;
+        this.line(
+          [
+            [side * 8, -4],
+            [side * 12 + kick, 6],
+            [side * 18 + kick, 8],
+          ],
+          "#3f9a52",
+          4,
+        );
+      }
+    }
     const bob = startled
       ? Math.abs(Math.sin(time * 18)) * -6
       : Math.sin(time * 3) * 0.8;
@@ -5340,6 +5392,25 @@ export class Renderer {
   }
 
   private feedback(game: Game) {
+    const pp = game.player;
+    if (game.events.includes("swim-stroke")) {
+      // A puff of bubbles trails from Pip's kicking feet.
+      this.burst(
+        pp.x + pp.w / 2 - pp.facing * 14,
+        pp.y + pp.h - 4,
+        "#e6fffb",
+        7,
+        60,
+      );
+    }
+    if (game.events.includes("gulp"))
+      this.burst(
+        pp.x + pp.w / 2 + pp.facing * 40,
+        pp.y + pp.h - 14,
+        "#ffd27a",
+        6,
+        70,
+      );
     game.coins.forEach((coin, i) => {
       if (coin.collected && !this.previousCoins[i])
         this.burst(coin.x, coin.y, "#ffda71", 7, 70);

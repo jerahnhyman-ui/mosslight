@@ -21,7 +21,9 @@ function swimTo(game: Game, x: number, y: number) {
       ...idle,
       left: delta < -4,
       right: delta > 4,
-      jump: p.y > y,
+      // Swim with strokes: tap Jump when too low and the last kick faded.
+      jump: p.y > y && p.vy > -40,
+      jumpPressed: p.y > y && p.vy > -40,
     });
     if (game.deaths) throw new Error(`Lost a life swimming to ${x}, ${y}`);
   }
@@ -96,8 +98,10 @@ describe("Moonpool Grotto", () => {
     expect(game.level.mechanisms ?? []).toHaveLength(0);
     expect(game.level.gates ?? []).toHaveLength(0);
 
-    // Follow actual directional and swim input from the entrance. The first
-    // rock must be crossed above, then the hanging reef below.
+    // Follow actual directional and swim input from the entrance. Walk into
+    // the water first: tapping Jump on the dry shore would use the feather.
+    // The first rock must be crossed above, then the hanging reef below.
+    swimTo(game, 300, 452);
     swimTo(game, 900, 250);
     swimTo(game, 1200, 260);
     swimTo(game, 1290, 330);

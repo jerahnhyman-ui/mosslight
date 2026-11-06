@@ -12,6 +12,15 @@ export const moonpoolLevel: Level = {
   spawn: { x: 80, y: 452 },
   platforms: [
     { x: 0, y: 490, w: 2880, h: 170, kind: "ground" },
+    // A rock ceiling over the pool keeps Pip swimming underwater.
+    {
+      id: "moonpool.rock.ceiling",
+      x: 220,
+      y: -200,
+      w: 2470,
+      h: 385,
+      kind: "ground",
+    },
     // Rising rock walls require Pip to swim above them. The surrounding
     // shelves and bubble streams give the player a clear route around each.
     { id: "moonpool.rock.1", x: 1050, y: 350, w: 58, h: 140, kind: "ground" },

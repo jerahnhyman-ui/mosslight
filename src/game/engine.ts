@@ -23,6 +23,8 @@ export type GameInput = {
   jump: boolean;
   jumpPressed: boolean;
   jumpEdges?: boolean[];
+  /** The action button (Gulp's tongue) was pressed this frame. */
+  action?: boolean;
 };
 export type Player = Rect & {
   form: "small" | "big";
@@ -105,6 +107,11 @@ const MAX_SPEED = 300;
 /** Speed multiplier while star power lasts. */
 export const STAR_SPEED_BOOST = 1.4;
 const COYOTE_TIME = 0.12;
+/** Upward kick from one swim stroke, and the fastest a stroke can push. */
+const SWIM_STROKE = -230;
+const SWIM_STROKE_MAX = -260;
+/** Gulp's flutter: how long Pip can hang in the air per jump. */
+export const FLUTTER_TIME = 0.75;
 /** How far a bug on Pip's floor notices and reacts to Pip. */
 const ENEMY_SIGHT = 220;
 /** Walking pace or slower lets Pip use a portal; a full run passes through. */
@@ -128,6 +135,12 @@ export class Game {
   readonly mode: RunMode;
   boss: BossState | null = null;
   mounts: Mount[] = [];
+  /** True while Pip is in water, and the fading timer of the last stroke. */
+  swimming = false;
+  swimStroke = 0;
+  /** Seconds of Gulp's flutter used in this jump; and whether it is active. */
+  flutterUsed = 0;
+  fluttering = false;
   riding: Mount | null = null;
   /** Seconds left on the tongue animation, and where it is reaching. */
   tongue = 0;
@@ -482,10 +495,16 @@ export class Game {
       overlaps(p, zone),
     );
     const swimming = water.length > 0;
+    this.swimming = swimming;
+    this.swimStroke = Math.max(0, this.swimStroke - STEP);
+    if (p.grounded) this.flutterUsed = 0;
+    this.fluttering = false;
     if (this.hurtLock === 0) {
       let acceleration = p.grounded ? 3200 : 2600;
       if (direction === 0) acceleration = p.grounded ? 4200 : 1800;
       else if (p.vx * direction < 0) acceleration = p.grounded ? 4800 : 3600;
+      // In water Pip builds speed with each kick and glides to a stop.
+      if (swimming && !p.grounded) acceleration = direction ? 700 : 260;
       // Star power makes Pip noticeably faster as well as invincible.
       const starred = this.starPowerRemaining > 0;
       if (starred && direction) acceleration *= STAR_SPEED_BOOST;
@@ -520,6 +539,13 @@ export class Game {
         if (swimming) {
           if (p.grounded) this.activateOnTakeoff(input);
           this.jumpBuffer = 0;
+          if (this.hurtLock === 0) {
+            // Each press is one swim stroke: a kick upward that fades.
+            p.vy = Math.max(SWIM_STROKE_MAX, Math.min(p.vy, 60) + SWIM_STROKE);
+            p.grounded = false;
+            this.swimStroke = 0.32;
+            this.events.push("swim-stroke");
+          }
           continue;
         }
         this.jumpBuffer = JUMP_BUFFER_TIME;
@@ -556,8 +582,9 @@ export class Game {
         (sum, zone) => sum + (zone.currentY ?? 0),
         0,
       );
-      const target = (input.jump && this.hurtLock === 0 ? -160 : 115) + current;
-      p.vy = approach(p.vy, target, 440 * STEP);
+      // Between strokes Pip drifts down; holding Jump only slows the sink.
+      const target = (input.jump && this.hurtLock === 0 ? 35 : 150) + current;
+      p.vy = approach(p.vy, target, 340 * STEP);
     } else if (
       this.liftActive &&
       input.jump &&
@@ -573,6 +600,20 @@ export class Game {
         this.flightNeedsRelease = true;
         this.events.push("feather-empty");
       }
+    } else if (
+      this.riding &&
+      input.jump &&
+      !p.grounded &&
+      p.vy > 0 &&
+      this.flutterUsed < FLUTTER_TIME &&
+      this.hurtLock === 0
+    ) {
+      // Gulp's flutter: kicking its legs, it slows the fall and lifts a
+      // little, stretching a jump across a wider gap.
+      if (this.flutterUsed === 0) this.events.push("flutter");
+      this.flutterUsed += STEP;
+      this.fluttering = true;
+      p.vy = approach(p.vy, -70, 2600 * STEP);
     } else {
       p.vy = Math.min(900, p.vy + (p.vy < 0 ? GRAVITY : FALL_GRAVITY) * STEP);
       if (this.glideArmed && this.hurtLock === 0) p.vy = Math.min(p.vy, 180);
@@ -772,7 +813,7 @@ export class Game {
       }
     }
 
-    this.updateMounts();
+    this.updateMounts(input);
     for (const enemy of this.enemies) {
       enemy.squashed = Math.max(0, enemy.squashed - STEP);
       if (!enemy.alive) continue;
@@ -1288,15 +1329,10 @@ export class Game {
       onFloor && center > enemy.minX && center < enemy.maxX + enemy.w;
     const toward = dx >= 0 ? 1 : -1;
     if (enemy.kind === "fish") {
-      // A fish weaves up and down as it swims its patrol, turning toward
-      // Pip when Pip swims into its water.
+      // A fish weaves up and down along a steady patrol, so its path can be
+      // read and timed (or stomped by sinking onto it).
       enemy.stateTime += STEP * 2;
-      const alert =
-        Math.abs(dx) < ENEMY_SIGHT &&
-        center > enemy.minX &&
-        center < enemy.maxX + enemy.w;
-      if (alert) enemy.facing = toward;
-      enemy.vx = enemy.facing * (alert ? 95 : 65);
+      enemy.vx = enemy.facing * 70;
       enemy.y = enemy.baseY + Math.sin(enemy.stateTime * 1.6) * 22;
     } else if (enemy.kind === "beetle") {
       // A beetle that spots Pip turns and scurries toward them.
@@ -1447,7 +1483,7 @@ export class Game {
     );
   }
 
-  private updateMounts() {
+  private updateMounts(input: GameInput) {
     const p = this.player;
     this.tongue = Math.max(0, this.tongue - STEP);
     if (this.tongue === 0) this.tongueTarget = null;
@@ -1484,24 +1520,35 @@ export class Game {
     ride.x = p.x + p.w / 2 - MOUNT_SIZE.w / 2;
     ride.y = p.y + p.h;
     ride.facing = p.facing;
-    if (this.tongueCooldown > 0) return;
+    // The player shoots Gulp's tongue with the action button.
+    if (!input.action || this.tongueCooldown > 0) return;
     const cx = p.x + p.w / 2;
-    const prey = this.enemies.find((e) => {
-      if (!e.alive) return false;
-      const dx = e.x + e.w / 2 - cx;
-      return (
-        Math.sign(dx) === p.facing &&
-        Math.abs(dx) <= TONGUE_REACH &&
-        Math.abs(e.y + e.h - (p.y + p.h)) < 50
-      );
-    });
-    if (!prey) return;
+    const mouthY = p.y + p.h - 14;
+    const prey = this.enemies
+      .filter((e) => {
+        if (!e.alive) return false;
+        const dx = e.x + e.w / 2 - cx;
+        return (
+          Math.sign(dx) === p.facing &&
+          Math.abs(dx) <= TONGUE_REACH &&
+          Math.abs(e.y + e.h / 2 - mouthY) < 55
+        );
+      })
+      .sort((a, b) => Math.abs(a.x - cx) - Math.abs(b.x - cx))[0];
+    this.tongue = 0.22;
+    this.tongueCooldown = 0.3;
+    if (!prey) {
+      // A miss still flicks the tongue out to its full reach.
+      this.tongueTarget = { x: cx + p.facing * TONGUE_REACH, y: mouthY };
+      this.events.push("tongue");
+      return;
+    }
     prey.alive = false;
     prey.squashed = ENEMY_SQUASH_DURATION;
     prey.vx = prey.vy = 0;
-    this.tongue = 0.22;
     this.tongueTarget = { x: prey.x + prey.w / 2, y: prey.y + prey.h / 2 };
-    this.tongueCooldown = 0.35;
+    // Each swallowed bug is worth a coin.
+    this.awardCoins(1);
     this.events.push("gulp");
   }
 

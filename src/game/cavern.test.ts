@@ -112,7 +112,8 @@ function ride(
   waitUntil(g, () => leave(pad), `${id} in place`);
 }
 const leftward = (t: Tile) => t.x - t.previousX < 0;
-const fresh = () => new Game(0, { level: { ...cavernLevel, enemies: [] } });
+const fresh = () =>
+  new Game(0, { level: { ...cavernLevel, enemies: [], mounts: [] } });
 /** Hop onto a moving crystal once `ready` says it is placed for the jump. */
 function hopTo(g: Game, id: string, ready: () => boolean) {
   const pad = tile(g, id);
