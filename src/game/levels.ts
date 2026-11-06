@@ -1,6 +1,8 @@
 import { windmillLevel } from "./expansion-levels";
 import { marshLevel } from "./marsh-level";
 import { cavernLevel } from "./cavern-level";
+import { tidewellLevel } from "./tidewell-level";
+import { expansionChallenges } from "./challenge-expansion";
 import { cloudAscentPlatforms } from "./cloud-garden";
 import { withTrailChallenges } from "./challenge-balance";
 import { withRewardBlocks } from "./reward-layouts";
@@ -36,7 +38,7 @@ export type Platform = Rect & {
   wakeRadius?: number;
   enemyBreakable?: boolean;
 };
-export type EnemyKind = "beetle" | "hopper" | "charger";
+export type EnemyKind = "beetle" | "hopper" | "charger" | "fish";
 export type EnemySpawn = {
   kind: EnemyKind;
   x: number;
@@ -51,6 +53,7 @@ export type BossKind =
   | "moth"
   | "toad"
   | "mole"
+  | "crab"
   | "millkeeper"
   | "heartwood";
 export type BossSpec = {
@@ -102,7 +105,11 @@ export interface Level {
   goal: { x: number; y: number };
   kind?: "world" | "grove" | "challenge" | "secret" | "minigame";
   featherFountains?: { x: number; y: number }[];
-  waterZones?: (Rect & { currentY?: number })[];
+  /** Where Gulp the tree frog waits to be ridden (y is the ground surface). */
+  mounts?: { x: number; y: number }[];
+  /** Water. currentY lifts (negative) or pulls down (positive); currentX
+   * pushes sideways. Overlapping zones add their currents together. */
+  waterZones?: (Rect & { currentY?: number; currentX?: number })[];
   mechanisms?: {
     id: string;
     kind:
@@ -1106,6 +1113,7 @@ export const levels: Level[] = [
   windmillLevel,
   marshLevel,
   cavernLevel,
+  tidewellLevel,
 ];
 
 /** A real, safe platforming space: all residents and purchased furnishings are
@@ -1193,200 +1201,204 @@ export const groveLevel: Level = withRewardBlocks({
 /** Compact mastery courses unlocked by rescuing a world's three fireflies.
  * Gold times allow comfortable mistakes; every completion earns bronze.
  */
-export const challengeLevels: Level[] = (
-  [
-    {
-      id: 11,
-      contentId: "challenge.sunlit-meadow",
-      name: "Petal-Hop Sprint",
-      subtitle:
-        "Wake the flowers, ride the mushroom, and follow the golden arc.",
-      kind: "challenge",
-      challengeTime: 18,
-      theme: "meadow",
-      width: 2300,
-      spawn: { x: 95, y: 392 },
-      platforms: [
-        ground(0, 860),
-        ground(1010, 1290),
-        wakingPlant(250, 340, 150),
-        wakingPlant(470, 265, 160, "curled"),
-        mushroom(700, 350, 90),
-        wakingPlant(880, 205, 180, "flower", 270),
-        ledge(1130, 295, 160),
-        mushroom(1420, 350, 90),
-        wakingPlant(1600, 205, 200, "flower", 270),
-        ledge(1900, 310, 160),
-      ],
-      coins: [
-        ...row(270, 308, 4),
-        ...row(490, 233, 4),
-        ...arc(760, 235, 5),
-        ...row(900, 173, 4),
-        ...row(1150, 263, 4),
-        ...arc(1480, 235, 5),
-        ...row(1630, 173, 5),
-        ...row(1920, 278, 4),
-        ...row(2110, 392, 3),
-      ],
-      stars: [],
-      diamonds: [
-        { x: 165, y: 400 },
-        { x: 1245, y: 400 },
-      ],
-      enemies: [bug(1310, 1295, 1390, "hopper")],
-      checkpoints: [{ x: 1220, y: 430 }],
-      sections: [
-        { x: 0, name: "Wake & Climb" },
-        { x: 680, name: "The Petal Leap" },
-        { x: 1220, name: "Bounce & Glide" },
-      ],
-      fireflies: [],
-      landmarks: [
-        {
-          x: 470,
-          y: 265,
-          w: 160,
-          h: 165,
-          kind: "flowerpot",
-          name: "The Sprint Pot",
-        },
-      ],
-      tutorials: [
-        {
-          x: 95,
-          text: "Gold target: 18 seconds. Follow the petals for coins, or find your own fast route.",
-        },
-      ],
-      goal: { x: 2180, y: 430 },
-    },
-    {
-      id: 12,
-      contentId: "challenge.firefly-hollow",
-      name: "Lantern-Leaf Relay",
-      subtitle: "Cross the stream on drifting leaves and light the far bank.",
-      kind: "challenge",
-      challengeTime: 20,
-      theme: "dusk",
-      width: 2500,
-      spawn: { x: 95, y: 392 },
-      platforms: [
-        ground(0, 760),
-        ground(1040, 1460),
-        wakingPlant(230, 340, 150, "curled"),
-        movingLeaf(450, 280, 180, "y", 35, 4),
-        ledge(690, 205, 170),
-        movingLeaf(860, 340, 170, "x", 45, 3.6),
-        ledge(1160, 340, 170),
-        movingLeaf(1400, 275, 180, "y", 40, 4.2),
-        ledge(1650, 205, 180),
-        movingLeaf(1880, 290, 190, "x", 55, 4),
-        ledge(2180, 340, 170),
-      ],
-      coins: [
-        ...row(250, 308, 4),
-        ...row(710, 173, 4),
-        ...arc(790, 285, 6),
-        ...row(1180, 308, 4),
-        ...row(1670, 173, 4),
-        ...row(2200, 308, 4),
-        ...row(2360, 392, 3),
-      ],
-      stars: [{ x: 1690, y: 155 }],
-      diamonds: [
-        { x: 165, y: 400 },
-        { x: 1125, y: 400 },
-      ],
-      enemies: [bug(2030, 1980, 2120, "charger")],
-      checkpoints: [{ x: 1080, y: 430 }],
-      sections: [
-        { x: 0, name: "The Leaf Lift" },
-        { x: 740, name: "Lantern Stream" },
-        { x: 1080, name: "Canopy Relay" },
-      ],
-      fireflies: [],
-      landmarks: [
-        {
-          x: 760,
-          y: 430,
-          w: 280,
-          h: 110,
-          kind: "stream",
-          name: "Lantern Stream",
-        },
-      ],
-      tutorials: [
-        {
-          x: 95,
-          text: "Gold target: 20 seconds. The drifting leaf carries you over the stream.",
-        },
-      ],
-      goal: { x: 2400, y: 430 },
-    },
-    {
-      id: 13,
-      contentId: "challenge.cloudtop-crossing",
-      name: "Cloudbreak Dash",
-      subtitle: "Keep moving as the cloud bridge melts behind your footsteps.",
-      kind: "challenge",
-      challengeTime: 22,
-      theme: "alpine",
-      width: 2600,
-      spawn: { x: 95, y: 392 },
-      platforms: [
-        ground(0, 720),
-        ground(1360, 1240),
-        ledge(240, 340, 160),
-        cloud(470, 275, 180),
-        cloud(700, 340, 190),
-        cloud(860, 340, 190),
-        cloud(1020, 340, 190),
-        cloud(1180, 340, 190),
-        wakingPlant(1470, 340, 170),
-        cloud(1710, 265, 180),
-        ledge(1950, 195, 200),
-        cloud(2220, 310, 180),
-      ],
-      coins: [
-        ...row(260, 308, 4),
-        ...row(490, 243, 4),
-        ...row(735, 308, 17, 35),
-        ...row(1490, 308, 4),
-        ...row(1730, 233, 4),
-        ...row(1980, 163, 5),
-        ...row(2240, 278, 4),
-        ...row(2440, 392, 3),
-      ],
-      stars: [{ x: 2020, y: 145 }],
-      diamonds: [
-        { x: 165, y: 400 },
-        { x: 1425, y: 400 },
-      ],
-      enemies: [bug(1770, 1680, 1870, "hopper")],
-      checkpoints: [{ x: 1390, y: 430 }],
-      sections: [
-        { x: 0, name: "A Moment to Breathe" },
-        { x: 690, name: "The Melting Bridge" },
-        { x: 1390, name: "The Last Leap" },
-      ],
-      fireflies: [],
-      landmarks: [
-        {
-          x: 1950,
-          y: 195,
-          w: 200,
-          h: 235,
-          kind: "flowerpot",
-          name: "The Sky Garden",
-        },
-      ],
-      tutorials: [
-        {
-          x: 95,
-          text: "Gold target: 22 seconds. Clouds tremble, then vanish. Cross the bridge without stopping.",
-        },
-      ],
-      goal: { x: 2500, y: 430 },
-    },
-  ] satisfies Level[]
-).map(withRewardBlocks);
+export const challengeLevels: Level[] = [
+  ...(
+    [
+      {
+        id: 11,
+        contentId: "challenge.sunlit-meadow",
+        name: "Petal-Hop Sprint",
+        subtitle:
+          "Wake the flowers, ride the mushroom, and follow the golden arc.",
+        kind: "challenge",
+        challengeTime: 18,
+        theme: "meadow",
+        width: 2300,
+        spawn: { x: 95, y: 392 },
+        platforms: [
+          ground(0, 860),
+          ground(1010, 1290),
+          wakingPlant(250, 340, 150),
+          wakingPlant(470, 265, 160, "curled"),
+          mushroom(700, 350, 90),
+          wakingPlant(880, 205, 180, "flower", 270),
+          ledge(1130, 295, 160),
+          mushroom(1420, 350, 90),
+          wakingPlant(1600, 205, 200, "flower", 270),
+          ledge(1900, 310, 160),
+        ],
+        coins: [
+          ...row(270, 308, 4),
+          ...row(490, 233, 4),
+          ...arc(760, 235, 5),
+          ...row(900, 173, 4),
+          ...row(1150, 263, 4),
+          ...arc(1480, 235, 5),
+          ...row(1630, 173, 5),
+          ...row(1920, 278, 4),
+          ...row(2110, 392, 3),
+        ],
+        stars: [],
+        diamonds: [
+          { x: 165, y: 400 },
+          { x: 1245, y: 400 },
+        ],
+        enemies: [bug(1310, 1295, 1390, "hopper")],
+        checkpoints: [{ x: 1220, y: 430 }],
+        sections: [
+          { x: 0, name: "Wake & Climb" },
+          { x: 680, name: "The Petal Leap" },
+          { x: 1220, name: "Bounce & Glide" },
+        ],
+        fireflies: [],
+        landmarks: [
+          {
+            x: 470,
+            y: 265,
+            w: 160,
+            h: 165,
+            kind: "flowerpot",
+            name: "The Sprint Pot",
+          },
+        ],
+        tutorials: [
+          {
+            x: 95,
+            text: "Gold target: 18 seconds. Follow the petals for coins, or find your own fast route.",
+          },
+        ],
+        goal: { x: 2180, y: 430 },
+      },
+      {
+        id: 12,
+        contentId: "challenge.firefly-hollow",
+        name: "Lantern-Leaf Relay",
+        subtitle: "Cross the stream on drifting leaves and light the far bank.",
+        kind: "challenge",
+        challengeTime: 20,
+        theme: "dusk",
+        width: 2500,
+        spawn: { x: 95, y: 392 },
+        platforms: [
+          ground(0, 760),
+          ground(1040, 1460),
+          wakingPlant(230, 340, 150, "curled"),
+          movingLeaf(450, 280, 180, "y", 35, 4),
+          ledge(690, 205, 170),
+          movingLeaf(860, 340, 170, "x", 45, 3.6),
+          ledge(1160, 340, 170),
+          movingLeaf(1400, 275, 180, "y", 40, 4.2),
+          ledge(1650, 205, 180),
+          movingLeaf(1880, 290, 190, "x", 55, 4),
+          ledge(2180, 340, 170),
+        ],
+        coins: [
+          ...row(250, 308, 4),
+          ...row(710, 173, 4),
+          ...arc(790, 285, 6),
+          ...row(1180, 308, 4),
+          ...row(1670, 173, 4),
+          ...row(2200, 308, 4),
+          ...row(2360, 392, 3),
+        ],
+        stars: [{ x: 1690, y: 155 }],
+        diamonds: [
+          { x: 165, y: 400 },
+          { x: 1125, y: 400 },
+        ],
+        enemies: [bug(2030, 1980, 2120, "charger")],
+        checkpoints: [{ x: 1080, y: 430 }],
+        sections: [
+          { x: 0, name: "The Leaf Lift" },
+          { x: 740, name: "Lantern Stream" },
+          { x: 1080, name: "Canopy Relay" },
+        ],
+        fireflies: [],
+        landmarks: [
+          {
+            x: 760,
+            y: 430,
+            w: 280,
+            h: 110,
+            kind: "stream",
+            name: "Lantern Stream",
+          },
+        ],
+        tutorials: [
+          {
+            x: 95,
+            text: "Gold target: 20 seconds. The drifting leaf carries you over the stream.",
+          },
+        ],
+        goal: { x: 2400, y: 430 },
+      },
+      {
+        id: 13,
+        contentId: "challenge.cloudtop-crossing",
+        name: "Cloudbreak Dash",
+        subtitle:
+          "Keep moving as the cloud bridge melts behind your footsteps.",
+        kind: "challenge",
+        challengeTime: 22,
+        theme: "alpine",
+        width: 2600,
+        spawn: { x: 95, y: 392 },
+        platforms: [
+          ground(0, 720),
+          ground(1360, 1240),
+          ledge(240, 340, 160),
+          cloud(470, 275, 180),
+          cloud(700, 340, 190),
+          cloud(860, 340, 190),
+          cloud(1020, 340, 190),
+          cloud(1180, 340, 190),
+          wakingPlant(1470, 340, 170),
+          cloud(1710, 265, 180),
+          ledge(1950, 195, 200),
+          cloud(2220, 310, 180),
+        ],
+        coins: [
+          ...row(260, 308, 4),
+          ...row(490, 243, 4),
+          ...row(735, 308, 17, 35),
+          ...row(1490, 308, 4),
+          ...row(1730, 233, 4),
+          ...row(1980, 163, 5),
+          ...row(2240, 278, 4),
+          ...row(2440, 392, 3),
+        ],
+        stars: [{ x: 2020, y: 145 }],
+        diamonds: [
+          { x: 165, y: 400 },
+          { x: 1425, y: 400 },
+        ],
+        enemies: [bug(1770, 1680, 1870, "hopper")],
+        checkpoints: [{ x: 1390, y: 430 }],
+        sections: [
+          { x: 0, name: "A Moment to Breathe" },
+          { x: 690, name: "The Melting Bridge" },
+          { x: 1390, name: "The Last Leap" },
+        ],
+        fireflies: [],
+        landmarks: [
+          {
+            x: 1950,
+            y: 195,
+            w: 200,
+            h: 235,
+            kind: "flowerpot",
+            name: "The Sky Garden",
+          },
+        ],
+        tutorials: [
+          {
+            x: 95,
+            text: "Gold target: 22 seconds. Clouds tremble, then vanish. Cross the bridge without stopping.",
+          },
+        ],
+        goal: { x: 2500, y: 430 },
+      },
+    ] satisfies Level[]
+  ).map(withRewardBlocks),
+  ...expansionChallenges,
+];

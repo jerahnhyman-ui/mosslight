@@ -262,7 +262,7 @@ describe("adventure progress", () => {
     });
     expect(save.progress[0].fireflies).toEqual([0, 2]);
     expect(save.progress[0].adventureBestTime).toBeNull();
-    expect(save.progress).toHaveLength(6);
+    expect(save.progress).toHaveLength(7);
   });
 
   it("continues with session-only progress when storage is unavailable", () => {
@@ -524,11 +524,12 @@ describe("windmill save migration and rewards", () => {
     writeSave(save);
     expect(readSave()).toEqual(save);
   });
-  it("persists discoveries, eighteen rescues, and idempotent bee and hoop rewards", () => {
+  it("persists discoveries, twenty-one rescues, and idempotent bee and hoop rewards", () => {
     const save = readSave();
     for (const world of save.progress) recordFireflies(world, [0, 1, 2]);
-    expect(rescuedTotal(save)).toBe(18);
-    expect(challengeUnlocked(save, 3)).toBe(false);
+    expect(rescuedTotal(save)).toBe(21);
+    // Every world, Windmill Garden included, now has a challenge room.
+    expect(challengeUnlocked(save, 3)).toBe(true);
     expect(purchaseItem(save, "cosmetic.bee_scarf")).toBe("locked");
     expect(purchaseItem(save, "cosmetic.pinwheel_garland")).toBe("locked");
     expect(discoverBeehive(save)).toBe(true);
@@ -600,7 +601,7 @@ describe("Reedwater Marsh progress", () => {
     delete stored.worlds["world.reedwater-marsh"];
     items.set(SAVE_KEY, JSON.stringify(stored));
     const loaded = readSave();
-    expect(loaded.progress).toHaveLength(6);
+    expect(loaded.progress).toHaveLength(7);
     expect(loaded.progress[3]!.fireflies).toEqual([0, 2]);
     expect(loaded.progress[3]!.garden.classic.completed).toBe(true);
     expect(loaded.progress[4]!.fireflies).toEqual([]);
@@ -658,5 +659,19 @@ describe("comfort settings from player feedback", () => {
     const loaded = readSave();
     expect(loaded.messages).toBe(true);
     expect(loaded.tipsSeen).toEqual(["world.sunlit-meadow:0"]);
+  });
+});
+
+describe("game speed setting", () => {
+  it("defaults to normal speed and saves only supported speeds", () => {
+    const save = readSave();
+    expect(save.gameSpeed).toBe(1);
+    save.gameSpeed = 0.7;
+    writeSave(save);
+    expect(readSave().gameSpeed).toBe(0.7);
+    const stored = JSON.parse(items.get(SAVE_KEY)!);
+    stored.gameSpeed = 0.1;
+    items.set(SAVE_KEY, JSON.stringify(stored));
+    expect(readSave().gameSpeed).toBe(1);
   });
 });

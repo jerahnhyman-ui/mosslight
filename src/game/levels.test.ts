@@ -525,6 +525,7 @@ describe("Living garden level safety", () => {
       undefined,
       "toad",
       "mole",
+      "crab",
     ]);
     for (const level of levels.slice(0, 3)) {
       const boss = level.boss!;
@@ -584,13 +585,13 @@ describe("Living garden level safety", () => {
     },
   );
 
-  it("provides a safe playable home and three separate challenge rooms", () => {
+  it("provides a safe playable home and six separate challenge rooms", () => {
     expect(groveLevel.kind).toBe("grove");
     expect(groveLevel.enemies).toHaveLength(0);
     expect(groveLevel.boss).toBeUndefined();
     expect(groveLevel.coins).toHaveLength(0);
-    expect(challengeLevels).toHaveLength(3);
-    expect(new Set(challengeLevels.map((level) => level.name)).size).toBe(3);
+    expect(challengeLevels).toHaveLength(6);
+    expect(new Set(challengeLevels.map((level) => level.name)).size).toBe(6);
     for (const level of challengeLevels) {
       expect(level.kind).toBe("challenge");
       expect(level.challengeTime).toBeGreaterThan(0);
@@ -639,7 +640,10 @@ const challengeRoutes: RouteStep[][] = [
   ],
 ];
 describe("Playable rewards", () => {
-  it.each(challengeLevels.map((level, index) => ({ level, index })))(
+  // Rooms 4–6 use moving platforms; challenge-expansion.test.ts times them.
+  it.each(
+    challengeLevels.slice(0, 3).map((level, index) => ({ level, index })),
+  )(
     "finishes $level.name using normal input within the gold target",
     ({ level, index }) => {
       const game = new Game(index, { level, mode: "timed" });

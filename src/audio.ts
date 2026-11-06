@@ -268,6 +268,10 @@ const effects: Record<string, number[]> = {
   "star-end": [660, 440, 330],
   hurt: [200, 150, 95],
   stomp: [180, 400],
+  // Gulp the frog: a happy croak, a quick tongue snap, and a startled hop.
+  mount: [262, 196, 330],
+  gulp: [520, 260, 780],
+  dismount: [300, 200, 150],
   checkpoint: [520, 660, 780],
   firefly: [880, 1175, 1568],
   bounce: [180, 360, 620],

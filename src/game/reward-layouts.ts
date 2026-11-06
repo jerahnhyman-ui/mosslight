@@ -65,6 +65,12 @@ const layouts: Record<string, readonly Placement[]> = {
     // Recovery Sunseed on the mole's floor, after the last checkpoint.
     ["diamond", 8210, 300],
   ],
+  // Underwater worlds have no feather: flight does not work while swimming.
+  "world.tidewell-depths": [
+    ["diamond", 120, 360],
+    // Recovery Sunseed on the seabed after the last checkpoint.
+    ["diamond", 5480, 360],
+  ],
   grove: [["feather", 260, 300]],
   "secret.beehive": [
     ["feather", 150, 300],

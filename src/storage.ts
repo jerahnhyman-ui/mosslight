@@ -183,6 +183,8 @@ export interface Save {
   claimedRewards: string[];
   /** Pop-up messages and first-time tip cards. Off unless the player opts in. */
   messages: boolean;
+  /** Whole-game speed, for players who want more time to react. */
+  gameSpeed: 1 | 0.85 | 0.7;
   /** Tips already shown as a card on this device ("level:index"). */
   tipsSeen: string[];
 }
@@ -202,6 +204,7 @@ export const WORLD_IDS = [
   "world.windmill-garden",
   "world.reedwater-marsh",
   "world.glimmerdeep-caverns",
+  "world.tidewell-depths",
 ] as const;
 /** Worlds every v3 save already contains; later worlds may be missing. */
 const ORIGINAL_WORLD_COUNT = 4;
@@ -209,6 +212,9 @@ export const CHALLENGE_IDS = [
   "challenge.sunlit-meadow",
   "challenge.firefly-hollow",
   "challenge.cloudtop-crossing",
+  "challenge.windmill-garden",
+  "challenge.reedwater-marsh",
+  "challenge.glimmerdeep-caverns",
 ] as const;
 const emptyHoops = (): HoopRecord => ({
   revision: 1,
@@ -229,7 +235,7 @@ const blank = (): Save => ({
   outfit: "leaf",
   selectedCharacter: "pip",
   decorations: [],
-  challenges: Array.from({ length: 3 }, () => ({
+  challenges: Array.from({ length: CHALLENGE_IDS.length }, () => ({
     ...emptyRecord(),
     medal: "none",
   })),
@@ -246,6 +252,7 @@ const blank = (): Save => ({
   },
   claimedRewards: [],
   messages: false,
+  gameSpeed: 1,
   tipsSeen: [],
   progress: Array.from({ length: WORLD_IDS.length }, () => ({
     completed: false,
@@ -427,6 +434,8 @@ export function readSave(): Save {
     }
     // A new setting name, so earlier saves start with messages off.
     defaults.messages = raw.messages === true;
+    if ([1, 0.85, 0.7].includes(raw.gameSpeed))
+      defaults.gameSpeed = raw.gameSpeed;
     if (Array.isArray(raw.tipsSeen))
       defaults.tipsSeen = [
         ...new Set(
@@ -613,7 +622,9 @@ export function recordGardenRun(
 }
 export function challengeUnlocked(save: Save, world: number) {
   return (
-    world >= 0 && world < 3 && save.progress[world]?.fireflies.length === 3
+    world >= 0 &&
+    world < CHALLENGE_IDS.length &&
+    save.progress[world]?.fireflies.length === 3
   );
 }
 export function recordChallenge(
@@ -651,6 +662,7 @@ export function worldUnlocked(save: Save, index: number): boolean {
   if (index === 3) return gardenCompleted(save, 0);
   if (index === 4) return gardenCompleted(save, 3);
   if (index === 5) return gardenCompleted(save, 4);
+  if (index === 6) return gardenCompleted(save, 5);
   return true;
 }
 export function discoverFeather(save: Save): boolean {

@@ -32,12 +32,14 @@ export type MillState =
   | "recover"
   | "transition";
 export type BossHazard = Rect & {
-  kind: "web" | "gust" | "sweep";
+  kind: "web" | "gust" | "sweep" | "bubble";
   vx: number;
   vy: number;
   remaining: number;
 };
 
+/** Longest a hermit crab scuttles before stopping to rest. */
+export const CRAB_SCUTTLE = 1.4;
 /** Seconds the crystal mole spends tunnelling, and how long its mark is
  * locked in place before it bursts up. */
 export const MOLE_BURROW = 1.7;
@@ -66,7 +68,9 @@ export function createBoss(spec: BossSpec): BossState {
               ? { w: 96, h: 66 }
               : spec.kind === "mole"
                 ? { w: 100, h: 64 }
-                : { w: 92, h: 64 };
+                : spec.kind === "crab"
+                  ? { w: 104, h: 56 }
+                  : { w: 92, h: 64 };
   return {
     ...spec,
     ...size,
@@ -291,10 +295,13 @@ export function warnBoss(boss: BossState, player: Rect, events: string[]) {
 function recover(boss: BossState) {
   boss.state = "recover";
   // Later phases leave a shorter, still readable opportunity to stomp.
+  // Swimming is slower than running, so the underwater crab rests longer.
   boss.stateTime =
     boss.kind === "heartwood"
       ? 2.4 - (boss.phase - 1) * 0.2
-      : 2.2 - (boss.phase - 1) * 0.25;
+      : boss.kind === "crab"
+        ? 3.2 - (boss.phase - 1) * 0.2
+        : 2.2 - (boss.phase - 1) * 0.25;
   boss.y = boss.groundY - boss.h;
 }
 
@@ -332,6 +339,9 @@ export function stepBoss(
     else if (boss.kind === "spider")
       roam(boss, dt, Math.sin(boss.stateTime * 9) * 70);
     else if (boss.kind === "heartwood") roam(boss, dt, towardPlayer * 30);
+    else if (boss.kind === "crab")
+      // It clacks its claws and sidles on the spot before scuttling.
+      roam(boss, dt, Math.sin(boss.stateTime * 16) * 50);
     else if (boss.kind === "toad") {
       // The toad bobs side to side while crouched; its leap starts from
       // wherever it is. (The moth already rises to hover as it warns.)
@@ -363,7 +373,9 @@ export function stepBoss(
               ? TOAD_LEAP
               : boss.kind === "mole"
                 ? MOLE_EMERGE
-                : 1.3;
+                : boss.kind === "crab"
+                  ? CRAB_SCUTTLE
+                  : 1.3;
     boss.attackElapsed = 0;
   }
   if (boss.state === "attack") {
@@ -432,6 +444,30 @@ export function stepBoss(
         });
         boss.shotsFired++;
       }
+    } else if (boss.kind === "crab") {
+      // It scuttles sideways along the seabed, puffing bubbles that drift
+      // up through the water. Swim around them; it tires at the wall.
+      boss.x += boss.facing * (200 + boss.phase * 40) * dt;
+      if (
+        boss.shotsFired < boss.phase + 2 &&
+        boss.attackElapsed >= 0.15 + boss.shotsFired * 0.3
+      ) {
+        hazards.push({
+          kind: "bubble",
+          x: boss.x + boss.w / 2 - 11,
+          y: boss.groundY - boss.h - 10,
+          w: 22,
+          h: 22,
+          vx: -boss.facing * (25 + boss.phase * 10),
+          vy: -85,
+          remaining: 3.5,
+        });
+        boss.shotsFired++;
+      }
+      if (boss.x <= boss.minX || boss.x >= boss.maxX) {
+        boss.x = clamp(boss.x, boss.minX, boss.maxX);
+        boss.stateTime = 0;
+      }
     } else if (boss.kind === "mole") {
       // It bursts up through the marked spot.
       boss.x = boss.attackTargetX;
@@ -477,7 +513,9 @@ export function stepBoss(
     // A dazed guardian staggers slowly away from Pip, so the stomp has to
     // be chased and aimed, but the opening stays generous and the next
     // attack never starts on top of Pip.
-    roam(boss, dt, -towardPlayer * (22 + boss.phase * 8));
+    // (The crab lies still on its shell.)
+    if (boss.kind !== "crab")
+      roam(boss, dt, -towardPlayer * (22 + boss.phase * 8));
     if (boss.stateTime === 0) warnBoss(boss, player, events);
   }
 }
