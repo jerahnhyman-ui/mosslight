@@ -59,6 +59,17 @@ const overhang = (x: number, w: number, y = 180): Platform => ({
 });
 const row = (x: number, y: number, count: number, gap = 35) =>
   Array.from({ length: count }, (_, i) => ({ x: x + i * gap, y }));
+/** Coins that bob back and forth along one axis. */
+const bobbing = (
+  coins: { x: number; y: number }[],
+  axis: "x" | "y",
+  range: number,
+  period: number,
+) =>
+  coins.map((c, i) => ({
+    ...c,
+    move: { axis, range, period, phase: i * 0.5 },
+  }));
 const bug = (
   kind: EnemyKind,
   x: number,
@@ -134,7 +145,7 @@ export const snowLevel: Level = withRewardBlocks({
   coins: [
     ...row(365, 318, 3),
     ...row(605, 268, 3),
-    ...row(1410, 340, 3),
+    ...bobbing(row(1410, 340, 3), "x", 40, 2.4),
     ...row(2470, 358, 2),
     ...row(2630, 338, 2),
     ...row(2790, 358, 2),
@@ -143,7 +154,7 @@ export const snowLevel: Level = withRewardBlocks({
     ...row(3460, 178, 4),
     ...row(4520, 300, 3),
     ...row(4720, 248, 3),
-    ...row(4920, 268, 3),
+    ...bobbing(row(4920, 268, 3), "y", 18, 1.8),
     ...row(5620, 308, 3),
     ...row(5820, 228, 3),
     ...row(6020, 148, 3),
@@ -154,6 +165,14 @@ export const snowLevel: Level = withRewardBlocks({
   ],
   stars: [],
   diamonds: [],
+  coinRings: [
+    {
+      x: 7020,
+      y: 395,
+      time: 5,
+      coins: row(7080, 392, 13, 60),
+    },
+  ],
   fireflies: [
     { x: 3730, y: 85, id: "snow.firefly.snowcap-loft" },
     { x: 6070, y: 145, id: "snow.firefly.summit-steps" },

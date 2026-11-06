@@ -8,6 +8,9 @@ import {
   COINS_PER_LIFE,
   MAX_LIVES,
   STAR_POWER_DURATION,
+  MAGNET_DURATION,
+  SPRING_DURATION,
+  RING_BONUS,
 } from "./game/engine";
 import {
   levels,
@@ -1721,6 +1724,27 @@ function frame(now: number) {
       ["extra-life", "+1 life!", "pip"],
       ["grow", "Big Pip! One hit protected", "diamond"],
       ["star", `Star power! ${STAR_POWER_DURATION} seconds`, "leaf"],
+      [
+        "magnet",
+        `Coin magnet! Nearby coins fly to you for ${MAGNET_DURATION} seconds`,
+        "leaf",
+      ],
+      ["magnet-end", "Coin magnet ended", "leaf"],
+      ["shield", "Bubble shield! It pops instead of you getting hurt", "pip"],
+      ["shield-pop", "Pop! The bubble shield kept you safe", "pip"],
+      [
+        "spring",
+        `Spring shoes! Higher jumps for ${SPRING_DURATION} seconds`,
+        "leaf",
+      ],
+      ["spring-end", "Spring shoes wore off", "leaf"],
+      [
+        "ring-start",
+        "Coin ring! Catch every blue coin before time runs out",
+        "leaf",
+      ],
+      ["ring-clear", `Every blue coin! +${RING_BONUS} bonus coins`, "leaf"],
+      ["ring-fail", "Out of time. Touch the ring to try again", "leaf"],
       [
         "firefly",
         `Firefly rescued · ${save.progress[selected].fireflies.length} / 3 home`,

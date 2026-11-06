@@ -344,6 +344,16 @@ const effects: Record<string, number[]> = {
   "life-lost": [220, 165, 110],
   "extra-life": [523, 784, 1047, 1319],
   "star-end": [660, 440, 330],
+  // The new block powers and timed coin rings.
+  magnet: [520, 780, 1040],
+  "magnet-end": [780, 520],
+  shield: [440, 660, 880, 1100],
+  "shield-pop": [900, 600, 300],
+  spring: [330, 660, 990],
+  "spring-end": [660, 330],
+  "ring-start": [880, 1175, 1568],
+  "ring-clear": [784, 988, 1175, 1568],
+  "ring-fail": [440, 370, 330],
   hurt: [200, 150, 95],
   stomp: [180, 400],
   // A found acorn, a rising stomp chain, and the soft firefly chime.

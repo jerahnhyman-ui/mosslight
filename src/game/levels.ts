@@ -43,7 +43,7 @@ export type Platform = Rect & {
   /** A boat: once Pip boards, it cruises right at `speed` until `until`. */
   cruise?: { speed: number; until: number };
   /** Power released by bumping this solid block from below. */
-  rewardPower?: "diamond" | "feather" | "star";
+  rewardPower?: "diamond" | "feather" | "star" | "magnet" | "shield" | "spring";
   wakeRadius?: number;
   enemyBreakable?: boolean;
 };
@@ -116,7 +116,20 @@ export interface Level {
     | "volcano";
   spawn: { x: number; y: number };
   platforms: Platform[];
-  coins: { x: number; y: number }[];
+  coins: {
+    x: number;
+    y: number;
+    /** A coin that bobs back and forth along one axis. */
+    move?: { axis: "x" | "y"; range: number; period: number; phase?: number };
+  }[];
+  /** Touch a ring to release a trail of blue coins; catch them all in time
+   * for a bonus. */
+  coinRings?: {
+    x: number;
+    y: number;
+    time: number;
+    coins: { x: number; y: number }[];
+  }[];
   stars: { x: number; y: number }[];
   diamonds: { x: number; y: number }[];
   enemies: EnemySpawn[];

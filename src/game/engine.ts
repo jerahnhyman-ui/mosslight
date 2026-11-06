@@ -53,6 +53,10 @@ export type Collectible = {
   x: number;
   y: number;
   collected: boolean;
+  /** Moving coins bob around a base position. */
+  baseX?: number;
+  baseY?: number;
+  move?: { axis: "x" | "y"; range: number; period: number; phase?: number };
   fromRewardBlock?: boolean;
   /** A reserve diamond falls into the scene after Pip takes a hit. */
   reserveDrop?: { vy: number; pickupDelay: number; needsSeparation: boolean };
@@ -109,6 +113,14 @@ const MOUNT_JUMP_BOOST = 1.12;
 export const MAX_LIVES = 3;
 export const COINS_PER_LIFE = 50;
 export const STAR_POWER_DURATION = 10;
+/** Seconds a coin magnet pulls in nearby coins. */
+export const MAGNET_DURATION = 12;
+/** Seconds spring shoes give higher jumps. */
+export const SPRING_DURATION = 15;
+const MAGNET_RADIUS = 190;
+const SPRING_BOOST = 1.22;
+/** Bonus coins for catching every coin a ring releases. */
+export const RING_BONUS = 10;
 export const ENEMY_SQUASH_DURATION = 0.4;
 export const CRUMBLE_WARNING = 0.8;
 const SMALL_SIZE = { w: 28, h: 38 };
@@ -230,6 +242,18 @@ export class Game {
   collectedStars = 0;
   collectedFireflies = 0;
   starPowerRemaining = 0;
+  magnetRemaining = 0;
+  springRemaining = 0;
+  /** A bubble that pops instead of Pip taking a hit. */
+  shield = false;
+  coinRings: {
+    x: number;
+    y: number;
+    time: number;
+    state: "ready" | "active" | "cooldown" | "done";
+    remaining: number;
+    coins: { x: number; y: number; collected: boolean; paid: boolean }[];
+  }[] = [];
   elapsed = 0;
   deaths = 0;
   activeCheckpointIndex = -1;
@@ -382,7 +406,18 @@ export class Game {
       (tile) => tile.id === "windmill.reed-screen",
     );
     if (reed) reed.broken = true;
-    this.coins = this.level.coins.map((c) => ({ ...c, collected: false }));
+    this.coins = this.level.coins.map((c) => ({
+      ...c,
+      baseX: c.x,
+      baseY: c.y,
+      collected: false,
+    }));
+    this.coinRings = (this.level.coinRings ?? []).map((ring) => ({
+      ...ring,
+      state: "ready" as const,
+      remaining: 0,
+      coins: ring.coins.map((c) => ({ ...c, collected: false, paid: false })),
+    }));
     this.acorns = acornSpots(this.level).map((a) => ({
       ...a,
       collected: false,
@@ -499,6 +534,9 @@ export class Game {
     this.collectedStars = source.collectedStars;
     this.reserveDiamond = source.reserveDiamond;
     this.starPowerRemaining = source.starPowerRemaining;
+    this.magnetRemaining = source.magnetRemaining;
+    this.springRemaining = source.springRemaining;
+    this.shield = source.shield;
     this.hasWindFeather = source.hasWindFeather;
     this.liftTicks = source.liftTicks;
     this.liftRemaining = this.liftTicks * STEP;
@@ -559,6 +597,20 @@ export class Game {
       return;
     }
     this.elapsed += STEP;
+    if (this.magnetRemaining > 0) {
+      this.magnetRemaining = Math.max(0, this.magnetRemaining - STEP);
+      if (this.magnetRemaining < 1e-9) {
+        this.magnetRemaining = 0;
+        this.events.push("magnet-end");
+      }
+    }
+    if (this.springRemaining > 0) {
+      this.springRemaining = Math.max(0, this.springRemaining - STEP);
+      if (this.springRemaining < 1e-9) {
+        this.springRemaining = 0;
+        this.events.push("spring-end");
+      }
+    }
     if (this.starPowerRemaining > 0) {
       this.starPowerRemaining = Math.max(0, this.starPowerRemaining - STEP);
       if (this.starPowerRemaining < 1e-9) {
@@ -859,6 +911,15 @@ export class Game {
               });
             } else if (tile.rewardPower === "feather") {
               this.equipFeather();
+            } else if (tile.rewardPower === "magnet") {
+              this.magnetRemaining = MAGNET_DURATION;
+              this.events.push("magnet");
+            } else if (tile.rewardPower === "shield") {
+              this.shield = true;
+              this.events.push("shield");
+            } else if (tile.rewardPower === "spring") {
+              this.springRemaining = SPRING_DURATION;
+              this.events.push("spring");
             } else {
               this.collectedStars++;
               this.starPowerRemaining = STAR_POWER_DURATION;
@@ -892,15 +953,35 @@ export class Game {
     this.updateExpansion(previousCenterX, previousCenterY);
     if (this.minigame.finished) return;
 
+    const pcx = p.x + p.w / 2,
+      pcy = p.y + p.h / 2;
     for (const coin of this.coins) {
+      if (coin.collected) continue;
       if (
-        !coin.collected &&
-        overlaps(p, { x: coin.x - 10, y: coin.y - 12, w: 20, h: 24 })
+        this.magnetRemaining > 0 &&
+        Math.hypot(coin.x - pcx, coin.y - pcy) < MAGNET_RADIUS
       ) {
+        // The magnet pulls the coin in; it stops bobbing once caught.
+        coin.move = undefined;
+        const d = Math.hypot(coin.x - pcx, coin.y - pcy) || 1;
+        const pull = Math.min(d, 560 * STEP);
+        coin.x += ((pcx - coin.x) / d) * pull;
+        coin.y += ((pcy - coin.y) / d) * pull;
+      } else if (coin.move) {
+        const wave =
+          Math.sin(
+            (this.elapsed / coin.move.period) * Math.PI * 2 +
+              (coin.move.phase ?? 0),
+          ) * coin.move.range;
+        if (coin.move.axis === "x") coin.x = (coin.baseX ?? coin.x) + wave;
+        else coin.y = (coin.baseY ?? coin.y) + wave;
+      }
+      if (overlaps(p, { x: coin.x - 10, y: coin.y - 12, w: 20, h: 24 })) {
         coin.collected = true;
         this.awardCoins(1);
       }
     }
+    this.updateCoinRings();
     for (const acorn of this.acorns) {
       if (
         !acorn.collected &&
@@ -1381,6 +1462,16 @@ export class Game {
       this.level.kind === "grove"
     )
       return false;
+    if (this.shield) {
+      // The bubble pops instead: Pip keeps their size and a moment of safety.
+      this.shield = false;
+      p.invulnerable = 1.2;
+      p.vy = Math.min(p.vy, -260);
+      p.grounded = false;
+      this.hurtLock = 0.15;
+      this.events.push("shield-pop");
+      return false;
+    }
     if (this.riding) {
       // Gulp takes the hit: Pip tumbles off and Gulp hops away.
       const mount = this.riding;
@@ -1892,7 +1983,9 @@ export class Game {
       return;
     if (this.player.grounded) this.activateOnTakeoff(input);
     this.player.vy =
-      (input.jump ? JUMP : SHORT_JUMP) * (this.riding ? MOUNT_JUMP_BOOST : 1);
+      (input.jump ? JUMP : SHORT_JUMP) *
+      (this.riding ? MOUNT_JUMP_BOOST : 1) *
+      (this.springRemaining > 0 ? SPRING_BOOST : 1);
     this.player.grounded = false;
     this.coyote = 0;
     this.jumpBuffer = 0;
@@ -2060,6 +2153,14 @@ export class Game {
     this.deaths++;
     this.resetMounts();
     this.starPowerRemaining = 0;
+    this.magnetRemaining = 0;
+    this.springRemaining = 0;
+    this.shield = false;
+    for (const ring of this.coinRings)
+      if (ring.state === "active" || ring.state === "cooldown") {
+        ring.state = "ready";
+        for (const c of ring.coins) c.collected = false;
+      }
     this.events.push("life-lost");
     this.hazards = [];
     const retrySpec = this.finalBossStarted
@@ -2087,6 +2188,50 @@ export class Game {
       this.events.push("lose");
     } else this.spawn();
     return true;
+  }
+
+  /** Timed coin rings: touching one releases its blue coins for a while. */
+  private updateCoinRings() {
+    const p = this.player;
+    for (const ring of this.coinRings) {
+      if (ring.state === "done") continue;
+      if (ring.state === "ready") {
+        if (overlaps(p, { x: ring.x - 22, y: ring.y - 30, w: 44, h: 60 })) {
+          ring.state = "active";
+          ring.remaining = ring.time;
+          for (const c of ring.coins) c.collected = false;
+          this.events.push("ring-start");
+        }
+        continue;
+      }
+      ring.remaining = Math.max(0, ring.remaining - STEP);
+      if (ring.state === "cooldown") {
+        if (ring.remaining === 0) ring.state = "ready";
+        continue;
+      }
+      for (const c of ring.coins) {
+        if (
+          !c.collected &&
+          overlaps(p, { x: c.x - 10, y: c.y - 12, w: 20, h: 24 })
+        ) {
+          c.collected = true;
+          // Each blue coin pays once, however many tries it takes.
+          if (!c.paid) {
+            c.paid = true;
+            this.awardCoins(1);
+          } else this.events.push("coin");
+        }
+      }
+      if (ring.coins.every((c) => c.collected)) {
+        ring.state = "done";
+        this.awardCoins(RING_BONUS);
+        this.events.push("ring-clear");
+      } else if (ring.remaining === 0) {
+        ring.state = "cooldown";
+        ring.remaining = 2;
+        this.events.push("ring-fail");
+      }
+    }
   }
 
   private resetRetryRewards() {

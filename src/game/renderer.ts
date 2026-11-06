@@ -721,11 +721,12 @@ export class Renderer {
       game.coins.forEach((coin, i) => {
         if (
           !coin.collected &&
-          !hidden.has(`${coin.x},${coin.y}`) &&
+          !hidden.has(`${coin.baseX ?? coin.x},${coin.baseY ?? coin.y}`) &&
           this.visible(coin.x, 24)
         )
           this.coin(coin.x, coin.y, time, i);
       });
+      for (const ring of game.coinRings) this.coinRing(ring, time);
       if (game.level.chase && Number.isFinite(game.chaseX))
         this.floodWall(game.chaseX, time);
       for (const lantern of game.lanterns)
@@ -927,6 +928,7 @@ export class Renderer {
       c.restore();
       if (game.starPowerRemaining > 0)
         this.starAura(center, feet, size, game.starPowerRemaining, time, true);
+      this.powerEffects(game, center, feet, size, time);
       if (game.level.dark && !titleMode) this.nightDarkness(game, time);
       this.worldOverlays(game, dt);
     } else {
@@ -4812,6 +4814,9 @@ export class Renderer {
       diamond: { face: "#f0a463", edge: "#9a5a34", glyph: "#fff1c9" },
       feather: { face: "#a6d786", edge: "#568457", glyph: "#fff8d6" },
       star: { face: "#f9cf68", edge: "#a6793e", glyph: "#fff8ce" },
+      magnet: { face: "#e98a8a", edge: "#9c4646", glyph: "#fff1f1" },
+      shield: { face: "#8fc7ee", edge: "#3f7aa8", glyph: "#f2faff" },
+      spring: { face: "#b8e070", edge: "#5f8a32", glyph: "#fbffe8" },
     } as const;
     if (!rewardPower) return;
     const tone = colors[rewardPower];
@@ -4835,6 +4840,43 @@ export class Renderer {
     if (rewardPower === "star") {
       this.starPath(0, 0, 10);
       c.fill();
+      c.stroke();
+    } else if (rewardPower === "magnet") {
+      // A horseshoe magnet.
+      c.lineWidth = 5;
+      c.lineCap = "butt";
+      c.strokeStyle = rewardUsed ? "#8b8980" : tone.glyph;
+      c.beginPath();
+      c.arc(0, -1, 6.5, Math.PI, 0, true);
+      c.lineTo(6.5, 7);
+      c.moveTo(-6.5, -1);
+      c.lineTo(-6.5, 7);
+      c.stroke();
+      if (!rewardUsed) {
+        this.rounded(-9, 5, 5, 4, 1, "#d8dde4");
+        this.rounded(4, 5, 5, 4, 1, "#d8dde4");
+      }
+    } else if (rewardPower === "shield") {
+      this.ellipse(
+        0,
+        0,
+        10,
+        10,
+        rewardUsed ? "#8b8980" : "rgba(242,250,255,.85)",
+        edge,
+        1.5,
+      );
+      this.ellipse(-3, -4, 3, 2, "#ffffff");
+    } else if (rewardPower === "spring") {
+      // A coiled spring.
+      c.lineWidth = 2.4;
+      c.strokeStyle = rewardUsed ? "#8b8980" : tone.glyph;
+      c.beginPath();
+      for (let i = 0; i <= 4; i++) {
+        const yy = 8 - i * 4;
+        c.moveTo(-7, yy);
+        c.lineTo(7, yy - 2);
+      }
       c.stroke();
     } else if (rewardPower === "diamond") {
       // A Sunseed glyph: a seed with a small leaf.
@@ -4971,6 +5013,132 @@ export class Renderer {
     c.fill();
     this.ellipse(x - 4, y - 14, 3, 2, "#fff2d1");
     this.ellipse(x + 5, y - 11, 2, 1.5, "#fff2d1");
+  }
+
+  /** A shield bubble, magnet glow and spring sparkle around the hero. */
+  private powerEffects(
+    game: Game,
+    center: number,
+    feet: number,
+    size: number,
+    time: number,
+  ) {
+    const c = this.ctx;
+    const cy = feet - 26 * size;
+    if (game.magnetRemaining > 0) {
+      const fading = game.magnetRemaining < 2 && Math.sin(time * 20) > 0;
+      if (!fading) {
+        c.save();
+        c.strokeStyle = "rgba(233,120,120,.45)";
+        c.lineWidth = 2;
+        c.setLineDash([6, 8]);
+        c.lineDashOffset = -time * 40;
+        c.beginPath();
+        c.arc(center, cy, 60 + Math.sin(time * 4) * 4, 0, Math.PI * 2);
+        c.stroke();
+        c.restore();
+      }
+    }
+    if (game.shield) {
+      const g = c.createRadialGradient(
+        center - 8,
+        cy - 10,
+        4,
+        center,
+        cy,
+        40 * size,
+      );
+      g.addColorStop(0, "rgba(255,255,255,.25)");
+      g.addColorStop(0.75, "rgba(143,199,238,.18)");
+      g.addColorStop(1, "rgba(143,199,238,.5)");
+      this.ellipse(
+        center,
+        cy,
+        34 * size,
+        38 * size,
+        g as unknown as string,
+        "rgba(120,180,230,.7)",
+        2,
+      );
+      this.ellipse(
+        center - 12 * size,
+        cy - 16 * size,
+        6,
+        4,
+        "rgba(255,255,255,.8)",
+      );
+    }
+    if (game.springRemaining > 0) {
+      const fading = game.springRemaining < 2 && Math.sin(time * 20) > 0;
+      if (!fading)
+        for (const dx of [-9, 9]) {
+          this.ellipse(
+            center + dx * size,
+            feet - 2,
+            6,
+            3,
+            "#b8e070",
+            "#5f8a32",
+            1.2,
+          );
+          this.ellipse(
+            center + dx * size,
+            feet + 3 + Math.sin(time * 12 + dx) * 2,
+            2,
+            2,
+            "rgba(255,255,200,.8)",
+          );
+        }
+    }
+  }
+
+  /** A timed coin ring and, while it runs, its blue coins and timer. */
+  private coinRing(ring: Game["coinRings"][number], time: number) {
+    const c = this.ctx;
+    if (ring.state === "active")
+      ring.coins.forEach((coin, i) => {
+        if (coin.collected || !this.visible(coin.x, 24)) return;
+        const bob = Math.sin(time * 4 + i * 0.6) * 2.5;
+        this.ellipse(coin.x, coin.y + bob, 13, 15, "rgba(140,210,255,.22)");
+        this.ellipse(
+          coin.x,
+          coin.y + 1 + bob,
+          8,
+          11,
+          "#3f86c6",
+          "#2c6aa3",
+          1.5,
+        );
+        this.ellipse(coin.x, coin.y - 1 + bob, 7, 10, "#7cc4f5");
+        this.ellipse(coin.x - 1.5, coin.y - 3 + bob, 4, 6, "#c8ecff");
+      });
+    if (ring.state === "done" || !this.visible(ring.x, 40)) return;
+    const pulse = ring.state === "ready" ? Math.sin(time * 3) * 2 : 0;
+    c.save();
+    c.globalAlpha = ring.state === "cooldown" ? 0.35 : 1;
+    c.lineWidth = 6;
+    c.strokeStyle = "#5fb3ee";
+    c.beginPath();
+    c.ellipse(ring.x, ring.y, 16 + pulse, 26 + pulse, 0, 0, Math.PI * 2);
+    c.stroke();
+    c.lineWidth = 2;
+    c.strokeStyle = "#e6f6ff";
+    c.stroke();
+    if (ring.state === "active") {
+      // The timer drains around the ring.
+      c.lineWidth = 5;
+      c.strokeStyle = "#ffd96a";
+      c.beginPath();
+      c.arc(
+        ring.x,
+        ring.y - 44,
+        10,
+        -Math.PI / 2,
+        -Math.PI / 2 + (ring.remaining / ring.time) * Math.PI * 2,
+      );
+      c.stroke();
+    }
+    c.restore();
   }
 
   private coin(x: number, y: number, time: number, index: number) {
