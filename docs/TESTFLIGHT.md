@@ -153,8 +153,10 @@ results; neither substitutes for touch feel on an actual phone.
 
 `.github/workflows/testflight-status.yml` runs on every push to `main` (and can
 be run manually with a commit SHA). It follows that commit's Xcode Cloud run,
-waits for Apple's processing, adds the build to the internal **Beta** group if
-it is missing, and passes only when the build shows **Testing**. The job summary
+waits for Apple's processing, adds the build to the **Beta** and **Alpha**
+groups if it is missing, and passes only when the build shows **Testing**. If a
+group is external, the build is submitted for Apple's beta review and a pending
+review is reported. The job summary
 reports the version, build number and state; a failure names the blocker (for
 example a failed archive or a missing export-compliance answer).
 
