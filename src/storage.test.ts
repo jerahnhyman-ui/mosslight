@@ -198,6 +198,7 @@ describe("adventure progress", () => {
       adventureCompleted: false,
       adventureBestTime: null,
       fireflies: [],
+      acorns: [],
       garden: {
         classic: { completed: false, bestTime: null },
         relaxed: { completed: false, bestTime: null },
@@ -673,5 +674,27 @@ describe("game speed setting", () => {
     stored.gameSpeed = 0.1;
     items.set(SAVE_KEY, JSON.stringify(stored));
     expect(readSave().gameSpeed).toBe(1);
+  });
+});
+
+describe("acorn rewards", () => {
+  it("saves found acorns per world and unlocks outfits at 10 and at all", async () => {
+    const { recordAcorns, acornTotal, ownsItem } = await import("./storage");
+    const save = readSave();
+    expect(recordAcorns(save, 0, [0, 1, 2, 2, 9])).toEqual([]);
+    expect(save.progress[0]!.acorns).toEqual([0, 1, 2]);
+    expect(recordAcorns(save, 1, [0, 1, 2, 3, 4])).toEqual([]);
+    expect(recordAcorns(save, 2, [0, 1])).toEqual(["cosmetic.acorn_cap"]);
+    expect(acornTotal(save)).toBe(10);
+    for (let w = 0; w < save.progress.length; w++)
+      recordAcorns(save, w, [0, 1, 2, 3, 4]);
+    expect(save.outfits).toContain("cosmetic.golden_leaf");
+    writeSave(save);
+    const loaded = readSave();
+    expect(loaded.progress[2]!.acorns).toEqual([0, 1, 2, 3, 4]);
+    expect(loaded.outfits).toContain("cosmetic.acorn_cap");
+    expect(
+      ownsItem(loaded, { id: "cosmetic.golden_leaf", kind: "outfit" } as never),
+    ).toBe(true);
   });
 });

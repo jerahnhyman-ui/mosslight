@@ -3,6 +3,7 @@ import {
   CRUMBLE_WARNING,
   ENEMY_SQUASH_DURATION,
   type Game,
+  type OutfitId,
 } from "./engine";
 import type { Rect } from "./levels";
 import { CREATURES } from "./creatures";
@@ -233,6 +234,16 @@ export class Renderer {
   viewportHeight = HEIGHT;
   cameraX = 0;
   cameraY = 0;
+  private shake = 0;
+  private popups: {
+    x: number;
+    y: number;
+    text: string;
+    color: string;
+    size: number;
+    life: number;
+  }[] = [];
+  private bossBanner: { name: string; life: number } | null = null;
   private previousTime = 0;
   private previousGame: Game | null = null;
   private previousElapsed = -1;
@@ -485,6 +496,12 @@ export class Renderer {
     this.restoredLight(Math.max(0, Math.min(1, restoration)), time, camera);
     c.save();
     c.translate(-camera, -this.cameraY);
+    if (this.shake > 0 && !titleMode) {
+      // A short screen shake on big impacts.
+      const m = this.shake * 18;
+      c.translate((Math.random() - 0.5) * m, (Math.random() - 0.5) * m);
+    }
+    this.shake = Math.max(0, this.shake - dt);
     if (game.level.theme === "marsh") this.marshWater(camera, time);
 
     // The trees sit on actual ground sections; no scenery suggests a floor over a pit.
@@ -619,9 +636,21 @@ export class Renderer {
           }
         }
       }
+      // A hidden acorn sits on top of its coin and is drawn in its place.
+      const hidden = new Set(
+        game.acorns.filter((a) => !a.collected).map((a) => `${a.x},${a.y}`),
+      );
       game.coins.forEach((coin, i) => {
-        if (!coin.collected && this.visible(coin.x, 24))
+        if (
+          !coin.collected &&
+          !hidden.has(`${coin.x},${coin.y}`) &&
+          this.visible(coin.x, 24)
+        )
           this.coin(coin.x, coin.y, time, i);
+      });
+      game.acorns.forEach((acorn, i) => {
+        if (!acorn.collected && this.visible(acorn.x, 30))
+          this.acorn(acorn.x, acorn.y, time, i);
       });
       game.stars.forEach((star, i) => {
         if (!star.collected && this.visible(star.x, 30))
@@ -775,6 +804,7 @@ export class Renderer {
       c.restore();
       if (game.starPowerRemaining > 0)
         this.starAura(center, feet, size, game.starPowerRemaining, time, true);
+      this.worldOverlays(game, dt);
     } else {
       this.hero(
         titleX,
@@ -2323,6 +2353,88 @@ export class Renderer {
         i % 2 ? "#fff3bb" : "#f4a9b5",
       );
     }
+    c.restore();
+  }
+
+  /** Floating text (combo bonuses, acorns) and the guardian's name card. */
+  private worldOverlays(game: Game, dt: number) {
+    const c = this.ctx;
+    for (const pop of this.popups) {
+      pop.life -= dt;
+      pop.y -= 40 * dt;
+    }
+    this.popups = this.popups.filter((pop) => pop.life > 0);
+    c.save();
+    c.textAlign = "center";
+    for (const pop of this.popups) {
+      c.globalAlpha = Math.min(1, pop.life / 0.4);
+      c.font = `800 ${pop.size}px 'DM Sans', sans-serif`;
+      c.lineWidth = 4;
+      c.strokeStyle = "rgba(40,60,40,.55)";
+      c.strokeText(pop.text, pop.x, pop.y);
+      c.fillStyle = pop.color;
+      c.fillText(pop.text, pop.x, pop.y);
+    }
+    c.restore();
+    const banner = this.bossBanner;
+    if (!banner) return;
+    banner.life -= dt;
+    if (banner.life <= 0) {
+      this.bossBanner = null;
+      return;
+    }
+    // Slides in, holds, and fades: the guardian's name across the screen.
+    const t = 2.4 - banner.life;
+    const alpha = Math.min(1, t / 0.25, banner.life / 0.4);
+    const x = this.cameraX + this.viewportWidth / 2;
+    const y =
+      this.cameraY +
+      this.viewportHeight * 0.3 -
+      (1 - Math.min(1, t / 0.25)) * 20;
+    c.save();
+    c.globalAlpha = alpha;
+    c.font = "800 34px 'DM Sans', sans-serif";
+    const [title, ...rest] = banner.name.split(", ");
+    const width = Math.max(260, c.measureText(title!).width + 80);
+    this.rounded(
+      x - width / 2,
+      y - 48,
+      width,
+      92,
+      22,
+      "rgba(255,248,224,.94)",
+      "#c99a4a",
+    );
+    c.textAlign = "center";
+    c.fillStyle = "#7a3f2a";
+    c.fillText(title!, x, y);
+    if (rest.length) {
+      c.font = "700 16px 'DM Sans', sans-serif";
+      c.fillStyle = "#9a6a3a";
+      c.fillText(rest.join(", "), x, y + 26);
+    }
+    c.restore();
+  }
+
+  /** A hidden acorn: glossy brown with a little cap and a glint. */
+  private acorn(x: number, y: number, time: number, index: number) {
+    const c = this.ctx;
+    c.save();
+    c.translate(x, y + Math.sin(time * 2.3 + index) * 3);
+    c.rotate(Math.sin(time * 1.7 + index) * 0.12);
+    this.ellipse(0, 2, 18, 18, "rgba(255,220,140,.22)");
+    this.ellipse(0, 4, 9, 11, "#b9773a", "#6e4422", 2);
+    this.ellipse(-3, 1, 2.5, 4, "rgba(255,230,190,.6)");
+    this.rounded(-11, -9, 22, 9, 4, "#7a5230", "#4e321c");
+    for (let i = -8; i <= 8; i += 4) this.ellipse(i, -6, 1.6, 1.6, "#9c6d42");
+    this.line(
+      [
+        [0, -9],
+        [2, -14],
+      ],
+      "#4e321c",
+      2,
+    );
     c.restore();
   }
 
@@ -4673,7 +4785,7 @@ export class Renderer {
     landing: number,
     size = 1,
     pose: "normal" | "hurt" | "won" | "lost" = "normal",
-    outfit: "leaf" | "berry" | "moon" | "cosmetic.bee_scarf" = "leaf",
+    outfit: OutfitId = "leaf",
     danger = false,
     flight: "none" | "ready" | "lift" | "glide" = "none",
     character: "pip" | "poppy" = "pip",
@@ -4703,21 +4815,33 @@ export class Renderer {
         ? "#b86c94"
         : outfit === "moon"
           ? "#829ac5"
-          : "#69b86c";
+          : outfit === "cosmetic.acorn_cap"
+            ? "#a8743f"
+            : outfit === "cosmetic.golden_leaf"
+              ? "#e0ad3a"
+              : "#69b86c";
     const outfitLight =
       outfit === "berry"
         ? "#e4a1b9"
         : outfit === "moon"
           ? "#c4d8ed"
-          : "#8cce79";
+          : outfit === "cosmetic.acorn_cap"
+            ? "#d6a56a"
+            : outfit === "cosmetic.golden_leaf"
+              ? "#ffe28a"
+              : "#8cce79";
     const scarf =
       outfit === "cosmetic.bee_scarf"
         ? "#f2c552"
-        : outfit === "berry"
-          ? "#e3b86a"
-          : outfit === "moon"
-            ? "#e6dba7"
-            : "#eb745d";
+        : outfit === "cosmetic.golden_leaf"
+          ? "#fff1b8"
+          : outfit === "cosmetic.acorn_cap"
+            ? "#6f9a4f"
+            : outfit === "berry"
+              ? "#e3b86a"
+              : outfit === "moon"
+                ? "#e6dba7"
+                : "#eb745d";
     const stride = running ? Math.sin(time * 19) : 0;
     const celebration = pose === "won";
     const hurt = pose === "hurt" || pose === "lost";
@@ -4980,7 +5104,7 @@ export class Renderer {
     landing: number,
     size: number,
     pose: "normal" | "hurt" | "won" | "lost",
-    outfit: "leaf" | "berry" | "moon" | "cosmetic.bee_scarf",
+    outfit: OutfitId,
     danger: boolean,
     flight: "none" | "ready" | "lift" | "glide",
   ) {
@@ -5393,6 +5517,32 @@ export class Renderer {
 
   private feedback(game: Game) {
     const pp = game.player;
+    const combo = game.events.find((e) => e.startsWith("combo-"));
+    if (combo && game.lastCombo) {
+      const n = game.lastCombo.count;
+      this.popups.push({
+        x: game.lastCombo.x,
+        y: game.lastCombo.y - 10,
+        text: `×${n}  +${Math.min(5, n - 1)}`,
+        color: n >= 5 ? "#ffcf4d" : "#fff3c2",
+        size: 18 + Math.min(5, n) * 2,
+        life: 0.9,
+      });
+      if (n >= 3) this.shake = Math.max(this.shake, 0.1);
+    }
+    if (game.events.includes("acorn"))
+      this.popups.push({
+        x: pp.x + pp.w / 2,
+        y: pp.y - 12,
+        text: "Acorn!",
+        color: "#ffd9a0",
+        size: 20,
+        life: 1.1,
+      });
+    if (game.events.includes("boss-hit")) this.shake = 0.22;
+    if (game.events.includes("boss-defeat")) this.shake = 0.4;
+    if (game.events.includes("boss-start") && game.boss)
+      this.bossBanner = { name: game.boss.name, life: 2.4 };
     if (game.events.includes("swim-stroke")) {
       // A puff of bubbles trails from Pip's kicking feet.
       this.burst(

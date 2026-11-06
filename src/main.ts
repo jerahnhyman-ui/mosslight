@@ -36,6 +36,8 @@ import {
   ownsItem,
   purchaseItem,
   recordGardenRun,
+  recordAcorns,
+  acornTotal,
   recordChallenge,
   rescuedTotal,
   type PlayMode,
@@ -368,7 +370,7 @@ function updateWorlds() {
             : progress.bestTime !== null
               ? `Original trail ${formatTime(progress.bestTime)}`
               : "Meet this world’s guardian";
-      return `<button class="menu-world ${selected === i ? "selected" : ""} ${light > 0 ? "restored" : ""}" data-menu-world="${i}" ${worldUnlocked(save, i) ? "" : "disabled"} data-light="${light}" style="--world-light:${light}" aria-label="${level.name}, ${progress.fireflies.length} of 3 fireflies rescued, ${completed ? "trail completed" : "explore trail"}"><span class="map-island">${worldArt(i)}<span class="map-node-number">${completed ? "✓" : `0${i + 1}`}</span></span><span class="menu-world-info"><strong>${level.name}</strong><span>${!worldUnlocked(save, i) ? lockedHint(i) : completed ? "Trail completed" : ["Bouncing mushrooms", "Ride the leaves", "Brave the cloud bridges", "Take flight. Turn the garden.", "Hop the lily pads", "Explore the glowing caves", "Swim the deep lagoon"][i]}</span><span class="map-fireflies" aria-hidden="true">${fireflyMarks(progress.fireflies)}</span><small class="world-best">${best}</small></span></button>`;
+      return `<button class="menu-world ${selected === i ? "selected" : ""} ${light > 0 ? "restored" : ""}" data-menu-world="${i}" ${worldUnlocked(save, i) ? "" : "disabled"} data-light="${light}" style="--world-light:${light}" aria-label="${level.name}, ${progress.fireflies.length} of 3 fireflies rescued, ${completed ? "trail completed" : "explore trail"}"><span class="map-island">${worldArt(i)}<span class="map-node-number">${completed ? "✓" : `0${i + 1}`}</span></span><span class="menu-world-info"><strong>${level.name}</strong><span>${!worldUnlocked(save, i) ? lockedHint(i) : completed ? "Trail completed" : ["Bouncing mushrooms", "Ride the leaves", "Brave the cloud bridges", "Take flight. Turn the garden.", "Hop the lily pads", "Explore the glowing caves", "Swim the deep lagoon"][i]}</span><span class="map-fireflies" aria-hidden="true">${fireflyMarks(progress.fireflies)}</span><small class="map-acorns" aria-label="${progress.acorns.length} of 5 acorns found">🌰 ${progress.acorns.length}/5</small><small class="world-best">${best}</small></span></button>`;
     })
     .join("");
   document
@@ -581,7 +583,7 @@ function visitGrove() {
 function renderShop() {
   $("#wallet-count").textContent = `${save.wallet} coins`;
   $("#lifetime-count").textContent =
-    `${save.lifetimeCoins} collected · ${rescuedTotal(save)} fireflies home`;
+    `${save.lifetimeCoins} collected · ${rescuedTotal(save)} fireflies home · ${acornTotal(save)} acorns found`;
   $("#shop-items").innerHTML = SHOP_ITEMS.map((item) => {
     const owned = ownsItem(save, item);
     const locked =
@@ -739,6 +741,40 @@ function resume() {
   audio.unlock();
   updateUI();
   canvas.focus({ preventScroll: true });
+}
+let hitStopUntil = 0;
+let nextChimeAt = 0;
+/** A soft chime that quickens as Pip nears an unrescued firefly. */
+function fireflyChime(now: number) {
+  const p = game.player;
+  let nearest = Infinity;
+  for (const fly of game.fireflies) {
+    if (fly.collected) continue;
+    nearest = Math.min(
+      nearest,
+      Math.hypot(fly.x - (p.x + p.w / 2), fly.y - (p.y + p.h / 2)),
+    );
+  }
+  if (nearest > 420) return;
+  if (now < nextChimeAt) return;
+  audio.play("firefly-near");
+  nextChimeAt = now + 450 + (nearest / 420) * 1300;
+}
+function saveAcorns() {
+  if (runKind !== "world") return;
+  const indices = game.acorns.flatMap((a, i) => (a.collected ? [i] : []));
+  const earned = recordAcorns(save, selected, indices);
+  writeSave(save);
+  updateWorlds();
+  if (earned.length && save.messages) {
+    const name =
+      SHOP_ITEMS.find((item) => item.id === earned.at(-1))?.name ?? "outfit";
+    $("#game-toast").innerHTML = `${icon("leaf")}<span></span>`;
+    $("#game-toast span").textContent =
+      `${name} unlocked! Wear it from the Home Grove.`;
+    $("#game-toast").dataset.event = "reward";
+    toastUntil = performance.now() + 3500;
+  }
 }
 function saveRescuedFireflies() {
   if (runKind !== "world") return;
@@ -1289,7 +1325,13 @@ function frame(now: number) {
     input = controls.read();
   }
   if (mode === "playing") {
+    // A landed boss hit freezes the action for a few frames, for impact.
+    if (now < hitStopUntil) delta = 0;
     game.update(delta, input);
+    if (game.events.includes("boss-hit") || game.events.includes("boss-defeat"))
+      hitStopUntil = now + (reducedMotion ? 0 : 90);
+    if (runKind === "world" && !session?.inSecret) fireflyChime(now);
+    if (game.events.includes("acorn")) saveAcorns();
     if (
       runKind !== "grove" &&
       runKind !== "minigame" &&

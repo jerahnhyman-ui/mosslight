@@ -14,6 +14,15 @@ import {
   type BossState,
   type BossHazard,
 } from "./bosses";
+import { acornSpots } from "./acorns";
+/** Outfits Pip can wear; matches the save file's outfit ids. */
+export type OutfitId =
+  | "leaf"
+  | "berry"
+  | "moon"
+  | "cosmetic.bee_scarf"
+  | "cosmetic.acorn_cap"
+  | "cosmetic.golden_leaf";
 export type { BossState, BossHazard } from "./bosses";
 export type RunMode = "classic" | "relaxed" | "timed";
 
@@ -135,6 +144,12 @@ export class Game {
   readonly mode: RunMode;
   boss: BossState | null = null;
   mounts: Mount[] = [];
+  /** Hidden acorns in this run (sitting on top of high coins). */
+  acorns: { x: number; y: number; collected: boolean }[] = [];
+  /** Stomps in the current chain without touching the ground. */
+  combo = 0;
+  /** Where the last combo bonus was earned, and how big it was. */
+  lastCombo: { x: number; y: number; count: number } | null = null;
   /** True while Pip is in water, and the fading timer of the last stroke. */
   swimming = false;
   swimStroke = 0;
@@ -149,7 +164,7 @@ export class Game {
   /** A fourth-world finale is a separate encounter after the level guardian. */
   finalBossStarted = false;
   hazards: BossHazard[] = [];
-  outfit: "leaf" | "berry" | "moon" | "cosmetic.bee_scarf" = "leaf";
+  outfit: OutfitId = "leaf";
   character: "pip" | "poppy" = "pip";
   groveDecorations: string[] = [];
   rescuedTotal = 0;
@@ -324,6 +339,11 @@ export class Game {
     );
     if (reed) reed.broken = true;
     this.coins = this.level.coins.map((c) => ({ ...c, collected: false }));
+    this.acorns = acornSpots(this.level).map((a) => ({
+      ...a,
+      collected: false,
+    }));
+    this.combo = 0;
     this.stars = this.level.stars.map((c) => ({ ...c, collected: false }));
     this.fireflies = this.level.fireflies.map((c) => ({
       ...c,
@@ -740,6 +760,17 @@ export class Game {
         this.awardCoins(1);
       }
     }
+    for (const acorn of this.acorns) {
+      if (
+        !acorn.collected &&
+        overlaps(p, { x: acorn.x - 12, y: acorn.y - 14, w: 24, h: 28 })
+      ) {
+        acorn.collected = true;
+        this.events.push("acorn");
+      }
+    }
+    // A stomp chain lasts until Pip touches the ground.
+    if (p.grounded) this.combo = 0;
     for (const diamond of this.diamonds) {
       if (diamond.collected) continue;
       if (diamond.reserveDrop) this.updateReserveDrop(diamond);
@@ -1558,6 +1589,18 @@ export class Game {
     enemy.vx = 0;
     enemy.vy = 0;
     this.events.push("stomp");
+    // Chained stomps without landing pay a growing bonus (capped at 5).
+    this.combo++;
+    if (this.combo >= 2) {
+      const bonus = Math.min(5, this.combo - 1);
+      this.awardCoins(bonus);
+      this.lastCombo = {
+        x: enemy.x + enemy.w / 2,
+        y: enemy.y,
+        count: this.combo,
+      };
+      this.events.push(`combo-${Math.min(5, this.combo)}`);
+    }
   }
 
   private awardCoins(count: number) {
