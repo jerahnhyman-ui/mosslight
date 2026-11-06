@@ -1,3 +1,6 @@
+import { grumbleLevel, SNOW_FINALE_X } from "./snow-level";
+import { shellshockLevel, ICE_FINALE_X } from "./ice-level";
+import { cinderLevel, VOLCANO_FINALE_X } from "./volcano-level";
 import { Game, type RunMode } from "./engine";
 import type { Level } from "./levels";
 import { gloomwingLevel, NIGHTGLOW_FINALE_X } from "./nightglow-level";
@@ -104,3 +107,6 @@ export function createThornKingRun(mode: RunMode, source?: Game): Game {
 }
 
 registerFinale("world.nightglow-woods", NIGHTGLOW_FINALE_X, gloomwingLevel);
+registerFinale("world.snowdrift-peaks", SNOW_FINALE_X, grumbleLevel);
+registerFinale("world.frostglass-lake", ICE_FINALE_X, shellshockLevel);
+registerFinale("world.ember-caldera", VOLCANO_FINALE_X, cinderLevel);

@@ -21,8 +21,12 @@ import { AdventureSession, type SecretTarget } from "./game/session";
 import { moonpoolLevel } from "./game/moonpool-level";
 import { cloudGardenLevel } from "./game/cloud-garden";
 import { skySecretLevels } from "./game/sky-secrets";
-import { createFinaleRun, finaleFor, thornKingLevel } from "./game/boss-level";
-import { gloomwingLevel } from "./game/nightglow-level";
+import {
+  createFinaleRun,
+  FINALES,
+  finaleFor,
+  thornKingLevel,
+} from "./game/boss-level";
 import { guardianArena } from "./game/guardian-replays";
 import { GhostRecorder, loadGhost, saveGhost } from "./ghost";
 import { Renderer } from "./game/renderer";
@@ -309,10 +313,14 @@ function worldArt(index: number) {
     ["#2f3360", "#7c6fb8", "#5b5a96", "#3f3f72"],
     ["#2b8fa3", "#9be3dc", "#3f9f9a", "#257a7f"],
     ["#1d2147", "#5b4f9a", "#3e3c78", "#2b2a5a"],
-  ][index];
+    ["#9fc9e8", "#f4f9fc", "#d6e6f2", "#a9c3da"],
+    ["#2b4b7a", "#8fd3e0", "#9fdcf0", "#5f9fc4"],
+    ["#4a1f24", "#d9683a", "#6b2d2a", "#3a2420"],
+  ][index]!;
   return `<svg class="world-art" viewBox="0 0 240 130" aria-hidden="true"><defs><linearGradient id="sky-${index}" x2="0" y2="1"><stop stop-color="${colors[0]}"/><stop offset="1" stop-color="${colors[1]}"/></linearGradient></defs><rect width="240" height="130" rx="16" fill="url(#sky-${index})"/><circle cx="181" cy="34" r="18" fill="#fff5b6"/><path d="M0 87Q40 16 90 88Q138 40 191 81Q224 58 240 78V130H0" fill="${colors[2]}"/><path d="M0 112Q66 62 123 110Q178 71 240 101V130H0" fill="${colors[3]}"/><path d="M0 119Q74 112 133 119T240 119V130H0" fill="#207357"/><g fill="#fff" opacity=".8"><ellipse cx="50" cy="34" rx="24" ry="8"/><ellipse cx="59" cy="28" rx="14" ry="10"/></g><path d="m113 78 4 8 9 1-7 6 2 9-8-5-8 5 2-9-7-6 9-1Z" fill="#ffdb73"/></svg>`;
 }
 function lockedHint(index: number) {
+  if (index >= 8) return `Finish ${levels[index - 1]!.name} to open`;
   return index === 7
     ? "Finish Tidewell Depths to open"
     : index === 6
@@ -389,7 +397,7 @@ function updateWorlds() {
   $("#world-strip").innerHTML = levels
     .map(
       (level, i) =>
-        `<button class="world-tab ${selected === i ? "selected" : ""}" data-world="${i}" ${worldUnlocked(save, i) ? "" : "disabled"} aria-pressed="${selected === i}"><span class="tab-number">0${i + 1}</span><span><small>${!worldUnlocked(save, i) ? (i === 7 ? "FINISH THE DEPTHS" : i === 6 ? "FINISH THE CAVES" : i === 5 ? "FINISH THE MARSH" : i === 4 ? "BEAT THE THORN KING" : "BEAT MEADOW TO OPEN") : selected === i ? "YOUR NEXT ADVENTURE" : "EXPLORE"}</small><strong>${level.name}</strong></span><span class="tab-stars" aria-label="${save.progress[i].fireflies.length} of 3 fireflies rescued">${fireflyMarks(save.progress[i].fireflies)}</span></button>`,
+        `<button class="world-tab ${selected === i ? "selected" : ""}" data-world="${i}" ${worldUnlocked(save, i) ? "" : "disabled"} aria-pressed="${selected === i}"><span class="tab-number">${String(i + 1).padStart(2, "0")}</span><span><small>${!worldUnlocked(save, i) ? (i >= 8 ? `FINISH ${levels[i - 1]!.name.split(" ")[0]!.toUpperCase()}` : i === 7 ? "FINISH THE DEPTHS" : i === 6 ? "FINISH THE CAVES" : i === 5 ? "FINISH THE MARSH" : i === 4 ? "BEAT THE THORN KING" : "BEAT MEADOW TO OPEN") : selected === i ? "YOUR NEXT ADVENTURE" : "EXPLORE"}</small><strong>${level.name}</strong></span><span class="tab-stars" aria-label="${save.progress[i].fireflies.length} of 3 fireflies rescued">${fireflyMarks(save.progress[i].fireflies)}</span></button>`,
     )
     .join("");
   document
@@ -416,7 +424,7 @@ function updateWorlds() {
             : progress.bestTime !== null
               ? `Original trail ${formatTime(progress.bestTime)}`
               : "Meet this world’s guardian";
-      return `<button class="menu-world ${selected === i ? "selected" : ""} ${light > 0 ? "restored" : ""}" data-menu-world="${i}" ${worldUnlocked(save, i) ? "" : "disabled"} data-light="${light}" style="--world-light:${light}" aria-label="${level.name}, ${progress.fireflies.length} of 3 fireflies rescued, ${completed ? "trail completed" : "explore trail"}"><span class="map-island">${worldArt(i)}<span class="map-node-number">${completed ? "✓" : `0${i + 1}`}</span></span><span class="menu-world-info"><strong>${level.name}</strong><span>${!worldUnlocked(save, i) ? lockedHint(i) : completed ? "Trail completed" : ["Bouncing mushrooms", "Ride the leaves", "Brave the cloud bridges", "Take flight. Turn the garden.", "Hop the lily pads", "Explore the glowing caves", "Swim the deep lagoon", "Light the night lanterns"][i]}</span><span class="map-fireflies" aria-hidden="true">${fireflyMarks(progress.fireflies)}</span><small class="map-acorns" aria-label="${progress.acorns.length} of 5 acorns found">🌰 ${progress.acorns.length}/5</small><small class="world-best">${best}</small></span></button>`;
+      return `<button class="menu-world ${selected === i ? "selected" : ""} ${light > 0 ? "restored" : ""}" data-menu-world="${i}" ${worldUnlocked(save, i) ? "" : "disabled"} data-light="${light}" style="--world-light:${light}" aria-label="${level.name}, ${progress.fireflies.length} of 3 fireflies rescued, ${completed ? "trail completed" : "explore trail"}"><span class="map-island">${worldArt(i)}<span class="map-node-number">${completed ? "✓" : String(i + 1).padStart(2, "0")}</span></span><span class="menu-world-info"><strong>${level.name}</strong><span>${!worldUnlocked(save, i) ? lockedHint(i) : completed ? "Trail completed" : ["Bouncing mushrooms", "Ride the leaves", "Brave the cloud bridges", "Take flight. Turn the garden.", "Hop the lily pads", "Explore the glowing caves", "Swim the deep lagoon", "Light the night lanterns", "Dodge the falling icicles", "Slide across the frozen lake", "Cross the lava"][i]}</span><span class="map-fireflies" aria-hidden="true">${fireflyMarks(progress.fireflies)}</span><small class="map-acorns" aria-label="${progress.acorns.length} of 5 acorns found">🌰 ${progress.acorns.length}/5</small><small class="world-best">${best}</small></span></button>`;
     })
     .join("");
   $("#menu-worlds").insertAdjacentHTML(
@@ -500,9 +508,19 @@ function updateAdventureChoices() {
 function updateJournal() {
   const hive = save.secrets.beehive;
   const hoops = save.minigames.flowerHoops;
-  const gloomwingUnlocked = Object.values(save.progress[7]?.garden ?? {}).some(
-    (record) => record.completed,
-  );
+  // Every dedicated boss level after the Thorn King's has its own replay.
+  const finaleReplays = FINALES.filter(
+    (f) => f.world !== "world.windmill-garden",
+  ).map((finale) => {
+    const world = levels.findIndex((l) => l.contentId === finale.world);
+    return {
+      finale,
+      world,
+      unlocked: Object.values(save.progress[world]?.garden ?? {}).some(
+        (record) => record.completed,
+      ),
+    };
+  });
   const bossUnlocked =
     save.progress[3].adventureCompleted ||
     Object.values(save.progress[3].garden).some((record) => record.completed);
@@ -537,7 +555,12 @@ function updateJournal() {
     }).join("") +
     `<button class="challenge-entry" id="journal-hoops" ${save.unlocks.windFeatherDiscovered ? "" : "disabled"}><span><strong>Petal Post</strong><small>${save.unlocks.windFeatherDiscovered ? (hoops.best ? `${hoops.bestMedal === "none" ? "Practice" : hoops.bestMedal + " medal"} · best ${hoops.best.score} points` : "A little flight. Sixteen flower hoops.") : "Bump a feather block near a trail entrance"}</small></span><span>✿</span></button>` +
     `<button class="challenge-entry" id="journal-thorn-king" ${bossUnlocked ? "" : "disabled"}><span><strong>The Thorn King's Grove</strong><small>${bossUnlocked ? "Replay the major boss level" : "Finish Windmill Garden to unlock a replay"}</small></span><span>♛</span></button>` +
-    `<button class="challenge-entry" id="journal-gloomwing" ${gloomwingUnlocked ? "" : "disabled"}><span><strong>Gloomwing's Roost</strong><small>${gloomwingUnlocked ? "Replay the major boss level" : "Finish Nightglow Woods to unlock a replay"}</small></span><span>♛</span></button>` +
+    finaleReplays
+      .map(
+        ({ finale, world, unlocked }, i) =>
+          `<button class="challenge-entry" data-finale="${i}" ${unlocked ? "" : "disabled"}><span><strong>${finale.arena.name}</strong><small>${unlocked ? "Replay the boss level" : `Finish ${levels[world]?.name ?? "its world"} to unlock a replay`}</small></span><span>♛</span></button>`,
+      )
+      .join("") +
     `<h3>Guardian rematches</h3>` +
     levels
       .map((level, index) => {
@@ -568,19 +591,24 @@ function updateJournal() {
         start();
       }),
     );
-  $("#journal-gloomwing").addEventListener("click", () => {
-    if (!gloomwingUnlocked) return;
-    selected = 7;
-    bossReplay = true;
-    replayArena = null;
-    bossArena = gloomwingLevel;
-    bossOrigin = null;
-    runKind = "boss";
-    menuDialog.close();
-    groveDialog.close();
-    coinLedger = new RunCoinLedger();
-    start();
-  });
+  document
+    .querySelectorAll<HTMLButtonElement>("[data-finale]")
+    .forEach((button) =>
+      button.addEventListener("click", () => {
+        const replay = finaleReplays[Number(button.dataset.finale)];
+        if (!replay?.unlocked || button.disabled) return;
+        selected = replay.world;
+        bossReplay = true;
+        replayArena = null;
+        bossArena = replay.finale.arena;
+        bossOrigin = null;
+        runKind = "boss";
+        menuDialog.close();
+        groveDialog.close();
+        coinLedger = new RunCoinLedger();
+        start();
+      }),
+    );
   $("#journal-thorn-king").addEventListener("click", () => {
     if (!bossUnlocked) return;
     selected = 3;

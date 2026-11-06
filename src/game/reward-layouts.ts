@@ -79,6 +79,30 @@ const layouts: Record<string, readonly Placement[]> = {
     // Recovery Sunseed before Gloomwing's gate.
     ["diamond", 8500, 300],
   ],
+  "world.snowdrift-peaks": [
+    ["feather", 200, 300],
+    ["diamond", 1800, 300],
+    ["star", 4300, 300],
+    ["diamond", 5300, 300],
+    // Recovery Sunseed before Grumble's gate.
+    ["diamond", 8700, 300],
+  ],
+  "world.frostglass-lake": [
+    ["feather", 200, 300],
+    ["diamond", 2000, 300],
+    ["star", 3200, 300],
+    ["diamond", 5300, 300],
+    // Recovery Sunseed before Shellshock's gate.
+    ["diamond", 8500, 300],
+  ],
+  "world.ember-caldera": [
+    ["feather", 200, 300],
+    ["diamond", 1800, 300],
+    ["star", 3200, 300],
+    ["diamond", 5300, 300],
+    // Recovery Sunseed before Cinder's gate.
+    ["diamond", 8820, 300],
+  ],
   grove: [["feather", 260, 300]],
   "secret.beehive": [
     ["feather", 150, 300],

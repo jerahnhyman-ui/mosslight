@@ -18,7 +18,10 @@ type Theme =
   | "grotto"
   | "cloud"
   | "marsh"
-  | "cavern";
+  | "cavern"
+  | "snow"
+  | "ice"
+  | "volcano";
 type Palette = {
   sky: string;
   horizon: string;
@@ -68,6 +71,57 @@ const thornGrovePalette: Palette = {
   rock: "#ddc297",
 };
 const palettes: Record<Theme, Palette> = {
+  snow: {
+    sky: "#9fc9e8",
+    horizon: "#eef6fb",
+    sun: "#fffbe6",
+    far: "#d6e6f2",
+    middle: "#bcd3e6",
+    near: "#9fbcd6",
+    leaf: "#4f8f7a",
+    leafLight: "#a9d6c4",
+    leafShade: "#356d5e",
+    trunk: "#6f5e52",
+    grass: "#f4f8fb",
+    grassLight: "#ffffff",
+    soil: "#a9b9c9",
+    soilShade: "#7f93a8",
+    rock: "#d5e0ea",
+  },
+  ice: {
+    sky: "#2b4b7a",
+    horizon: "#8fd3e0",
+    sun: "#e6fbff",
+    far: "#5a86b0",
+    middle: "#4a77a3",
+    near: "#3d6a95",
+    leaf: "#5fa6b8",
+    leafLight: "#c6f1f7",
+    leafShade: "#3d7a8c",
+    trunk: "#5d6f86",
+    grass: "#bff0f7",
+    grassLight: "#f0feff",
+    soil: "#7fb6d6",
+    soilShade: "#4f86ab",
+    rock: "#d6f4fb",
+  },
+  volcano: {
+    sky: "#4a1f24",
+    horizon: "#d9683a",
+    sun: "#ffcf7a",
+    far: "#6b2d2a",
+    middle: "#5a2422",
+    near: "#46201f",
+    leaf: "#6f7d3a",
+    leafLight: "#b9c06a",
+    leafShade: "#4b5428",
+    trunk: "#3d2a22",
+    grass: "#7a5a4a",
+    grassLight: "#b58a6a",
+    soil: "#5a3a30",
+    soilShade: "#3a2420",
+    rock: "#8a5a48",
+  },
   cavern: {
     sky: "#232646",
     horizon: "#4a4479",
@@ -504,6 +558,8 @@ export class Renderer {
     }
     this.shake = Math.max(0, this.shake - dt);
     if (game.level.theme === "marsh") this.marshWater(camera, time);
+    if (game.level.lava)
+      this.lavaPool(camera, time, (game.level.checkpoints[0]?.y ?? 430) + 30);
 
     // The trees sit on actual ground sections; no scenery suggests a floor over a pit.
     for (const platform of game.platforms) {
@@ -512,6 +568,8 @@ export class Renderer {
         game.level.theme === "grotto" ||
         game.level.theme === "cloud" ||
         game.level.theme === "cavern" ||
+        game.level.theme === "ice" ||
+        game.level.theme === "volcano" ||
         thornGrove
       )
         continue;
@@ -654,6 +712,9 @@ export class Renderer {
       for (const lantern of game.lanterns)
         if (this.visible(lantern.x, 60))
           this.lanternPost(lantern.x, lantern.y, lantern.lit, time);
+      for (const icicle of game.icicles)
+        if (icicle.state !== "gone" && this.visible(icicle.x, 30))
+          this.icicleArt(icicle.x, icicle.y, icicle.state === "shake", time);
       game.acorns.forEach((acorn, i) => {
         if (!acorn.collected && this.visible(acorn.x, 30))
           this.acorn(acorn.x, acorn.y, time, i);
@@ -1022,6 +1083,10 @@ export class Renderer {
           "rgba(9,52,65,.25)",
         );
       }
+      return;
+    }
+    if (theme === "snow" || theme === "ice" || theme === "volcano") {
+      this.extraBackdrop(theme, p, time, camera);
       return;
     }
     if (theme === "cavern") {
@@ -2721,9 +2786,24 @@ export class Renderer {
       c.stroke();
       c.restore();
     }
+    if (b.kind === "salamander" && b.y + b.h > b.groundY + 1) {
+      // Under the island: glowing bubbles rise where it will surface.
+      const tx = b.attackTargetX + b.w / 2;
+      for (let i = 0; i < 4; i++) {
+        const bob = (time * 2 + i * 0.25) % 1;
+        this.ellipse(
+          tx - 36 + i * 24,
+          b.groundY - 4 - bob * 14,
+          5 - bob * 3,
+          5 - bob * 3,
+          `rgba(255,150,60,${0.8 - bob * 0.6})`,
+        );
+      }
+      this.ellipse(tx, b.groundY - 1, 48, 6, "rgba(255,120,40,.45)");
+    }
     c.save();
-    if (b.kind === "mole") {
-      // Hide whatever part of the mole is still under the floor.
+    if (b.kind === "mole" || b.kind === "salamander") {
+      // Hide whatever part of the guardian is still under the floor.
       c.beginPath();
       c.rect(b.x - 200, b.groundY - 600, b.w + 400, 600);
       c.clip();
@@ -2816,6 +2896,65 @@ export class Renderer {
         ],
         "#fff0d5",
         3,
+      );
+    } else if (b.kind === "bear") {
+      const rear = warning ? Math.abs(Math.sin(time * 6)) * 6 : 0;
+      // A big white bear with a scarf, rearing as it winds up a slam.
+      for (const fx of [-22, 18])
+        this.ellipse(fx, -6, 12, 8, "#e8eef4", "#9fb2c4", 2);
+      this.ellipse(-4, -30 - rear, 36, 28, "#f4f8fb", "#9fb2c4", 3);
+      this.ellipse(22, -50 - rear, 18, 16, "#f4f8fb", "#9fb2c4", 3);
+      for (const ex of [10, 30])
+        this.ellipse(ex, -64 - rear, 6, 6, "#f4f8fb", "#9fb2c4", 2);
+      this.ellipse(34, -48 - rear, 5, 4, "#3a3a44");
+      this.line(
+        [
+          [-16, -42 - rear],
+          [20, -40 - rear],
+        ],
+        shell === "#809c70" ? "#d9534f" : shell,
+        6,
+      );
+    } else if (b.kind === "tortoise") {
+      const spin = b.state === "attack" ? time * 20 : 0;
+      // A frosty tortoise; when it spins, only its shell shows.
+      if (b.state !== "attack" && !warning) {
+        for (const fx of [-24, 20])
+          this.ellipse(fx, -6, 9, 7, "#7fb8a0", "#4f8470", 2);
+        this.ellipse(34, -20, 12, 10, "#8fcab0", "#4f8470", 2);
+      }
+      c.save();
+      c.translate(0, -26);
+      c.rotate(spin);
+      this.ellipse(0, 0, 38, 24, "#cdeef7", "#6aa9c4", 3);
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * Math.PI * 2;
+        this.ellipse(Math.cos(a) * 18, Math.sin(a) * 10, 7, 5, "#9fd6e8");
+      }
+      c.restore();
+    } else if (b.kind === "salamander") {
+      // A molten salamander: dark basalt skin with glowing cracks.
+      const glow = 0.6 + Math.sin(time * 5) * 0.2;
+      this.ellipse(-30, -10, 16, 6, "#3a1e18", "#1e0f0c", 2);
+      this.ellipse(0, -22, 40, 16, "#4a2620", "#1e0f0c", 3);
+      this.ellipse(36, -26, 16, 12, "#4a2620", "#1e0f0c", 2);
+      for (let i = 0; i < 4; i++)
+        this.line(
+          [
+            [-26 + i * 14, -30],
+            [-20 + i * 14, -18],
+          ],
+          `rgba(255,140,50,${glow})`,
+          3,
+        );
+      this.line(
+        [
+          [-40, -16],
+          [-58, -8],
+          [-66, -14],
+        ],
+        "#4a2620",
+        6,
       );
     } else if (b.kind === "owl") {
       const flap =
@@ -3041,7 +3180,13 @@ export class Renderer {
                 ? 16
                 : b.kind === "owl"
                   ? 200
-                  : 27,
+                  : b.kind === "bear"
+                    ? 200
+                    : b.kind === "tortoise"
+                      ? 34
+                      : b.kind === "salamander"
+                        ? 38
+                        : 27,
       eyeY =
         b.kind === "moth"
           ? -47
@@ -3052,8 +3197,13 @@ export class Renderer {
               : b.kind === "crab"
                 ? -26
                 : -26;
-    if (b.kind === "owl") {
-      // The owl draws its own big eyes.
+    if (
+      b.kind === "owl" ||
+      b.kind === "bear" ||
+      (b.kind === "tortoise" && (warning || b.state === "attack"))
+    ) {
+      // The owl and bear draw their own eyes; the spinning tortoise has
+      // pulled its head into its shell.
     } else if (recovering) {
       this.line(
         [
@@ -3266,6 +3416,34 @@ export class Renderer {
             "#ffe4a3",
             3,
           );
+      } else if (r.kind === "icicle") {
+        // A falling icicle, with its shadow marking where it will land.
+        const ground = game.boss?.groundY ?? 470;
+        this.ellipse(cx, ground - 2, 14, 4, "rgba(40,80,120,.35)");
+        c.beginPath();
+        c.moveTo(r.x, r.y);
+        c.lineTo(r.x + r.w, r.y);
+        c.lineTo(cx, r.y + r.h);
+        c.closePath();
+        c.fillStyle = "#dff6ff";
+        c.fill();
+        c.strokeStyle = "#8ccbe6";
+        c.lineWidth = 1.5;
+        c.stroke();
+      } else if (r.kind === "fireball") {
+        this.ellipse(cx, cy, r.w * 0.8, r.h * 0.8, "rgba(255,140,50,.35)");
+        this.ellipse(cx, cy, r.w / 2, r.h / 2, "#ff7a2f", "#c2451c", 2);
+        this.ellipse(cx - 3, cy - 3, 4, 4, "#ffe08a");
+      } else if (r.kind === "shard") {
+        c.beginPath();
+        c.moveTo(r.x, r.y + r.h);
+        c.lineTo(r.x + r.w / 2, r.y);
+        c.lineTo(r.x + r.w, r.y + r.h);
+        c.closePath();
+        c.fillStyle = "#c9f0fb";
+        c.fill();
+        c.strokeStyle = "#6fb7d6";
+        c.stroke();
       } else if (r.kind === "feather") {
         // A loose owl feather drifting down, swaying as it falls.
         c.save();
@@ -3505,6 +3683,70 @@ export class Renderer {
             2,
           );
         }
+      } else if (
+        game.level.theme === "snow" ||
+        game.level.theme === "ice" ||
+        game.level.theme === "volcano"
+      ) {
+        // A little snowman, ice crystal, or glowing ember cairn.
+        if (game.level.theme === "snow") {
+          this.ellipse(signX - 26, y - 14, 15, 14, "#ffffff", "#b9c9d8", 2);
+          this.ellipse(signX - 26, y - 38, 11, 10, "#ffffff", "#b9c9d8", 2);
+          this.ellipse(signX - 22, y - 40, 2, 2, "#3a3a3a");
+          this.ellipse(signX - 30, y - 40, 2, 2, "#3a3a3a");
+          this.line(
+            [
+              [signX - 26, y - 36],
+              [signX - 18, y - 35],
+            ],
+            "#e9873a",
+            3,
+          );
+          this.line(
+            [
+              [signX - 38, y - 28],
+              [signX - 15, y - 26],
+            ],
+            "#d9534f",
+            4,
+          );
+        } else if (game.level.theme === "ice") {
+          for (const [dx, h] of [
+            [-34, 40],
+            [-24, 58],
+            [-14, 34],
+          ] as const) {
+            c.beginPath();
+            c.moveTo(signX + dx - 7, y);
+            c.lineTo(signX + dx, y - h);
+            c.lineTo(signX + dx + 7, y);
+            c.closePath();
+            c.fillStyle = "rgba(214,246,252,.85)";
+            c.fill();
+            c.strokeStyle = "#7fc4dc";
+            c.lineWidth = 1.5;
+            c.stroke();
+          }
+        } else {
+          for (let i = 0; i < 3; i++)
+            this.ellipse(
+              signX - 26,
+              y - 8 - i * 14,
+              16 - i * 3,
+              8,
+              "#3d2a22",
+              "#241612",
+              2,
+            );
+          this.ellipse(
+            signX - 26,
+            y - 50,
+            7 + Math.sin(time * 6 + index) * 2,
+            10,
+            "#ffb347",
+          );
+          this.ellipse(signX - 26, y - 48, 4, 6, "#fff1a8");
+        }
       } else if (game.level.theme === "cavern") {
         // A glowing crystal cluster marks each new stretch of the caves.
         const glow = 0.55 + Math.sin(time * 2 + index) * 0.15;
@@ -3741,6 +3983,38 @@ export class Renderer {
           );
         }
       }
+      return;
+    }
+    if (r.slippery && r.kind !== "crumble" && r.kind !== "moving") {
+      // Ice: a glassy blue sheet with bright glints along the surface.
+      this.rounded(x, y, w, h, 4, "#9fdcf0", "#5f9fc4");
+      const glass = c.createLinearGradient(0, y, 0, y + Math.min(h, 80));
+      glass.addColorStop(0, "rgba(255,255,255,.6)");
+      glass.addColorStop(1, "rgba(160,220,240,0)");
+      c.fillStyle = glass;
+      c.fillRect(x + 2, y + 2, w - 4, Math.min(h, 80));
+      this.line(
+        [
+          [x + 3, y + 2],
+          [x + w - 3, y + 2],
+        ],
+        "#ffffff",
+        3,
+      );
+      for (let xx = x + 30; xx < x + w - 10; xx += 90)
+        this.line(
+          [
+            [xx, y + 8],
+            [xx + 18, y + 4],
+          ],
+          "rgba(255,255,255,.8)",
+          2,
+        );
+      return;
+    }
+    if (r.id?.startsWith("ice.floe.") || r.id?.startsWith("ice.crack.")) {
+      // Ice floes and cracking ice share the cave's crystal-ledge look.
+      this.crystalLedge(r, time);
       return;
     }
     if (r.id?.startsWith("cave.lift.") || r.id?.startsWith("cave.crack.")) {
@@ -4020,6 +4294,135 @@ export class Renderer {
       "#fff7dc",
       2.5,
     );
+  }
+
+  /** Backdrops for the snow, ice and fire worlds. */
+  private extraBackdrop(
+    theme: Theme,
+    p: Palette,
+    time: number,
+    camera: number,
+  ) {
+    const c = this.ctx;
+    const w = this.viewportWidth,
+      h = this.viewportHeight;
+    if (theme === "ice") {
+      // A shimmering aurora across the night sky.
+      for (let band = 0; band < 3; band++) {
+        c.beginPath();
+        for (let x = 0; x <= w; x += 20) {
+          const y =
+            80 + band * 30 + Math.sin(x * 0.006 + time * 0.4 + band) * 24;
+          if (x === 0) c.moveTo(x, y);
+          else c.lineTo(x, y);
+        }
+        c.strokeStyle = [
+          "rgba(140,255,200,.22)",
+          "rgba(120,200,255,.18)",
+          "rgba(200,160,255,.14)",
+        ][band]!;
+        c.lineWidth = 26;
+        c.stroke();
+      }
+    } else if (theme === "volcano") {
+      this.ellipse(w * 0.78, 110, 60, 60, "rgba(255,170,80,.18)");
+    } else {
+      this.ellipse(w * 0.78, 95, 38, 38, p.sun);
+    }
+    // Three layers of peaks: snowy, icy spires, or volcanic cones.
+    for (let layer = 0; layer < 3; layer++) {
+      const parallax = 0.1 + layer * 0.12;
+      const spacing = 340 - layer * 40;
+      const shift = camera * parallax;
+      const color = layer === 0 ? p.far : layer === 1 ? p.middle : p.near;
+      for (
+        let i = Math.floor(shift / spacing) - 1;
+        i <= Math.floor(shift / spacing) + Math.ceil(w / spacing) + 1;
+        i++
+      ) {
+        const x = i * spacing - shift;
+        const peak = 200 + layer * 55 + hash(i + layer * 31) * 50;
+        c.beginPath();
+        c.moveTo(x - 140, h);
+        c.lineTo(x + 40, peak);
+        c.lineTo(x + 220, h);
+        c.closePath();
+        c.fillStyle = color;
+        c.fill();
+        if (theme !== "volcano" && layer < 2) {
+          // Snowy caps.
+          c.beginPath();
+          c.moveTo(x + 40, peak);
+          c.lineTo(x + 8, peak + 46);
+          c.lineTo(x + 28, peak + 38);
+          c.lineTo(x + 44, peak + 52);
+          c.lineTo(x + 72, peak + 46);
+          c.closePath();
+          c.fillStyle = theme === "ice" ? "#d9f5fb" : "#ffffff";
+          c.fill();
+        } else if (theme === "volcano" && layer === 0) {
+          this.ellipse(x + 40, peak + 4, 14, 6, "rgba(255,150,60,.6)");
+        }
+      }
+    }
+    // Falling snow, drifting ice glints, or rising embers.
+    const count = Math.ceil((40 * w) / WIDTH);
+    for (let i = 0; i < count; i++) {
+      const speed = 20 + hash(i + 7) * 30;
+      const fall = theme === "volcano" ? -speed : speed;
+      const x =
+        (hash(i + 500) * (w + 100) +
+          Math.sin(time * 0.8 + i) * 20 -
+          camera * 0.05 +
+          w * 8) %
+        (w + 100);
+      const y = (((hash(i + 520) * h + time * fall) % h) + h) % h;
+      const size = 1.2 + hash(i + 540) * 2;
+      this.ellipse(
+        x,
+        y,
+        size,
+        size,
+        theme === "volcano"
+          ? "rgba(255,170,80,.7)"
+          : theme === "ice"
+            ? "rgba(220,250,255,.6)"
+            : "rgba(255,255,255,.9)",
+      );
+    }
+  }
+
+  /** Lava fills the gaps of the fire world, glowing and bubbling. */
+  private lavaPool(camera: number, time: number, surface: number) {
+    const c = this.ctx;
+    const left = camera - 40,
+      right = camera + this.viewportWidth + 40;
+    const lava = c.createLinearGradient(0, surface, 0, 660);
+    lava.addColorStop(0, "#ffb347");
+    lava.addColorStop(0.3, "#ff6a2b");
+    lava.addColorStop(1, "#8a1f12");
+    c.fillStyle = lava;
+    c.fillRect(left, surface, right - left, 700 - surface);
+    for (let xx = Math.floor(left / 70) * 70; xx < right; xx += 70) {
+      const bob = Math.sin(time * 2 + xx * 0.07) * 4;
+      this.ellipse(xx + 20, surface + 4 + bob, 12, 4, "rgba(255,230,140,.6)");
+    }
+  }
+
+  /** An icicle hanging, shaking before it falls, or falling. */
+  private icicleArt(x: number, y: number, shaking: boolean, time: number) {
+    const c = this.ctx;
+    const dx = shaking ? Math.sin(time * 50) * 2 : 0;
+    c.beginPath();
+    c.moveTo(x - 8 + dx, y);
+    c.lineTo(x + 8 + dx, y);
+    c.lineTo(x + dx, y + 36);
+    c.closePath();
+    c.fillStyle = "#e6f8ff";
+    c.fill();
+    c.strokeStyle = "#86c3de";
+    c.lineWidth = 1.5;
+    c.stroke();
   }
 
   /** Cave walls, hanging stalactites and glowing crystals in the distance.
@@ -4817,6 +5220,23 @@ export class Renderer {
     }
     if (enemy.kind === "hopper") {
       this.grasshopper(enemy, time, squashed);
+      c.restore();
+      return;
+    }
+    if (enemy.kind === "ember") {
+      // A little fire sprite: a flickering flame with bright eyes.
+      const flick = Math.sin(time * 18 + enemy.x) * 2;
+      this.ellipse(0, -14, 16, 18, "rgba(255,160,60,.35)");
+      c.beginPath();
+      c.moveTo(0, -34 - flick);
+      c.quadraticCurveTo(14, -18, 10, -4);
+      c.quadraticCurveTo(0, 2, -10, -4);
+      c.quadraticCurveTo(-14, -18, 0, -34 - flick);
+      c.fillStyle = "#ff8a3d";
+      c.fill();
+      this.ellipse(0, -10, 7, 8, "#ffd36b");
+      this.ellipse(-3, -14, 2, 2.5, "#3a1a10");
+      this.ellipse(4, -14, 2, 2.5, "#3a1a10");
       c.restore();
       return;
     }
