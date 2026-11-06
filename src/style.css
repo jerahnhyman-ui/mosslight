@@ -3298,3 +3298,22 @@ select:focus-visible {
 .game-app[data-theme="cavern"] {
   background: linear-gradient(#232646, #4a4479 65%, #443b58);
 }
+
+/* With seven worlds the title strip is one swipeable row on every screen,
+ * so it never grows tall enough to cover the Play button. */
+.world-strip,
+.game-app .world-strip {
+  flex-direction: row;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+.world-strip::-webkit-scrollbar {
+  display: none;
+}
+.world-strip .world-tab {
+  flex: 0 0 min(210px, 44vw);
+  scroll-snap-align: start;
+}
