@@ -92,6 +92,16 @@ animated characters, and collectible/landing effects.
   separate major-boss level, Thunderhorn's Crag: Thunderhorn, the Storm Ram,
   marks where lightning will strike, rears while the bolts fall, then
   charges to the wall. Six hits over three phases.
+- **Signature sections:** each later world has a section built on its own
+  idea: Moonbloom Glade (night blooms that open only in Pip's light), the
+  Icefall Stair (crumbling snow steps climbing past an icicle overhang you can
+  walk along), Floe Drift (ride drifting floes in turn to a hidden ice ledge),
+  the Geyser Field (a high road between lava vents that bubble, then burst
+  into fire) and Lightning Ridge (strikes on a rolling beat and a storm lift
+  to a hidden spire).
+- **Map and pickups:** every world's island on the map has its own little
+  scene; castle worlds wear a tower badge. The new block powers and timed coin
+  rings now appear in the earlier worlds too.
 - **Big Pip and the Wind Feather:** grown Pip (and Poppy) has a look of its
   own: a flowing leaf cape, a golden Sunseed emblem, gold-capped boots and a
   bloomed crown with a golden flower. The Wind Feather is now a little

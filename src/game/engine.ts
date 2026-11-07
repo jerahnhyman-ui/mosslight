@@ -2214,7 +2214,9 @@ export class Game {
   trapRect(trap: NonNullable<Level["traps"]>[number]) {
     return trap.kind === "thorns"
       ? { x: trap.x, y: trap.y - 34, w: trap.w, h: 34 }
-      : { x: trap.x, y: trap.y - 520, w: trap.w, h: 520 };
+      : trap.kind === "geyser"
+        ? { x: trap.x, y: trap.y - 230, w: trap.w, h: 230 }
+        : { x: trap.x, y: trap.y - 520, w: trap.w, h: 520 };
   }
   private updateTraps() {
     const p = this.player;

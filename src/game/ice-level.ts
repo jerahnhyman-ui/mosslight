@@ -114,13 +114,13 @@ export const iceLevel: Level = withRewardBlocks({
     floe("rise", 4500, 340, 120, "y", 70, 4.6),
     ledge(4700, 280, 120),
     floe("glide", 4900, 300, 120, "x", 70, 4.4, Math.PI / 2),
-    // Snowbank Hollow: a snow mushroom bounces to a hidden ledge.
-    ground(5200, 450),
-    { x: 5500, y: 408, w: 90, h: 22, kind: "mushroom" },
-    ledge(5640, 210, 160),
-    ledge(5860, 120, 150),
-    ice(5650, 700),
-    ground(6350, 250),
+    // Floe Drift: two floes drift across open water in turn; the second
+    // carries Pip up to a hidden ice ledge.
+    ground(5200, 300),
+    floe("drift.a", 5560, 390, 130, "x", 80, 4.6),
+    floe("drift.b", 5820, 330, 130, "x", 80, 4.6, Math.PI),
+    ledge(6000, 240, 110),
+    ground(6200, 400),
     // Cracking Channel: more thin ice over the deepest water.
     thin("e", 6650, 390),
     thin("f", 6810, 370),
@@ -148,8 +148,9 @@ export const iceLevel: Level = withRewardBlocks({
     ...row(4520, 300, 3),
     ...bobbing(row(4720, 248, 3), "y", 18, 1.8),
     ...row(4920, 268, 3),
-    ...row(5530, 300, 2),
-    ...row(5660, 178, 4),
+    ...row(5580, 340, 3),
+    ...row(5840, 280, 3),
+    ...row(6020, 208, 3),
     ...row(6670, 358, 2),
     ...row(6830, 338, 2),
     ...row(6990, 358, 2),
@@ -170,7 +171,7 @@ export const iceLevel: Level = withRewardBlocks({
   ],
   fireflies: [
     { x: 3920, y: 145, id: "ice.firefly.frost-spire" },
-    { x: 5930, y: 85, id: "ice.firefly.snowbank" },
+    { x: 6055, y: 205, id: "ice.firefly.snowbank" },
     { x: 8070, y: 145, id: "ice.firefly.glacier" },
   ],
   enemies: [
@@ -178,7 +179,7 @@ export const iceLevel: Level = withRewardBlocks({
     bug("hopper", 1950, 1850, 2050),
     bug("beetle", 3600, 3500, 3750),
     bug("charger", 4120, 4050, 4200),
-    bug("hopper", 6000, 5900, 6150),
+    bug("hopper", 6300, 6260, 6380),
     bug("charger", 7800, 7650, 7950),
     bug("beetle", 8350, 8250, 8450),
   ],
@@ -199,7 +200,7 @@ export const iceLevel: Level = withRewardBlocks({
     { x: 2400, name: "Thin Ice" },
     { x: 3100, name: "Frost Spire" },
     { x: 4400, name: "Aurora Floes" },
-    { x: 5200, name: "Snowbank Hollow" },
+    { x: 5200, name: "Floe Drift" },
     { x: 6600, name: "Cracking Channel" },
     { x: 7300, name: "Glacier Steps" },
     { x: 8400, name: "Shellshock's Gate" },
@@ -215,7 +216,7 @@ export const iceLevel: Level = withRewardBlocks({
       x: 5440,
       y: 405,
       kind: "footprints",
-      text: "The snow mushroom bounces higher than any jump.",
+      text: "Ride the drifting floes. The second one passes beneath a hidden ledge.",
     },
     {
       x: 7560,

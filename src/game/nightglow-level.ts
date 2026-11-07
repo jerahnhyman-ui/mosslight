@@ -46,6 +46,13 @@ const crack = (x: number, y: number, w = 120): Platform => ({
   h: 20,
   kind: "crumble",
 });
+/** A night bloom: it stays closed until Pip's light comes near. */
+const bloom = (
+  x: number,
+  y: number,
+  w: number,
+  kind: "flower" | "curled" = "flower",
+): Platform => ({ x, y, w, h: 20, kind, wakeRadius: 200 });
 const row = (x: number, y: number, count: number, gap = 35) =>
   Array.from({ length: count }, (_, i) => ({ x: x + i * gap, y }));
 const bug = (
@@ -90,10 +97,11 @@ export const nightglowLevel: Level = withRewardBlocks({
     ledge(4700, 280, 120),
     lift("glide", 4900, 300, 120, "x", 70, 4.4, Math.PI / 2),
     ground(5200, 1400),
-    // Glowroot Grove: a mushroom bounce to a hidden branch.
-    { x: 5500, y: 408, w: 90, h: 22, kind: "mushroom" },
-    ledge(5640, 210, 160),
-    ledge(5860, 120, 150),
+    // Moonbloom Glade: night blooms open only in Pip's light, making a
+    // climb to a hidden branch.
+    bloom(5560, 340, 150),
+    bloom(5780, 255, 160, "curled"),
+    bloom(6010, 175, 170),
     // Last Lantern: crumbling stones over the final drop.
     crack(6650, 390),
     crack(6810, 370),
@@ -128,8 +136,9 @@ export const nightglowLevel: Level = withRewardBlocks({
     ...row(4520, 300, 3),
     ...row(4720, 248, 3),
     ...row(4920, 268, 3),
-    ...row(5530, 300, 2),
-    ...row(5660, 178, 4),
+    ...row(5580, 308, 3),
+    ...row(5800, 223, 4),
+    ...row(6030, 143, 3),
     ...row(6670, 358, 2),
     ...row(6830, 338, 2),
     ...row(6990, 358, 2),
@@ -142,7 +151,7 @@ export const nightglowLevel: Level = withRewardBlocks({
   diamonds: [],
   fireflies: [
     { x: 2650, y: 185, id: "nightglow.firefly.moth-perch" },
-    { x: 5930, y: 85, id: "nightglow.firefly.glowroot" },
+    { x: 6095, y: 140, id: "nightglow.firefly.glowroot" },
     { x: 8070, y: 145, id: "nightglow.firefly.last-lantern" },
   ],
   enemies: [
@@ -170,7 +179,7 @@ export const nightglowLevel: Level = withRewardBlocks({
     { x: 1300, name: "Shadow Steps" },
     { x: 2400, name: "Moth Hollow" },
     { x: 4400, name: "Wisp Lifts" },
-    { x: 5200, name: "Glowroot Grove" },
+    { x: 5200, name: "Moonbloom Glade" },
     { x: 6600, name: "Last Lantern" },
     { x: 8400, name: "Gloomwing's Gate" },
   ],
@@ -185,7 +194,7 @@ export const nightglowLevel: Level = withRewardBlocks({
       x: 5440,
       y: 405,
       kind: "footprints",
-      text: "The glowing mushroom bounces higher than any jump.",
+      text: "Night blooms open in your light. Climb them toward a hidden branch.",
     },
     {
       x: 7560,

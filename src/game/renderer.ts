@@ -4873,6 +4873,48 @@ export class Renderer {
     const t = game.trapCycle(trap);
     const striking = t < trap.active;
     const warning = !striking && trap.period - t < 0.7;
+    if (trap.kind === "geyser") {
+      // A lava vent: it bubbles and glows, then bursts into a fire column.
+      const cx = trap.x + trap.w / 2;
+      this.ellipse(cx, trap.y - 2, trap.w / 2 + 6, 7, "#3a2420", "#1e100c", 2);
+      this.ellipse(
+        cx,
+        trap.y - 3,
+        trap.w / 2 - 2,
+        4,
+        striking ? "#ffd36b" : warning ? "#ff8a3d" : "#8a2f18",
+      );
+      if (warning)
+        for (let i = 0; i < 3; i++) {
+          const bob = (time * 3 + i * 0.33) % 1;
+          this.ellipse(
+            cx - 10 + i * 10,
+            trap.y - 6 - bob * 26,
+            4 - bob * 2,
+            4 - bob * 2,
+            `rgba(255,150,60,${0.8 - bob * 0.6})`,
+          );
+        }
+      if (striking) {
+        const grow = Math.min(1, t / 0.15);
+        const top = trap.y - 230 * grow;
+        const g = c.createLinearGradient(0, top, 0, trap.y);
+        g.addColorStop(0, "rgba(255,240,170,.85)");
+        g.addColorStop(0.4, "rgba(255,150,60,.9)");
+        g.addColorStop(1, "rgba(220,60,30,.95)");
+        c.fillStyle = g;
+        c.beginPath();
+        c.moveTo(trap.x, trap.y);
+        for (let y = trap.y; y > top; y -= 20)
+          c.lineTo(trap.x + Math.sin(y * 0.1 + time * 25) * 5, y);
+        c.lineTo(cx, top - 12);
+        for (let y = top; y < trap.y; y += 20)
+          c.lineTo(trap.x + trap.w + Math.sin(y * 0.1 + time * 25 + 2) * 5, y);
+        c.closePath();
+        c.fill();
+      }
+      return;
+    }
     if (trap.kind === "thorns") {
       // A bed of brambles that rustles, then bursts up into spikes.
       const rise = striking

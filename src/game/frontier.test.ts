@@ -22,6 +22,7 @@ import {
 } from "./volcano-level";
 import { createFinaleRun, finaleFor } from "./boss-level";
 import { fightBoss } from "./boss-bot";
+import { crossTraps } from "./route-bot";
 import { stormCitadel } from "./castles";
 import {
   STORM_FINAL_CHECKPOINT,
@@ -205,10 +206,16 @@ function snowRoute(g: Game) {
   slideAcross(g, "snow.lift.gorge", 1270, 1680);
   walk(g, 2380);
   hops(g, bridges);
-  walk(g, 3240);
-  bounceTo(g, 3345, 3520, 210);
-  jump(g, 3735, 120);
-  jump(g, 3850, 430);
+  // Icefall Stair: keep climbing before the snow steps give way.
+  hops(g, [
+    [3320, 380],
+    [3470, 330],
+    [3620, 280],
+    [3770, 230],
+    [3875, 170],
+    // On along the top of the icicle overhang, then drop off its far end.
+    [4000, 180],
+  ]);
   liftRun(g, "snow.lift.", "glide");
   walk(g, 5540);
   hops(g, [
@@ -238,10 +245,20 @@ function iceRoute(g: Game) {
     [4100, 430],
   ]);
   liftRun(g, "ice.floe.", "glide");
-  walk(g, 5440);
-  bounceTo(g, 5545, 5720, 210);
-  jump(g, 5935, 120);
-  jump(g, 6100, 430);
+  // Floe Drift: ride one floe, hop to the next, and up to the hidden ledge.
+  walk(g, 5470);
+  const a = tile(g, "ice.floe.drift.a"),
+    b = tile(g, "ice.floe.drift.b");
+  ride(
+    g,
+    a.id!,
+    (t) => t.x <= 5495,
+    (t) => t.x >= 5630,
+  );
+  hopTo(g, b.id!, () => b.x <= 5770);
+  waitUntil(g, () => b.x >= 5885, "second floe under the ledge");
+  jump(g, 6055, 240);
+  jump(g, 6260, 430);
   walk(g, 6580);
   hops(g, crust);
   walk(g, 7480);
@@ -279,10 +296,25 @@ function volcanoRoute(g: Game, embers = false) {
     [4100, 430],
   ]);
   liftRun(g, "volcano.lift.", "drift");
-  walk(g, 5440);
-  bounceTo(g, 5545, 5720, 210);
-  jump(g, 5935, 120);
-  jump(g, 6100, 430);
+  // Geyser Field: hop the high road, each jump in a vent's quiet spell.
+  walk(g, 5410);
+  for (const [vent, x, y] of [
+    [0, 5570, 330],
+    [1, 5780, 250],
+    [2, 5955, 170],
+    [3, 6200, 430],
+  ] as const) {
+    const trap = g.level.traps![vent]!;
+    waitUntil(
+      g,
+      () => {
+        const t = g.trapCycle(trap);
+        return t >= trap.active && trap.period - t > 1.1;
+      },
+      `vent ${vent} quiet`,
+    );
+    jump(g, x, y);
+  }
   walk(g, 6580);
   hops(g, crust);
   walk(g, 7860);
@@ -489,10 +521,13 @@ function stormRoute(g: Game) {
     [3030, 380],
     [3250, 430],
   ]);
-  walk(g, 3340);
-  bounceTo(g, 3445, 3620, 210);
-  jump(g, 3835, 120);
-  jump(g, 3950, 430);
+  // Lightning Ridge: cross between strikes, then ride the storm lift up.
+  crossTraps(g, 4040);
+  const spire = tile(g, "storm.lift.spire");
+  hopTo(g, spire.id!, () => spire.y >= 380);
+  waitUntil(g, () => spire.y <= 222, "storm lift at the top");
+  jump(g, 4300, 150);
+  jump(g, 4385, 430);
   liftRun(g, "storm.lift.", "glide");
   walk(g, 5540);
   galeHops(g, 5540, [

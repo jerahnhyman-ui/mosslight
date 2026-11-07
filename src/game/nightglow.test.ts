@@ -239,11 +239,13 @@ describe("Nightglow Woods", () => {
     hopTo(g, glide.id!, () => glide.x <= 4840 && leftward(glide));
     waitUntil(g, () => glide.x + glide.w >= 5080, "sliding branch");
     jump(g, 5240, 430);
+    // Night blooms open in Pip's light and make the climb.
     walk(g, 5440);
-    bounceTo(g, 5545, 5720, 210);
-    jump(g, 5935, 120);
+    jump(g, 5635, 340);
+    jump(g, 5860, 255);
+    jump(g, 6095, 175);
     expect(rescued(g)).toBe(2);
-    jump(g, 6100, 430);
+    jump(g, 6260, 430);
     walk(g, 6580);
     for (const [x, y] of [
       [6710, 390],

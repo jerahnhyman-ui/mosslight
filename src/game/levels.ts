@@ -133,7 +133,7 @@ export interface Level {
    * or lightning that strikes a marked spot. Each glows and rustles just
    * before it strikes, for `active` seconds out of every `period`. */
   traps?: {
-    kind: "thorns" | "lightning";
+    kind: "thorns" | "lightning" | "geyser";
     x: number;
     w: number;
     /** The floor the trap sits on. */
