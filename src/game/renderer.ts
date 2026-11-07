@@ -951,6 +951,7 @@ export class Renderer {
         game.character,
       );
       c.restore();
+      this.windSprite(game, center, feet, size, time, dt);
       if (game.starPowerRemaining > 0)
         this.starAura(center, feet, size, game.starPowerRemaining, time, true);
       this.powerEffects(game, center, feet, size, time);
@@ -6286,39 +6287,7 @@ export class Renderer {
       this.ellipse(-17, -23, flutter, 7, "rgba(226,255,224,.72)", "#92c9a2", 1);
       this.ellipse(14, -23, flutter, 7, "rgba(226,255,224,.72)", "#92c9a2", 1);
     }
-    if (flight !== "none") {
-      // The feather is anchored to Pip's satchel; lift and glide spread it differently.
-      c.save();
-      c.translate(-15, -25 + bob);
-      c.rotate(
-        flight === "lift"
-          ? -0.8 + Math.sin(time * 18) * 0.15
-          : flight === "glide"
-            ? -1.35
-            : -0.35,
-      );
-      this.leaf(0, 0, flight === "glide" ? 24 : 19, 0, "#e9fff4");
-      this.line(
-        [
-          [0, 0],
-          [0, -23],
-        ],
-        "#6bbdb3",
-        2,
-      );
-      c.restore();
-      if (flight === "lift") {
-        for (let i = 0; i < 3; i++)
-          this.line(
-            [
-              [-21 - i * 4, -5 + i * 7],
-              [-25 - i * 4, 2 + i * 7],
-            ],
-            "rgba(225,255,246,.8)",
-            2,
-          );
-      }
-    }
+    // The Wind Feather is drawn as its own little companion (windSprite).
     // A streaming scarf makes direction and speed easy to read.
     c.beginPath();
     c.moveTo(-9, -26 + bob);
@@ -6335,6 +6304,7 @@ export class Renderer {
     c.fillStyle = scarf;
     c.fill();
     this.scarfPattern(bob);
+    if (size > 1.1) this.grownBack(bob, time, vx);
     if (outfit === "cosmetic.bee_scarf" && !this.wornScarf) {
       this.line(
         [
@@ -6503,6 +6473,7 @@ export class Renderer {
       this.ellipse(-7, -43 + bob, 4, 4, "#fff0b3");
       this.ellipse(-5, -44 + bob, 3.3, 3.3, outfitColor);
     }
+    if (size > 1.1) this.grownFront(bob, time, danger);
     this.hatArt(bob - (danger ? 3 : 0), time);
     // A slightly tucked pose communicates rising/falling without moving the feet origin.
     if (!grounded && vy < -100) {
@@ -6573,38 +6544,7 @@ export class Renderer {
       this.ellipse(-17, -23, flutter, 7, "rgba(255,239,242,.72)", "#d79bab", 1);
       this.ellipse(14, -23, flutter, 7, "rgba(255,239,242,.72)", "#d79bab", 1);
     }
-    if (flight !== "none") {
-      c.save();
-      c.translate(-15, -25 + bob);
-      c.rotate(
-        flight === "lift"
-          ? -0.8 + Math.sin(time * 18) * 0.15
-          : flight === "glide"
-            ? -1.35
-            : -0.35,
-      );
-      this.leaf(0, 0, flight === "glide" ? 24 : 19, 0, "#e9fff4");
-      this.line(
-        [
-          [0, 0],
-          [0, -23],
-        ],
-        "#6bbdb3",
-        2,
-      );
-      c.restore();
-      if (flight === "lift") {
-        for (let i = 0; i < 3; i++)
-          this.line(
-            [
-              [-21 - i * 4, -5 + i * 7],
-              [-25 - i * 4, 2 + i * 7],
-            ],
-            "rgba(225,255,246,.8)",
-            2,
-          );
-      }
-    }
+    // The Wind Feather is drawn as its own little companion (windSprite).
     // A little scarf and satchel mark her as Pip's fellow garden explorer.
     c.beginPath();
     c.moveTo(-9, -26 + bob);
@@ -6621,6 +6561,7 @@ export class Renderer {
     c.fillStyle = scarf;
     c.fill();
     this.scarfPattern(bob);
+    if (size > 1.1) this.grownBack(bob, time, vx);
     if (outfit === "cosmetic.bee_scarf" && !this.wornScarf) {
       this.line(
         [
@@ -6781,8 +6722,229 @@ export class Renderer {
       );
     }
     this.ellipse(sway, -53 + crownBob, 2.5, 2.5, "#f4c65e");
+    if (size > 1.1) this.grownFront(bob, time, danger);
     this.hatArt(bob - (danger ? 3 : 0), time);
     c.restore();
+  }
+
+  /** Grown (big) Pip gets a look of its own: a flowing leaf cape behind... */
+  private grownBack(bob: number, time: number, vx: number) {
+    const c = this.ctx;
+    const sway = Math.sin(time * 6) * 2 + Math.min(10, Math.abs(vx) / 30);
+    for (const [dx, dy, len, tilt, color] of [
+      [-6, -30, 22, -2.3, "#3f8f55"],
+      [-8, -22, 24, -2.6, "#4fa868"],
+      [-6, -14, 20, -2.9, "#3f8f55"],
+    ] as const) {
+      c.save();
+      c.translate(dx, dy + bob);
+      c.rotate(tilt - sway * 0.02);
+      this.leaf(0, 0, len + sway * 0.4, 0, color);
+      c.restore();
+    }
+  }
+  /** ...and in front, a golden Sunseed emblem, gold-capped boots and a
+   * bloomed crown: three leaves around a golden flower. */
+  private grownFront(bob: number, time: number, danger: boolean) {
+    const c = this.ctx;
+    // Sunseed emblem on the chest.
+    c.save();
+    c.translate(1, -15 + bob);
+    c.beginPath();
+    c.moveTo(0, -5);
+    c.bezierCurveTo(5, -3, 5, 3, 0, 6);
+    c.bezierCurveTo(-5, 3, -5, -3, 0, -5);
+    c.fillStyle = "#ffd36b";
+    c.fill();
+    c.strokeStyle = "#c98f2c";
+    c.lineWidth = 1;
+    c.stroke();
+    c.restore();
+    // Gold toe caps.
+    this.ellipse(-8, -2, 4, 2, "#ffd36b");
+    this.ellipse(9, -2, 4, 2, "#ffd36b");
+    // The bloom.
+    const lift = danger ? 6 : 0;
+    const sway = Math.sin(time * 3) * 0.08;
+    for (const angle of [-0.9, 0.1, 1.1])
+      this.leaf(
+        1,
+        -49 + bob - lift,
+        12,
+        angle + sway,
+        angle === 0.1 ? "#7cc46a" : "#4f9d5d",
+      );
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2 + time * 0.6;
+      this.ellipse(
+        1 + Math.cos(a) * 4.5,
+        -61 + bob - lift + Math.sin(a) * 4.5,
+        3.6,
+        3.6,
+        "#ffe08a",
+        "#e0a83a",
+        0.8,
+      );
+    }
+    this.ellipse(1, -61 + bob - lift, 3, 3, "#f08a3c");
+  }
+
+  /** The Wind Feather: a little feather sprite that follows Pip on a
+   * springy lag, blinks and bobs; it flaps above Pip to lift, and spreads
+   * into a pair of feather wings for a glide. Drawn in world space. */
+  private featherSpot = { x: 0, y: 0, vx: 0, vy: 0, ready: false };
+  private windSprite(
+    game: Game,
+    center: number,
+    feet: number,
+    size: number,
+    time: number,
+    dt: number,
+  ) {
+    const c = this.ctx;
+    const p = game.player;
+    const flight: "none" | "ready" | "lift" | "glide" = game.hasWindFeather
+      ? game.liftActive
+        ? "lift"
+        : game.glideArmed && !p.grounded
+          ? "glide"
+          : "ready"
+      : "none";
+    const spot = this.featherSpot;
+    if (flight === "none") {
+      spot.ready = false;
+      return;
+    }
+    const facing = p.facing || 1;
+    // Where it wants to be: behind Pip's shoulder, or above while lifting.
+    const anchorX = center - facing * (flight === "lift" ? 4 : 26 * size);
+    const anchorY =
+      feet - (flight === "lift" ? 64 : 54) * size + Math.sin(time * 3) * 4;
+    if (!spot.ready || Math.abs(spot.x - anchorX) > 300) {
+      Object.assign(spot, {
+        x: anchorX,
+        y: anchorY,
+        vx: 0,
+        vy: 0,
+        ready: true,
+      });
+    }
+    // A soft spring: it trails a little behind Pip's movement.
+    const k = 60,
+      damping = 10;
+    const step = Math.min(dt, 1 / 30);
+    spot.vx += ((anchorX - spot.x) * k - spot.vx * damping) * step;
+    spot.vy += ((anchorY - spot.y) * k - spot.vy * damping) * step;
+    spot.x += spot.vx * step;
+    spot.y += spot.vy * step;
+    if (flight === "glide") {
+      // Spread as wings from Pip's back.
+      c.save();
+      c.translate(center, feet - 30 * size);
+      c.scale(facing < 0 ? -1 : 1, 1);
+      c.scale(size, size);
+      const beat = Math.sin(time * 4) * 0.08;
+      for (const side of [-1, 1]) {
+        c.save();
+        c.rotate(side * (0.25 + beat) - 1.57);
+        c.scale(1, side);
+        this.leaf(0, 0, 34, -0.2, "rgba(233,255,244,.95)");
+        this.leaf(0, 0, 26, 0.25, "rgba(196,240,222,.95)");
+        c.restore();
+      }
+      c.restore();
+    }
+    // The sprite itself.
+    const tilt =
+      flight === "lift"
+        ? Math.sin(time * 22) * 0.6
+        : Math.max(-0.6, Math.min(0.6, spot.vx / 400)) +
+          Math.sin(time * 2) * 0.1;
+    c.save();
+    c.translate(spot.x, spot.y);
+    c.rotate(tilt);
+    c.scale(size * 0.9, size * 0.9);
+    this.ellipse(0, 0, 16, 16, "rgba(220,255,240,.18)");
+    // Feather vane and quill.
+    c.beginPath();
+    c.moveTo(0, -18);
+    c.bezierCurveTo(11, -10, 10, 8, 0, 16);
+    c.bezierCurveTo(-10, 8, -11, -10, 0, -18);
+    c.fillStyle = "#effff7";
+    c.fill();
+    c.strokeStyle = "#7cc7b6";
+    c.lineWidth = 1.4;
+    c.stroke();
+    for (const [y, l] of [
+      [-8, 6],
+      [-1, 7],
+      [6, 6],
+    ] as const) {
+      this.line(
+        [
+          [0, y],
+          [-l, y - 3],
+        ],
+        "#bfe8dc",
+        1.2,
+      );
+      this.line(
+        [
+          [0, y],
+          [l, y - 3],
+        ],
+        "#bfe8dc",
+        1.2,
+      );
+    }
+    this.line(
+      [
+        [0, -14],
+        [0, 22],
+      ],
+      "#6bbdb3",
+      1.8,
+    );
+    // A face: it blinks, and squints happily while gliding.
+    const blink = Math.sin(time * 1.3) > 0.97 || flight === "glide";
+    if (blink) {
+      this.line(
+        [
+          [-5, -4],
+          [-2, -4],
+        ],
+        "#2f5e57",
+        1.6,
+      );
+      this.line(
+        [
+          [2, -4],
+          [5, -4],
+        ],
+        "#2f5e57",
+        1.6,
+      );
+    } else {
+      this.ellipse(-3.5, -4, 1.6, 2.2, "#2f5e57");
+      this.ellipse(3.5, -4, 1.6, 2.2, "#2f5e57");
+    }
+    c.beginPath();
+    c.arc(0, 0, 2.6, 0.2, Math.PI - 0.2);
+    c.strokeStyle = "#2f5e57";
+    c.lineWidth = 1.2;
+    c.stroke();
+    c.restore();
+    if (flight === "lift")
+      // Little gusts under the flapping feather.
+      for (let i = 0; i < 3; i++)
+        this.line(
+          [
+            [spot.x - 8 + i * 8, spot.y + 22 + ((time * 120 + i * 9) % 18)],
+            [spot.x - 10 + i * 8, spot.y + 30 + ((time * 120 + i * 9) % 18)],
+          ],
+          "rgba(225,255,246,.8)",
+          2,
+        );
   }
 
   /** The worn scarf's colour, or the costume's own scarf. */
