@@ -242,7 +242,7 @@ export const galeRun: Level = {
     slider("storm.lift.gale", 2390),
     ground(2600, 600),
   ],
-  windZones: [{ x: 200, w: 1350, speed: -125, period: 3.6, duration: 1.4 }],
+  windZones: [{ x: 200, w: 1350, speed: -110, period: 3.6, duration: 1.4 }],
 
   coins: [
     ...row(260, 392, 8, 55),

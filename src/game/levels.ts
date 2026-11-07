@@ -1199,6 +1199,32 @@ export const levels: Level[] = [
   stormLevel,
 ];
 
+/** Timed coin rings on clear, flat stretches of the earlier worlds. */
+const EARLY_RINGS: Record<string, number> = {
+  "world.sunlit-meadow": 5970,
+  "world.firefly-hollow": 6240,
+  "world.cloudtop-crossing": 6930,
+  "world.windmill-garden": 9020,
+  "world.reedwater-marsh": 6100,
+  "world.glimmerdeep-caverns": 3400,
+  "world.nightglow-woods": 3380,
+};
+for (const level of levels) {
+  const x = EARLY_RINGS[level.contentId ?? ""];
+  if (x === undefined || level.coinRings) continue;
+  level.coinRings = [
+    {
+      x: x + 20,
+      y: 395,
+      time: 3.5,
+      coins: Array.from({ length: 7 }, (_, i) => ({
+        x: x + 80 + i * 60,
+        y: 392,
+      })),
+    },
+  ];
+}
+
 /** A real, safe platforming space: all residents and purchased furnishings are
  * drawn here, while the clear floor makes exploring comfortable on a phone.
  * Coins are earned on the trails rather than by repeatedly entering the grove.

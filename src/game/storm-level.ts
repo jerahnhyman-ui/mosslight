@@ -118,10 +118,10 @@ export const stormLevel: Level = withRewardBlocks({
     ledge(8350, 180, 140),
   ],
   windZones: [
-    gust(500, 750, -110, 4.5, 1.6),
-    gust(2330, 960),
-    gust(5560, 620, -110, 4.2, 1.6, 1),
-    gust(7450, 450, -160, 4, 2),
+    gust(500, 750, -95, 4.5, 1.6),
+    gust(2330, 960, -115),
+    gust(5560, 620, -95, 4.2, 1.6, 1),
+    gust(7450, 450, -140, 4, 2),
   ],
   coinRings: [
     {

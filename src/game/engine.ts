@@ -641,7 +641,8 @@ export class Game {
       // In water Pip builds speed with each kick and glides to a stop.
       if (swimming && !p.grounded) acceleration = direction ? 700 : 260;
       // Ice: slow to get going and slow to stop.
-      if (p.grounded && this.onIce) acceleration = direction ? 900 : 160;
+      // Ice: a little grip for steering, and a long (but not endless) slide.
+      if (p.grounded && this.onIce) acceleration = direction ? 1000 : 200;
       // Just after a wall kick, the push carries Pip away from the wall.
       if (this.wallLock > 0) acceleration = 0;
       // Star power makes Pip noticeably faster as well as invincible.
