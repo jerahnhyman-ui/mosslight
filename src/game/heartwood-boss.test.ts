@@ -136,6 +136,10 @@ describe("subboss difficulty", () => {
     for (let i = 0; i < 350 && boss.state !== "recover"; i++)
       stepBoss(boss, 1 / 120, player, hazards, events);
     expect(boss.state).toBe("recover");
+    // The wave rolls out a beat after the impact.
+    expect(hazards).toHaveLength(0);
+    for (let i = 0; i < 60; i++)
+      stepBoss(boss, 1 / 120, player, hazards, events);
     expect(hazards).toHaveLength(1);
     expect(hazards[0]).toMatchObject({
       kind: "gust",
@@ -154,14 +158,19 @@ describe("subboss difficulty", () => {
         const hazards: BossHazard[] = [],
           events: string[] = [];
         stepBoss(b, 1 / 120, player, hazards, events);
+        // The signature volley (later phases also mix in other attacks).
+        b.variant = "main";
         for (let i = 0; i < 100; i++)
           stepBoss(b, 1 / 120, player, hazards, events);
         expect(b.state).toBe("warning");
         expect(hazards).toHaveLength(0);
-        for (let i = 0; i < 500 && b.state !== "recover"; i++)
+        let volley: BossHazard[] = [];
+        for (let i = 0; i < 500 && b.state !== "recover"; i++) {
           stepBoss(b, 1 / 120, player, hazards, events);
+          if (b.state === "attack") volley = [...hazards];
+        }
         expect(b.state).toBe("recover");
-        return { boss: b, hazards };
+        return { boss: b, hazards: volley };
       }
       const first = attack(1),
         last = attack(3);

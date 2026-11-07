@@ -1,3 +1,4 @@
+import { fightBoss } from "./boss-bot";
 import { describe, expect, it } from "vitest";
 import { Game, type GameInput } from "./engine";
 import { levels } from "./levels";
@@ -38,24 +39,14 @@ describe("guardian rematch arenas", () => {
 
   it("can be won with ordinary input (stag rematch)", () => {
     const g = new Game(0, { level: guardianArena(levels[0]!)! });
-    let previousJump = false;
-    for (let frame = 0; frame < 120 * 90 && g.state === "playing"; frame++) {
-      const b = g.boss!,
-        p = g.player;
-      let target =
-        b.state === "defeated" ? g.level.goal.x + 30 : b.x + b.w / 2 - p.w / 2;
-      if (b.state === "attack") target += b.facing * 120;
-      const dx = target - p.x - (p.vx * Math.abs(p.vx)) / 3700;
-      const jump = p.grounded || (!p.grounded && p.vy < 0);
-      const input: GameInput = {
-        left: dx < -2,
-        right: dx > 2,
-        jump,
-        jumpPressed: jump && !previousJump,
-      };
-      previousJump = jump;
-      g.update(1 / 120, input);
-    }
+    fightBoss(g, { seconds: 120 });
+    for (let i = 0; i < 120 * 10 && g.state === "playing"; i++)
+      g.update(1 / 120, {
+        left: false,
+        right: true,
+        jump: false,
+        jumpPressed: false,
+      });
     expect(g.state).toBe("won");
   });
 });

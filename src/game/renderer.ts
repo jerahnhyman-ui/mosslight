@@ -585,6 +585,7 @@ export class Renderer {
     this.previousDeaths = game.deaths;
     this.previousElapsed = game.elapsed;
     this.background(p, game.level.theme, time, camera);
+    if (game.level.castle) this.castleWalls(game.level.castle, time, camera);
     this.restoredLight(Math.max(0, Math.min(1, restoration)), time, camera);
     c.save();
     c.translate(-camera, -this.cameraY);
@@ -607,6 +608,7 @@ export class Renderer {
         game.level.theme === "cavern" ||
         game.level.theme === "ice" ||
         game.level.theme === "volcano" ||
+        !!game.level.castle ||
         thornGrove
       )
         continue;
@@ -746,6 +748,7 @@ export class Renderer {
       });
       for (const ring of game.coinRings) this.coinRing(ring, time);
       this.windStreaks(game, time);
+      for (const trap of game.level.traps ?? []) this.trapArt(game, trap, time);
       if (game.level.chase && Number.isFinite(game.chaseX))
         this.floodWall(game.chaseX, time);
       for (const lantern of game.lanterns)
@@ -753,7 +756,10 @@ export class Renderer {
           this.lanternPost(lantern.x, lantern.y, lantern.lit, time);
       for (const icicle of game.icicles)
         if (icicle.state !== "gone" && this.visible(icicle.x, 30))
-          this.icicleArt(icicle.x, icicle.y, icicle.state === "shake", time);
+          if (game.level.castle === "belfry")
+            this.shingleArt(icicle.x, icicle.y, icicle.state === "shake", time);
+          else
+            this.icicleArt(icicle.x, icicle.y, icicle.state === "shake", time);
       game.acorns.forEach((acorn, i) => {
         if (!acorn.collected && this.visible(acorn.x, 30))
           this.acorn(acorn.x, acorn.y, time, i);
@@ -945,6 +951,7 @@ export class Renderer {
         game.character,
       );
       c.restore();
+      this.windSprite(game, center, feet, size, time, dt);
       if (game.starPowerRemaining > 0)
         this.starAura(center, feet, size, game.starPowerRemaining, time, true);
       this.powerEffects(game, center, feet, size, time);
@@ -2163,6 +2170,7 @@ export class Renderer {
 
   private expansionScenery(game: Game, time: number) {
     if (game.level.theme !== "windmill" && game.level.theme !== "hive") return;
+    if (game.level.castle) return;
     const c = this.ctx;
     if (game.level.theme === "hive") {
       // Honeycomb is background only; collision remains visible in the foreground.
@@ -2852,8 +2860,42 @@ export class Renderer {
       c.rect(b.x - 200, b.groundY - 600, b.w + 400, 600);
       c.clip();
     }
+    if (b.skid > 0)
+      // Dust kicked up by a skid, a slam or a flinch.
+      for (let i = 0; i < 4; i++) {
+        const k = 1 - b.skid / 0.4;
+        this.ellipse(
+          cx - b.facing * (b.w / 2 + 6 + i * 12 + k * 18),
+          feet - 6 - i * 3 - k * 8,
+          9 + k * 6,
+          6 + k * 4,
+          `rgba(235,228,210,${0.55 * (b.skid / 0.4)})`,
+        );
+      }
+    if (b.fury > 0) {
+      // A new phase: a red flare as it rears up and roars.
+      const glow = Math.sin((b.fury / 0.9) * Math.PI);
+      this.ellipse(
+        cx,
+        feet - b.h / 2,
+        b.w * 0.85,
+        b.h * 0.85,
+        `rgba(255,90,70,${0.3 * glow})`,
+      );
+    }
     c.translate(cx, feet);
     c.scale(b.facing < 0 ? -1 : 1, 1);
+    // Body language: a flinch shakes it back, a roar rears it up, a wind-up
+    // crouches it, and the first moment of an attack stretches it forward.
+    if (b.stagger > 0) {
+      c.translate(Math.sin(time * 70) * 3 - 4, 0);
+      c.rotate(-0.08);
+    }
+    if (b.fury > 0) c.rotate(-0.16 * Math.sin((b.fury / 0.9) * Math.PI));
+    if (warning && b.stateTime < 0.28 && b.kind !== "owl" && b.kind !== "moth")
+      c.scale(1.08, 0.9);
+    else if (b.state === "attack" && b.attackElapsed < 0.15)
+      c.scale(0.94, 1.07);
     c.scale(b.w / 82, b.h / 58);
     if (b.invulnerable > 0) c.globalAlpha = 0.65 + Math.sin(time * 16) * 0.15;
     const stride = Math.sin(time * (b.state === "attack" ? 25 : 9)) * 3;
@@ -2984,6 +3026,30 @@ export class Renderer {
       c.restore();
       this.ellipse(38 + lean, -34, 3, 3.5, "#fff4d4");
       this.ellipse(39 + lean, -34, 1.5, 2.2, "#283040");
+    } else if (
+      b.kind === "bear" &&
+      b.state === "attack" &&
+      b.variant === "roll"
+    ) {
+      // Curled into a rolling snowball.
+      c.save();
+      c.scale(82 / b.w, 58 / b.h);
+      c.translate(0, -35);
+      c.rotate(time * 14);
+      this.ellipse(0, 0, 35, 35, "#f4f8fb", "#9fb2c4", 3);
+      for (let i = 0; i < 3; i++) {
+        const a = (i / 3) * Math.PI * 2;
+        this.ellipse(Math.cos(a) * 20, Math.sin(a) * 20, 6, 4, "#d6e2ec");
+      }
+      this.line(
+        [
+          [-30, 8],
+          [30, -8],
+        ],
+        "#d9534f",
+        6,
+      );
+      c.restore();
     } else if (b.kind === "bear") {
       const rear = warning ? Math.abs(Math.sin(time * 6)) * 6 : 0;
       // A big white bear with a scarf, rearing as it winds up a slam.
@@ -4233,8 +4299,43 @@ export class Renderer {
       this.bounceMushroom(r, time);
       return;
     }
+    if (r.kind === "moving" && r.id?.startsWith("castle.")) {
+      // A castle lift: a stone slab (a bell yoke in the belfry) on chains.
+      const belfry = r.id.startsWith("castle.belfry.");
+      for (const cx of [r.x + 14, r.x + r.w - 14])
+        this.line(
+          [
+            [cx, r.y - 260],
+            [cx, r.y],
+          ],
+          "rgba(60,55,70,.6)",
+          2,
+        );
+      this.rounded(
+        r.x,
+        r.y,
+        r.w,
+        r.h + 4,
+        5,
+        belfry ? "#b08a4a" : "#9aa0a8",
+        belfry ? "#6e5426" : "#5d636c",
+      );
+      this.line(
+        [
+          [r.x + 6, r.y + 3],
+          [r.x + r.w - 6, r.y + 3],
+        ],
+        "rgba(255,255,255,.35)",
+        2,
+      );
+      return;
+    }
     if (r.kind === "moving") {
       this.movingLeaf(r, time);
+      return;
+    }
+    if (r.kind === "crumble" && r.id?.startsWith("castle.")) {
+      this.castleStone(r, time);
       return;
     }
     if (r.kind === "crumble") {
@@ -4627,6 +4728,285 @@ export class Renderer {
   }
 
   /** An icicle hanging, shaking before it falls, or falling. */
+  /** Castle walls behind the trail: each castle has its own stone, windows
+   * and decorations. Drawn in screen space with slow parallax. */
+  private castleWalls(
+    style: "bramble" | "belfry" | "citadel",
+    time: number,
+    camera: number,
+  ) {
+    const c = this.ctx;
+    const w = this.viewportWidth,
+      h = this.viewportHeight;
+    const stone =
+      style === "bramble"
+        ? ["#6f7d6a", "#5d6a58", "#86937f"]
+        : style === "belfry"
+          ? ["#3d3651", "#302a42", "#51496a"]
+          : ["#5e6676", "#4c5363", "#727b8c"];
+    const shift = (camera * 0.45) % 240;
+    const top = 120;
+    c.fillStyle = stone[0]!;
+    c.fillRect(0, top, w, h - top);
+    // Courses of stone blocks.
+    c.strokeStyle = stone[1]!;
+    c.lineWidth = 2;
+    for (let y = top; y < h; y += 34) {
+      c.beginPath();
+      c.moveTo(0, y);
+      c.lineTo(w, y);
+      c.stroke();
+      const offset = ((y - top) / 34) % 2 ? 60 : 0;
+      for (let x = -shift + offset - 120; x < w; x += 120) {
+        c.beginPath();
+        c.moveTo(x, y);
+        c.lineTo(x, y + 34);
+        c.stroke();
+      }
+    }
+    // Battlements along the top.
+    for (let x = -shift - 240; x < w + 60; x += 60) {
+      c.fillStyle = stone[0]!;
+      c.fillRect(x, top - 30, 34, 32);
+      c.fillStyle = stone[2]!;
+      c.fillRect(x, top - 30, 34, 5);
+    }
+    // Windows (and per-castle details) every 240px.
+    for (let x = -shift - 240; x < w + 240; x += 240) {
+      const wx = x + 100;
+      c.save();
+      c.beginPath();
+      c.moveTo(wx - 22, 330);
+      c.lineTo(wx - 22, 230);
+      c.arc(wx, 230, 22, Math.PI, 0);
+      c.lineTo(wx + 22, 330);
+      c.closePath();
+      const flash = style === "citadel" && time % 6.3 > 5.9 ? 0.9 : 0;
+      c.fillStyle =
+        style === "bramble"
+          ? "#2f3b30"
+          : style === "belfry"
+            ? "#c9d7ff"
+            : `rgba(${180 + flash * 70},${190 + flash * 60},${215 + flash * 40},1)`;
+      c.fill();
+      c.strokeStyle = stone[2]!;
+      c.lineWidth = 4;
+      c.stroke();
+      c.restore();
+      if (style === "belfry") {
+        // Moonlight through the arch, and a bell hanging in the next bay.
+        c.fillStyle = "rgba(200,215,255,.12)";
+        c.beginPath();
+        c.moveTo(wx - 22, 260);
+        c.lineTo(wx + 22, 260);
+        c.lineTo(wx + 90, 430);
+        c.lineTo(wx + 10, 430);
+        c.closePath();
+        c.fill();
+        const swing = Math.sin(time * 1.4 + x * 0.01) * 0.18;
+        c.save();
+        c.translate(wx + 120, 150);
+        c.rotate(swing);
+        this.line(
+          [
+            [0, 0],
+            [0, 40],
+          ],
+          "#2a2438",
+          3,
+        );
+        c.beginPath();
+        c.moveTo(-16, 70);
+        c.quadraticCurveTo(-14, 40, 0, 38);
+        c.quadraticCurveTo(14, 40, 16, 70);
+        c.closePath();
+        c.fillStyle = "#b08a4a";
+        c.fill();
+        c.restore();
+      } else if (style === "bramble") {
+        // Thorny vines creep over the wall, and a red banner hangs.
+        c.strokeStyle = "#3f5a33";
+        c.lineWidth = 4;
+        c.beginPath();
+        c.moveTo(wx + 60, 120);
+        for (let y = 120; y < 430; y += 30)
+          c.quadraticCurveTo(
+            wx + 80,
+            y + 15,
+            wx + 60 + Math.sin(y) * 14,
+            y + 30,
+          );
+        c.stroke();
+        this.rounded(wx + 130, 150, 34, 90, 3, "#a8423f", "#7a2c2a");
+        this.ellipse(wx + 147, 190, 9, 9, "#e9c46a");
+      } else {
+        // A storm flag snapping in the wind.
+        this.line(
+          [
+            [wx + 130, 100],
+            [wx + 130, 200],
+          ],
+          "#3a3f4a",
+          3,
+        );
+        c.beginPath();
+        c.moveTo(wx + 130, 104);
+        for (let i = 0; i <= 4; i++)
+          c.lineTo(wx + 130 - i * 12, 110 + Math.sin(time * 9 + i) * 5);
+        c.lineTo(wx + 82, 128);
+        c.lineTo(wx + 130, 126);
+        c.closePath();
+        c.fillStyle = "#e0b84a";
+        c.fill();
+      }
+    }
+  }
+
+  /** Thorn beds and lightning marks: dormant, warning, then striking. */
+  private trapArt(
+    game: Game,
+    trap: NonNullable<Game["level"]["traps"]>[number],
+    time: number,
+  ) {
+    if (!this.visible(trap.x + trap.w / 2, trap.w / 2 + 40)) return;
+    const c = this.ctx;
+    const t = game.trapCycle(trap);
+    const striking = t < trap.active;
+    const warning = !striking && trap.period - t < 0.7;
+    if (trap.kind === "thorns") {
+      // A bed of brambles that rustles, then bursts up into spikes.
+      const rise = striking
+        ? Math.min(1, t / 0.12)
+        : warning
+          ? 0.15 + Math.abs(Math.sin(time * 30)) * 0.1
+          : 0.08;
+      this.rounded(
+        trap.x - 4,
+        trap.y - 8,
+        trap.w + 8,
+        10,
+        4,
+        "#4c6b3a",
+        "#2f4a26",
+      );
+      c.save();
+      for (let x = trap.x + 6; x < trap.x + trap.w - 4; x += 14) {
+        const height = 34 * rise * (0.8 + ((x * 7) % 5) / 20);
+        c.beginPath();
+        c.moveTo(x - 6, trap.y - 6);
+        c.lineTo(x, trap.y - 6 - height);
+        c.lineTo(x + 6, trap.y - 6);
+        c.closePath();
+        c.fillStyle = striking ? "#7a5232" : "#5d7a45";
+        c.fill();
+        c.strokeStyle = "#3a2a1a";
+        c.lineWidth = 1.2;
+        c.stroke();
+      }
+      if (warning)
+        this.ellipse(
+          trap.x + trap.w / 2,
+          trap.y - 4,
+          trap.w / 2 + 8,
+          6,
+          `rgba(255,120,80,${0.25 + Math.sin(time * 20) * 0.15})`,
+        );
+      c.restore();
+    } else {
+      const cx = trap.x + trap.w / 2;
+      // A glowing mark on the flagstones; brighter as the strike nears.
+      const glow = striking
+        ? 0.9
+        : warning
+          ? 0.5 + Math.sin(time * 24) * 0.3
+          : 0.18;
+      this.ellipse(
+        cx,
+        trap.y - 3,
+        trap.w / 2 + 6,
+        6,
+        `rgba(255,226,122,${glow})`,
+      );
+      if (striking) {
+        c.save();
+        c.fillStyle = "rgba(255,250,210,.35)";
+        c.fillRect(trap.x - 8, trap.y - 520, trap.w + 16, 520);
+        c.strokeStyle = "#fffbe0";
+        c.lineWidth = 5;
+        c.lineJoin = "round";
+        c.beginPath();
+        let bx = cx;
+        c.moveTo(bx, trap.y - 520);
+        for (let y = trap.y - 520; y < trap.y; y += 40) {
+          bx = cx + (hash(y + Math.floor(time * 20)) - 0.5) * 22;
+          c.lineTo(bx, y + 40);
+        }
+        c.stroke();
+        c.strokeStyle = "#ffe27a";
+        c.lineWidth = 2;
+        c.stroke();
+        c.restore();
+      }
+    }
+  }
+
+  /** A cracked castle stone (or rotten board in the belfry) that shakes,
+   * then falls away, and settles back later. */
+  private castleStone(r: Game["platforms"][number], time: number) {
+    if (r.crumbleRemaining === 0) return;
+    const c = this.ctx;
+    const shaking = r.crumbleRemaining > 0;
+    const dx = shaking ? Math.sin(time * 45) * 1.6 : 0;
+    const board = r.id?.startsWith("castle.belfry.");
+    c.save();
+    c.translate(dx, 0);
+    this.rounded(
+      r.x,
+      r.y,
+      r.w,
+      r.h + 6,
+      4,
+      board ? "#7a5a40" : "#8a8f86",
+      board ? "#4d3626" : "#55594f",
+    );
+    c.strokeStyle = board ? "#4d3626" : "#4a4e45";
+    c.lineWidth = 2;
+    c.beginPath();
+    if (board)
+      for (let x = r.x + 30; x < r.x + r.w; x += 30) {
+        c.moveTo(x, r.y + 2);
+        c.lineTo(x, r.y + r.h + 4);
+      }
+    else {
+      c.moveTo(r.x + r.w * 0.35, r.y);
+      c.lineTo(r.x + r.w * 0.45, r.y + 10);
+      c.lineTo(r.x + r.w * 0.38, r.y + r.h + 5);
+      c.moveTo(r.x + r.w * 0.7, r.y);
+      c.lineTo(r.x + r.w * 0.62, r.y + 12);
+    }
+    c.stroke();
+    c.restore();
+  }
+
+  /** A loose roof shingle, for the belfry's rafters. */
+  private shingleArt(x: number, y: number, shaking: boolean, time: number) {
+    const c = this.ctx;
+    const dx = shaking ? Math.sin(time * 50) * 2 : 0;
+    c.save();
+    c.translate(x + dx, y + 14);
+    c.rotate(shaking ? Math.sin(time * 40) * 0.1 : 0.05);
+    this.rounded(-12, -14, 24, 28, 3, "#6a5a6e", "#3d3346");
+    this.line(
+      [
+        [-12, 0],
+        [12, 0],
+      ],
+      "#4d4256",
+      1.5,
+    );
+    c.restore();
+  }
+
   private icicleArt(x: number, y: number, shaking: boolean, time: number) {
     const c = this.ctx;
     const dx = shaking ? Math.sin(time * 50) * 2 : 0;
@@ -5907,39 +6287,7 @@ export class Renderer {
       this.ellipse(-17, -23, flutter, 7, "rgba(226,255,224,.72)", "#92c9a2", 1);
       this.ellipse(14, -23, flutter, 7, "rgba(226,255,224,.72)", "#92c9a2", 1);
     }
-    if (flight !== "none") {
-      // The feather is anchored to Pip's satchel; lift and glide spread it differently.
-      c.save();
-      c.translate(-15, -25 + bob);
-      c.rotate(
-        flight === "lift"
-          ? -0.8 + Math.sin(time * 18) * 0.15
-          : flight === "glide"
-            ? -1.35
-            : -0.35,
-      );
-      this.leaf(0, 0, flight === "glide" ? 24 : 19, 0, "#e9fff4");
-      this.line(
-        [
-          [0, 0],
-          [0, -23],
-        ],
-        "#6bbdb3",
-        2,
-      );
-      c.restore();
-      if (flight === "lift") {
-        for (let i = 0; i < 3; i++)
-          this.line(
-            [
-              [-21 - i * 4, -5 + i * 7],
-              [-25 - i * 4, 2 + i * 7],
-            ],
-            "rgba(225,255,246,.8)",
-            2,
-          );
-      }
-    }
+    // The Wind Feather is drawn as its own little companion (windSprite).
     // A streaming scarf makes direction and speed easy to read.
     c.beginPath();
     c.moveTo(-9, -26 + bob);
@@ -5956,6 +6304,7 @@ export class Renderer {
     c.fillStyle = scarf;
     c.fill();
     this.scarfPattern(bob);
+    if (size > 1.1) this.grownBack(bob, time, vx);
     if (outfit === "cosmetic.bee_scarf" && !this.wornScarf) {
       this.line(
         [
@@ -6124,6 +6473,7 @@ export class Renderer {
       this.ellipse(-7, -43 + bob, 4, 4, "#fff0b3");
       this.ellipse(-5, -44 + bob, 3.3, 3.3, outfitColor);
     }
+    if (size > 1.1) this.grownFront(bob, time, danger);
     this.hatArt(bob - (danger ? 3 : 0), time);
     // A slightly tucked pose communicates rising/falling without moving the feet origin.
     if (!grounded && vy < -100) {
@@ -6194,38 +6544,7 @@ export class Renderer {
       this.ellipse(-17, -23, flutter, 7, "rgba(255,239,242,.72)", "#d79bab", 1);
       this.ellipse(14, -23, flutter, 7, "rgba(255,239,242,.72)", "#d79bab", 1);
     }
-    if (flight !== "none") {
-      c.save();
-      c.translate(-15, -25 + bob);
-      c.rotate(
-        flight === "lift"
-          ? -0.8 + Math.sin(time * 18) * 0.15
-          : flight === "glide"
-            ? -1.35
-            : -0.35,
-      );
-      this.leaf(0, 0, flight === "glide" ? 24 : 19, 0, "#e9fff4");
-      this.line(
-        [
-          [0, 0],
-          [0, -23],
-        ],
-        "#6bbdb3",
-        2,
-      );
-      c.restore();
-      if (flight === "lift") {
-        for (let i = 0; i < 3; i++)
-          this.line(
-            [
-              [-21 - i * 4, -5 + i * 7],
-              [-25 - i * 4, 2 + i * 7],
-            ],
-            "rgba(225,255,246,.8)",
-            2,
-          );
-      }
-    }
+    // The Wind Feather is drawn as its own little companion (windSprite).
     // A little scarf and satchel mark her as Pip's fellow garden explorer.
     c.beginPath();
     c.moveTo(-9, -26 + bob);
@@ -6242,6 +6561,7 @@ export class Renderer {
     c.fillStyle = scarf;
     c.fill();
     this.scarfPattern(bob);
+    if (size > 1.1) this.grownBack(bob, time, vx);
     if (outfit === "cosmetic.bee_scarf" && !this.wornScarf) {
       this.line(
         [
@@ -6402,8 +6722,229 @@ export class Renderer {
       );
     }
     this.ellipse(sway, -53 + crownBob, 2.5, 2.5, "#f4c65e");
+    if (size > 1.1) this.grownFront(bob, time, danger);
     this.hatArt(bob - (danger ? 3 : 0), time);
     c.restore();
+  }
+
+  /** Grown (big) Pip gets a look of its own: a flowing leaf cape behind... */
+  private grownBack(bob: number, time: number, vx: number) {
+    const c = this.ctx;
+    const sway = Math.sin(time * 6) * 2 + Math.min(10, Math.abs(vx) / 30);
+    for (const [dx, dy, len, tilt, color] of [
+      [-6, -30, 22, -2.3, "#3f8f55"],
+      [-8, -22, 24, -2.6, "#4fa868"],
+      [-6, -14, 20, -2.9, "#3f8f55"],
+    ] as const) {
+      c.save();
+      c.translate(dx, dy + bob);
+      c.rotate(tilt - sway * 0.02);
+      this.leaf(0, 0, len + sway * 0.4, 0, color);
+      c.restore();
+    }
+  }
+  /** ...and in front, a golden Sunseed emblem, gold-capped boots and a
+   * bloomed crown: three leaves around a golden flower. */
+  private grownFront(bob: number, time: number, danger: boolean) {
+    const c = this.ctx;
+    // Sunseed emblem on the chest.
+    c.save();
+    c.translate(1, -15 + bob);
+    c.beginPath();
+    c.moveTo(0, -5);
+    c.bezierCurveTo(5, -3, 5, 3, 0, 6);
+    c.bezierCurveTo(-5, 3, -5, -3, 0, -5);
+    c.fillStyle = "#ffd36b";
+    c.fill();
+    c.strokeStyle = "#c98f2c";
+    c.lineWidth = 1;
+    c.stroke();
+    c.restore();
+    // Gold toe caps.
+    this.ellipse(-8, -2, 4, 2, "#ffd36b");
+    this.ellipse(9, -2, 4, 2, "#ffd36b");
+    // The bloom.
+    const lift = danger ? 6 : 0;
+    const sway = Math.sin(time * 3) * 0.08;
+    for (const angle of [-0.9, 0.1, 1.1])
+      this.leaf(
+        1,
+        -49 + bob - lift,
+        12,
+        angle + sway,
+        angle === 0.1 ? "#7cc46a" : "#4f9d5d",
+      );
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2 + time * 0.6;
+      this.ellipse(
+        1 + Math.cos(a) * 4.5,
+        -61 + bob - lift + Math.sin(a) * 4.5,
+        3.6,
+        3.6,
+        "#ffe08a",
+        "#e0a83a",
+        0.8,
+      );
+    }
+    this.ellipse(1, -61 + bob - lift, 3, 3, "#f08a3c");
+  }
+
+  /** The Wind Feather: a little feather sprite that follows Pip on a
+   * springy lag, blinks and bobs; it flaps above Pip to lift, and spreads
+   * into a pair of feather wings for a glide. Drawn in world space. */
+  private featherSpot = { x: 0, y: 0, vx: 0, vy: 0, ready: false };
+  private windSprite(
+    game: Game,
+    center: number,
+    feet: number,
+    size: number,
+    time: number,
+    dt: number,
+  ) {
+    const c = this.ctx;
+    const p = game.player;
+    const flight: "none" | "ready" | "lift" | "glide" = game.hasWindFeather
+      ? game.liftActive
+        ? "lift"
+        : game.glideArmed && !p.grounded
+          ? "glide"
+          : "ready"
+      : "none";
+    const spot = this.featherSpot;
+    if (flight === "none") {
+      spot.ready = false;
+      return;
+    }
+    const facing = p.facing || 1;
+    // Where it wants to be: behind Pip's shoulder, or above while lifting.
+    const anchorX = center - facing * (flight === "lift" ? 4 : 26 * size);
+    const anchorY =
+      feet - (flight === "lift" ? 64 : 54) * size + Math.sin(time * 3) * 4;
+    if (!spot.ready || Math.abs(spot.x - anchorX) > 300) {
+      Object.assign(spot, {
+        x: anchorX,
+        y: anchorY,
+        vx: 0,
+        vy: 0,
+        ready: true,
+      });
+    }
+    // A soft spring: it trails a little behind Pip's movement.
+    const k = 60,
+      damping = 10;
+    const step = Math.min(dt, 1 / 30);
+    spot.vx += ((anchorX - spot.x) * k - spot.vx * damping) * step;
+    spot.vy += ((anchorY - spot.y) * k - spot.vy * damping) * step;
+    spot.x += spot.vx * step;
+    spot.y += spot.vy * step;
+    if (flight === "glide") {
+      // Spread as wings from Pip's back.
+      c.save();
+      c.translate(center, feet - 30 * size);
+      c.scale(facing < 0 ? -1 : 1, 1);
+      c.scale(size, size);
+      const beat = Math.sin(time * 4) * 0.08;
+      for (const side of [-1, 1]) {
+        c.save();
+        c.rotate(side * (0.25 + beat) - 1.57);
+        c.scale(1, side);
+        this.leaf(0, 0, 34, -0.2, "rgba(233,255,244,.95)");
+        this.leaf(0, 0, 26, 0.25, "rgba(196,240,222,.95)");
+        c.restore();
+      }
+      c.restore();
+    }
+    // The sprite itself.
+    const tilt =
+      flight === "lift"
+        ? Math.sin(time * 22) * 0.6
+        : Math.max(-0.6, Math.min(0.6, spot.vx / 400)) +
+          Math.sin(time * 2) * 0.1;
+    c.save();
+    c.translate(spot.x, spot.y);
+    c.rotate(tilt);
+    c.scale(size * 0.9, size * 0.9);
+    this.ellipse(0, 0, 16, 16, "rgba(220,255,240,.18)");
+    // Feather vane and quill.
+    c.beginPath();
+    c.moveTo(0, -18);
+    c.bezierCurveTo(11, -10, 10, 8, 0, 16);
+    c.bezierCurveTo(-10, 8, -11, -10, 0, -18);
+    c.fillStyle = "#effff7";
+    c.fill();
+    c.strokeStyle = "#7cc7b6";
+    c.lineWidth = 1.4;
+    c.stroke();
+    for (const [y, l] of [
+      [-8, 6],
+      [-1, 7],
+      [6, 6],
+    ] as const) {
+      this.line(
+        [
+          [0, y],
+          [-l, y - 3],
+        ],
+        "#bfe8dc",
+        1.2,
+      );
+      this.line(
+        [
+          [0, y],
+          [l, y - 3],
+        ],
+        "#bfe8dc",
+        1.2,
+      );
+    }
+    this.line(
+      [
+        [0, -14],
+        [0, 22],
+      ],
+      "#6bbdb3",
+      1.8,
+    );
+    // A face: it blinks, and squints happily while gliding.
+    const blink = Math.sin(time * 1.3) > 0.97 || flight === "glide";
+    if (blink) {
+      this.line(
+        [
+          [-5, -4],
+          [-2, -4],
+        ],
+        "#2f5e57",
+        1.6,
+      );
+      this.line(
+        [
+          [2, -4],
+          [5, -4],
+        ],
+        "#2f5e57",
+        1.6,
+      );
+    } else {
+      this.ellipse(-3.5, -4, 1.6, 2.2, "#2f5e57");
+      this.ellipse(3.5, -4, 1.6, 2.2, "#2f5e57");
+    }
+    c.beginPath();
+    c.arc(0, 0, 2.6, 0.2, Math.PI - 0.2);
+    c.strokeStyle = "#2f5e57";
+    c.lineWidth = 1.2;
+    c.stroke();
+    c.restore();
+    if (flight === "lift")
+      // Little gusts under the flapping feather.
+      for (let i = 0; i < 3; i++)
+        this.line(
+          [
+            [spot.x - 8 + i * 8, spot.y + 22 + ((time * 120 + i * 9) % 18)],
+            [spot.x - 10 + i * 8, spot.y + 30 + ((time * 120 + i * 9) % 18)],
+          ],
+          "rgba(225,255,246,.8)",
+          2,
+        );
   }
 
   /** The worn scarf's colour, or the costume's own scarf. */
@@ -6660,6 +7201,10 @@ export class Renderer {
         70,
       );
     if (game.events.includes("boss-hit")) this.shake = 0.22;
+    if (game.events.includes("boss-slam"))
+      this.shake = Math.max(this.shake, 0.16);
+    if (game.events.includes("boss-roar"))
+      this.shake = Math.max(this.shake, 0.35);
     if (game.events.includes("boss-defeat")) this.shake = 0.4;
     if (game.events.includes("boss-start") && game.boss)
       this.bossBanner = { name: game.boss.name, life: 2.4 };

@@ -21,6 +21,8 @@ import {
   VOLCANO_FINALE_X,
 } from "./volcano-level";
 import { createFinaleRun, finaleFor } from "./boss-level";
+import { fightBoss } from "./boss-bot";
+import { stormCitadel } from "./castles";
 import {
   STORM_FINAL_CHECKPOINT,
   STORM_FINALE_X,
@@ -403,118 +405,13 @@ function fight(
   maxX = 2300,
 ) {
   const g = createFinaleRun(arena, "classic");
-  const hits: number[] = [];
-  const phases = new Set<number>();
-  let previousJump = false;
-  for (let frame = 0; frame < 120 * 300 && g.state === "playing"; frame++) {
-    const b = g.boss!,
-      p = g.player;
-    phases.add(b.phase);
-    const px = p.x + p.w / 2;
-    const bx = b.x + b.w / 2;
-    let target: number;
-    if (b.state === "defeated") target = g.level.goal.x + 20;
-    else if (
-      b.state === "recover" &&
-      b.stateTime * 300 > Math.abs(px - bx) - b.w / 2 + 140
-    )
-      target = bx;
-    else if (
-      rest > 0 &&
-      !p.grounded &&
-      px > gaps[1]![1] + 60 &&
-      px < gaps[2]![0] - 60
-    )
-      // Bouncing off Cinder: land on the near side of the island first.
-      target = gaps[1]![1] + 70;
-    else if (rest > 0 && px > gaps[1]![1] && px < gaps[2]![0] && p.grounded)
-      // Leaving the island: from its near edge, hop the stones home.
-      target = px > gaps[1]![1] + 40 ? gaps[1]![1] + 30 : rest;
-    else target = rest > 0 ? rest : px < bx ? bx - 300 : bx + 300;
-    const charging =
-      (b.kind === "tortoise" || b.kind === "ram") &&
-      b.state === "attack" &&
-      Math.sign(px - bx) === b.facing;
-    // Hold still and hop the spinning shell as it arrives.
-    if (charging) target = px;
-    const overGap = gaps.some(([a, z]) => px > a - 30 && px < z + 30);
-    if (b.state !== "defeated" && (p.grounded || !overGap)) {
-      // Where will each falling icicle or fireball land?
-      // The stretch each one sweeps through at Pip's height.
-      const landings: [number, number][] = [];
-      for (const h of g.hazards) {
-        if (h.kind === "mark" || h.kind === "bolt") {
-          // Lightning strikes straight down on its mark.
-          landings.push([h.x + 4, h.x + h.w - 4]);
-          continue;
-        }
-        if (h.kind !== "icicle" && h.kind !== "fireball") continue;
-        let x = h.x + h.w / 2,
-          y = h.y,
-          vy = h.vy,
-          from: number | null = null;
-        for (let t = 0; t < 3 && y + h.h < 472; t += 1 / 120) {
-          vy = Math.min(900, vy + 900 / 120);
-          y += vy / 120;
-          x += h.vx / 120;
-          if (from === null && vy > 0 && y + h.h >= 428) from = x;
-        }
-        landings.push([Math.min(from ?? x, x), Math.max(from ?? x, x)]);
-      }
-      const lo = Math.min(px - 120, Math.max(minX, b.minX + 20)),
-        hi = Math.min(maxX, b.maxX + b.w + 6);
-      const inGap = (x: number) =>
-        gaps.some(([a, z]) => x > a - 20 && x < z + 20);
-      const safe = (x: number) =>
-        x >= lo &&
-        x <= hi &&
-        !inGap(x) &&
-        landings.every(
-          ([a, z]) =>
-            (x < a - 28 || x > z + 28) &&
-            // Never run through a landing spot ahead.
-            !(
-              (x - px) * ((a + z) / 2 - px) > 0 &&
-              Math.abs((a + z) / 2 - px) < Math.abs(x - px) + 40
-            ),
-        );
-      if (landings.length && !safe(target)) {
-        const options = [0, -30, 30, -60, 60, -120, 120, -180, 180, -260, 260]
-          .map((d) => px + d)
-          .filter(safe)
-          .sort((a, z) => Math.abs(a - target) - Math.abs(z - target));
-        target = options[0] ?? px;
-      }
-      target = Math.max(lo, Math.min(hi, target));
-    }
-    const dx = target - px - (p.vx * Math.abs(p.vx)) / 3700;
-    const incoming = g.hazards.some(
-      (h) =>
-        h.vy === 0 &&
-        ((h.vx > 0 && h.x + h.w < p.x + 6 && p.x - (h.x + h.w) < 40) ||
-          (h.vx < 0 && h.x > p.x + p.w - 6 && h.x - (p.x + p.w) < 40)),
-    );
-    const hop = charging && Math.abs(px - bx) - b.w / 2 - p.w / 2 < 60;
-    const atGap = gaps.some(
-      ([a, z]) =>
-        (dx > 0 && px > a - 34 && px < a) || (dx < 0 && px < z + 34 && px > z),
-    );
-    const jump: boolean =
-      ((b.state === "recover" && Math.abs(px - bx) < b.w / 2 + 40) ||
-        incoming ||
-        hop ||
-        (atGap && p.grounded) ||
-        !p.grounded) &&
-      !(p.grounded && previousJump);
-    g.update(1 / 120, {
-      left: dx < -2,
-      right: dx > 2,
-      jump,
-      jumpPressed: jump && !previousJump,
-    });
-    previousJump = jump;
-    if (g.events.includes("boss-hit")) hits.push(g.boss!.health);
-  }
+  const { hits, phases } = fightBoss(g, {
+    rest,
+    gaps,
+    minX,
+    maxX,
+    trace: process.env.DBG ? (snap) => console.log("DEATH", snap) : undefined,
+  });
   return { g, hits, phases };
 }
 
@@ -645,7 +542,8 @@ describe("Thunderhead Heights", () => {
     expect(rescued(g)).toBe(3);
     walk(g, STORM_FINALE_X + 20);
     expect(g.deaths).toBe(0);
-    expect(finaleFor(g)).toBe(thunderhornLevel);
+    // The trail hands over to the Storm Citadel, which leads to Thunderhorn.
+    expect(finaleFor(g)).toBe(stormCitadel);
   });
 
   it("gusts push Pip back while they blow", () => {
