@@ -3616,3 +3616,9 @@ select:focus-visible {
   color: #3e5f8a;
   background: #fff3cf;
 }
+
+/* The castle badge on boss worlds. */
+.map-boss svg {
+  width: 16px;
+  height: 16px;
+}

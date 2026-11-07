@@ -641,7 +641,8 @@ export class Game {
       // In water Pip builds speed with each kick and glides to a stop.
       if (swimming && !p.grounded) acceleration = direction ? 700 : 260;
       // Ice: slow to get going and slow to stop.
-      if (p.grounded && this.onIce) acceleration = direction ? 900 : 160;
+      // Ice: a little grip for steering, and a long (but not endless) slide.
+      if (p.grounded && this.onIce) acceleration = direction ? 1000 : 200;
       // Just after a wall kick, the push carries Pip away from the wall.
       if (this.wallLock > 0) acceleration = 0;
       // Star power makes Pip noticeably faster as well as invincible.
@@ -2213,7 +2214,9 @@ export class Game {
   trapRect(trap: NonNullable<Level["traps"]>[number]) {
     return trap.kind === "thorns"
       ? { x: trap.x, y: trap.y - 34, w: trap.w, h: 34 }
-      : { x: trap.x, y: trap.y - 520, w: trap.w, h: 520 };
+      : trap.kind === "geyser"
+        ? { x: trap.x, y: trap.y - 230, w: trap.w, h: 230 }
+        : { x: trap.x, y: trap.y - 520, w: trap.w, h: 520 };
   }
   private updateTraps() {
     const p = this.player;

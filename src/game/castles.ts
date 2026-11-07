@@ -316,8 +316,8 @@ export const stormCitadel: Level = {
     bolt(3980, 3, 1.9),
   ],
   windZones: [
-    { x: 200, w: 760, speed: -110, period: 4.4, duration: 1.5 },
-    { x: 1060, w: 780, speed: -130, period: 4, duration: 1.8 },
+    { x: 200, w: 760, speed: -95, period: 4.4, duration: 1.5 },
+    { x: 1060, w: 780, speed: -115, period: 4, duration: 1.8 },
   ],
   coins: [
     ...row(250, 392, 3),
