@@ -102,12 +102,11 @@ animated characters, and collectible/landing effects.
 - **Map and pickups:** every world's island on the map has its own little
   scene; castle worlds wear a tower badge. The new block powers and timed coin
   rings now appear in the earlier worlds too.
-- **Big Pip and the Wind Feather:** grown Pip (and Poppy) has a look of its
-  own: a flowing leaf cape, a golden Sunseed emblem, gold-capped boots and a
-  bloomed crown with a golden flower. The Wind Feather is now a little
-  companion: a feather sprite with a face that follows on a springy lag,
-  blinks and bobs, flaps above Pip during lift and spreads into a pair of
-  feather wings for a glide.
+- **Big Pip and the Wind Feather:** grown Pip has one signature change: the
+  sprout grows into a taller crown of three leaves. The Wind Feather is a
+  little companion: a feather sprite with a face that follows on a springy lag,
+  rises above Pip during lift, and folds into two small swept-back feather
+  wings behind Pip for a glide.
 - **Castles:** each major guardian (every fourth world) now waits at the end of
   its own castle, with a checkpoint at the guardian's door:
   Bramblethorn Keep (the Thorn King) has thorn beds that burst from the floor
