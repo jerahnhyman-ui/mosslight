@@ -92,6 +92,14 @@ animated characters, and collectible/landing effects.
   separate major-boss level, Thunderhorn's Crag: Thunderhorn, the Storm Ram,
   marks where lightning will strike, rears while the bolts fall, then
   charges to the wall. Six hits over three phases.
+- **Castles:** each major guardian (every fourth world) now waits at the end of
+  its own castle, with a checkpoint at the guardian's door:
+  Bramblethorn Keep (the Thorn King) has thorn beds that burst from the floor
+  on a beat and a high road above them; the Moonlit Belfry (Gloomwing) is a
+  dark, lantern-lit belfry with falling roof shingles, rotten floorboards and
+  rising and sliding bells; the Storm Citadel (Thunderhorn) has wind and
+  lightning that strikes marked flagstones on a rolling beat. Each castle has
+  its own stone walls, windows and banners. Castles replay from the journal.
 - **Living guardians:** every guardian stalks Pip between attacks, steps back
   to wind up, builds speed into a charge and skids into the wall (its
   shockwave rolls out a beat later). Hits make it flinch, and each new phase

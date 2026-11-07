@@ -983,6 +983,7 @@ export class Game {
       }
     }
     this.updateCoinRings();
+    if (this.updateTraps()) return true;
     for (const acorn of this.acorns) {
       if (
         !acorn.collected &&
@@ -2201,6 +2202,30 @@ export class Game {
     );
   }
   /** The wind pushing at this x right now, in px/s. */
+  /** Seconds into a trap's cycle; it strikes while this is below `active`. */
+  trapCycle(trap: NonNullable<Level["traps"]>[number]) {
+    return (
+      (((this.elapsed + (trap.phase ?? 0)) % trap.period) + trap.period) %
+      trap.period
+    );
+  }
+  /** The area a trap hurts while it strikes. */
+  trapRect(trap: NonNullable<Level["traps"]>[number]) {
+    return trap.kind === "thorns"
+      ? { x: trap.x, y: trap.y - 34, w: trap.w, h: 34 }
+      : { x: trap.x, y: trap.y - 520, w: trap.w, h: 520 };
+  }
+  private updateTraps() {
+    const p = this.player;
+    for (const trap of this.level.traps ?? []) {
+      const t = this.trapCycle(trap);
+      if (t < STEP && trap.kind === "lightning") this.events.push("thunder");
+      if (t < trap.active && overlaps(p, this.trapRect(trap)))
+        if (this.hurt(this.trapRect(trap))) return true;
+    }
+    return false;
+  }
+
   windAt(x: number) {
     let push = 0;
     for (const zone of this.level.windZones ?? [])

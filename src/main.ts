@@ -24,6 +24,7 @@ import { AdventureSession, type SecretTarget } from "./game/session";
 import { moonpoolLevel } from "./game/moonpool-level";
 import { cloudGardenLevel } from "./game/cloud-garden";
 import { skySecretLevels } from "./game/sky-secrets";
+import { brambleKeep } from "./game/castles";
 import {
   createFinaleRun,
   FINALES,
@@ -649,8 +650,12 @@ function updateJournal() {
   const hive = save.secrets.beehive;
   const hoops = save.minigames.flowerHoops;
   // Every dedicated boss level after the Thorn King's has its own replay.
+  // Every boss level after the Thorn King's has its own replay (a castle's
+  // own door entry is part of its castle, so it is not listed).
   const finaleReplays = FINALES.filter(
-    (f) => f.world !== "world.windmill-garden",
+    (f) =>
+      f.world !== "world.windmill-garden" &&
+      levels.some((l) => l.contentId === f.world),
   ).map((finale) => {
     const world = levels.findIndex((l) => l.contentId === finale.world);
     return {
@@ -754,7 +759,7 @@ function updateJournal() {
     selected = 3;
     bossReplay = true;
     replayArena = null;
-    bossArena = thornKingLevel;
+    bossArena = brambleKeep;
     bossOrigin = null;
     runKind = "boss";
     menuDialog.close();
@@ -1175,7 +1180,7 @@ function updateUI() {
     overlay.innerHTML = `<div class="title-content"><p class="eyebrow"><span class="eyebrow-dot"></span> THE SUNSEED TRAILS</p><h1>A little hero.<br><span>A wild adventure.</span></h1><p class="title-description">Find a Wind Feather. Take flight.<br>Bring the garden’s tiny lights back home.</p><button class="primary-button" id="start-button">${icon("play")}<span>Play ${game.level.name}</span></button><div class="title-footnote">${icon("firefly")} ${modeName(save.playMode)} · 3 fireflies · a garden guardian</div></div><div class="hero-callout"><span>Hey, I’m Pip!</span><svg viewBox="0 0 70 50" aria-hidden="true"><path d="M5 5q42-6 48 32m-12-7 13 10 7-15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg></div>`;
     $("#start-button").addEventListener("click", start);
   } else if (mode === "boss-intro") {
-    overlay.innerHTML = `<div class="result-panel"><p class="eyebrow">${replayArena ? "GUARDIAN REMATCH" : "BOSS LEVEL"}</p><h2>${game.level.name}</h2><p>${replayArena ? `${game.boss?.name ?? "The guardian"} waits ahead. Power blocks are ready before the fight.` : `${game.boss?.name.split(",")[0] ?? "The guardian"} waits ahead. A checkpoint and power blocks are ready before the fight.`}</p><button class="primary-button" id="boss-start">${replayArena ? "Start the rematch" : "Enter the arena"} ${icon("arrow")}</button><div class="panel-links"><button id="home-button">Choose a world</button></div></div>`;
+    overlay.innerHTML = `<div class="result-panel"><p class="eyebrow">${replayArena ? "GUARDIAN REMATCH" : game.level.castle ? "CASTLE" : "BOSS LEVEL"}</p><h2>${game.level.name}</h2><p>${replayArena ? `${game.boss?.name ?? "The guardian"} waits ahead. Power blocks are ready before the fight.` : game.level.castle ? `${game.level.subtitle} A checkpoint waits at the guardian's door.` : `${game.boss?.name.split(",")[0] ?? "The guardian"} waits ahead. A checkpoint and power blocks are ready before the fight.`}</p><button class="primary-button" id="boss-start">${replayArena ? "Start the rematch" : game.level.castle ? "Enter the castle" : "Enter the arena"} ${icon("arrow")}</button><div class="panel-links"><button id="home-button">Choose a world</button></div></div>`;
     $("#boss-start").addEventListener("click", resume);
     $("#home-button").addEventListener("click", showMenu);
   } else if (mode === "tip") {
@@ -1836,13 +1841,19 @@ function frame(now: number) {
     }
     updateHUD();
     const finale =
-      runKind === "world" && !session?.inSecret ? finaleFor(game) : null;
+      (runKind === "world" || (runKind === "boss" && !replayArena)) &&
+      !session?.inSecret
+        ? finaleFor(game)
+        : null;
     if (finale) {
       // Keep world rewards and firefly progress; victory belongs to the
-      // separate boss level, not to the approach.
-      saveRescuedFireflies();
+      // separate boss level, not to the approach. A castle's door hands
+      // over to its guardian's room the same way.
+      if (runKind === "world") {
+        saveRescuedFireflies();
+        bossReplay = false;
+      }
       bossOrigin = game;
-      bossReplay = false;
       replayArena = null;
       bossArena = finale;
       const bossGame = createFinaleRun(finale, game.mode, game);

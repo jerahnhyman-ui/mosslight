@@ -1,3 +1,11 @@
+import {
+  BELFRY_DOOR_X,
+  BRAMBLE_DOOR_X,
+  brambleKeep,
+  CITADEL_DOOR_X,
+  moonlitBelfry,
+  stormCitadel,
+} from "./castles";
 import { STORM_FINALE_X, thunderhornLevel } from "./storm-level";
 import { grumbleLevel, SNOW_FINALE_X } from "./snow-level";
 import { shellshockLevel, ICE_FINALE_X } from "./ice-level";
@@ -64,7 +72,14 @@ export const thornKingLevel: Level = {
 /** Worlds whose trail hands over to a separate major-boss arena: every
  * fourth main world. Reaching `triggerX` carries the run into the arena. */
 export const FINALES: { world: string; triggerX: number; arena: Level }[] = [
-  { world: "world.windmill-garden", triggerX: 11860, arena: thornKingLevel },
+  // Every fourth world hands over to a castle, and the castle's door to
+  // the guardian's room.
+  { world: "world.windmill-garden", triggerX: 11860, arena: brambleKeep },
+  {
+    world: brambleKeep.contentId!,
+    triggerX: BRAMBLE_DOOR_X,
+    arena: thornKingLevel,
+  },
 ];
 export function registerFinale(world: string, triggerX: number, arena: Level) {
   if (!FINALES.some((f) => f.world === world))
@@ -107,8 +122,10 @@ export function createThornKingRun(mode: RunMode, source?: Game): Game {
   return arena;
 }
 
-registerFinale("world.nightglow-woods", NIGHTGLOW_FINALE_X, gloomwingLevel);
+registerFinale("world.nightglow-woods", NIGHTGLOW_FINALE_X, moonlitBelfry);
+registerFinale(moonlitBelfry.contentId!, BELFRY_DOOR_X, gloomwingLevel);
 registerFinale("world.snowdrift-peaks", SNOW_FINALE_X, grumbleLevel);
 registerFinale("world.frostglass-lake", ICE_FINALE_X, shellshockLevel);
 registerFinale("world.ember-caldera", VOLCANO_FINALE_X, cinderLevel);
-registerFinale("world.thunderhead-heights", STORM_FINALE_X, thunderhornLevel);
+registerFinale("world.thunderhead-heights", STORM_FINALE_X, stormCitadel);
+registerFinale(stormCitadel.contentId!, CITADEL_DOOR_X, thunderhornLevel);

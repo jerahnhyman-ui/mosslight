@@ -129,6 +129,21 @@ export interface Level {
   /** Gusts of wind that blow across a stretch of the trail on a steady
    * beat: `speed` px/s (negative pushes Pip back), blowing for `duration`
    * seconds out of every `period`. Streaks warn before each gust. */
+  /** Castle traps on a steady beat: bramble thorns that burst from the floor,
+   * or lightning that strikes a marked spot. Each glows and rustles just
+   * before it strikes, for `active` seconds out of every `period`. */
+  traps?: {
+    kind: "thorns" | "lightning";
+    x: number;
+    w: number;
+    /** The floor the trap sits on. */
+    y: number;
+    period: number;
+    active: number;
+    phase?: number;
+  }[];
+  /** A castle level: drawn with its own stone walls behind the trail. */
+  castle?: "bramble" | "belfry" | "citadel";
   windZones?: {
     x: number;
     w: number;

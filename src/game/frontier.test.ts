@@ -22,6 +22,7 @@ import {
 } from "./volcano-level";
 import { createFinaleRun, finaleFor } from "./boss-level";
 import { fightBoss } from "./boss-bot";
+import { stormCitadel } from "./castles";
 import {
   STORM_FINAL_CHECKPOINT,
   STORM_FINALE_X,
@@ -541,7 +542,8 @@ describe("Thunderhead Heights", () => {
     expect(rescued(g)).toBe(3);
     walk(g, STORM_FINALE_X + 20);
     expect(g.deaths).toBe(0);
-    expect(finaleFor(g)).toBe(thunderhornLevel);
+    // The trail hands over to the Storm Citadel, which leads to Thunderhorn.
+    expect(finaleFor(g)).toBe(stormCitadel);
   });
 
   it("gusts push Pip back while they blow", () => {

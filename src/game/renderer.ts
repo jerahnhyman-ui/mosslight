@@ -585,6 +585,7 @@ export class Renderer {
     this.previousDeaths = game.deaths;
     this.previousElapsed = game.elapsed;
     this.background(p, game.level.theme, time, camera);
+    if (game.level.castle) this.castleWalls(game.level.castle, time, camera);
     this.restoredLight(Math.max(0, Math.min(1, restoration)), time, camera);
     c.save();
     c.translate(-camera, -this.cameraY);
@@ -607,6 +608,7 @@ export class Renderer {
         game.level.theme === "cavern" ||
         game.level.theme === "ice" ||
         game.level.theme === "volcano" ||
+        !!game.level.castle ||
         thornGrove
       )
         continue;
@@ -746,6 +748,7 @@ export class Renderer {
       });
       for (const ring of game.coinRings) this.coinRing(ring, time);
       this.windStreaks(game, time);
+      for (const trap of game.level.traps ?? []) this.trapArt(game, trap, time);
       if (game.level.chase && Number.isFinite(game.chaseX))
         this.floodWall(game.chaseX, time);
       for (const lantern of game.lanterns)
@@ -753,7 +756,10 @@ export class Renderer {
           this.lanternPost(lantern.x, lantern.y, lantern.lit, time);
       for (const icicle of game.icicles)
         if (icicle.state !== "gone" && this.visible(icicle.x, 30))
-          this.icicleArt(icicle.x, icicle.y, icicle.state === "shake", time);
+          if (game.level.castle === "belfry")
+            this.shingleArt(icicle.x, icicle.y, icicle.state === "shake", time);
+          else
+            this.icicleArt(icicle.x, icicle.y, icicle.state === "shake", time);
       game.acorns.forEach((acorn, i) => {
         if (!acorn.collected && this.visible(acorn.x, 30))
           this.acorn(acorn.x, acorn.y, time, i);
@@ -2163,6 +2169,7 @@ export class Renderer {
 
   private expansionScenery(game: Game, time: number) {
     if (game.level.theme !== "windmill" && game.level.theme !== "hive") return;
+    if (game.level.castle) return;
     const c = this.ctx;
     if (game.level.theme === "hive") {
       // Honeycomb is background only; collision remains visible in the foreground.
@@ -4291,8 +4298,43 @@ export class Renderer {
       this.bounceMushroom(r, time);
       return;
     }
+    if (r.kind === "moving" && r.id?.startsWith("castle.")) {
+      // A castle lift: a stone slab (a bell yoke in the belfry) on chains.
+      const belfry = r.id.startsWith("castle.belfry.");
+      for (const cx of [r.x + 14, r.x + r.w - 14])
+        this.line(
+          [
+            [cx, r.y - 260],
+            [cx, r.y],
+          ],
+          "rgba(60,55,70,.6)",
+          2,
+        );
+      this.rounded(
+        r.x,
+        r.y,
+        r.w,
+        r.h + 4,
+        5,
+        belfry ? "#b08a4a" : "#9aa0a8",
+        belfry ? "#6e5426" : "#5d636c",
+      );
+      this.line(
+        [
+          [r.x + 6, r.y + 3],
+          [r.x + r.w - 6, r.y + 3],
+        ],
+        "rgba(255,255,255,.35)",
+        2,
+      );
+      return;
+    }
     if (r.kind === "moving") {
       this.movingLeaf(r, time);
+      return;
+    }
+    if (r.kind === "crumble" && r.id?.startsWith("castle.")) {
+      this.castleStone(r, time);
       return;
     }
     if (r.kind === "crumble") {
@@ -4685,6 +4727,285 @@ export class Renderer {
   }
 
   /** An icicle hanging, shaking before it falls, or falling. */
+  /** Castle walls behind the trail: each castle has its own stone, windows
+   * and decorations. Drawn in screen space with slow parallax. */
+  private castleWalls(
+    style: "bramble" | "belfry" | "citadel",
+    time: number,
+    camera: number,
+  ) {
+    const c = this.ctx;
+    const w = this.viewportWidth,
+      h = this.viewportHeight;
+    const stone =
+      style === "bramble"
+        ? ["#6f7d6a", "#5d6a58", "#86937f"]
+        : style === "belfry"
+          ? ["#3d3651", "#302a42", "#51496a"]
+          : ["#5e6676", "#4c5363", "#727b8c"];
+    const shift = (camera * 0.45) % 240;
+    const top = 120;
+    c.fillStyle = stone[0]!;
+    c.fillRect(0, top, w, h - top);
+    // Courses of stone blocks.
+    c.strokeStyle = stone[1]!;
+    c.lineWidth = 2;
+    for (let y = top; y < h; y += 34) {
+      c.beginPath();
+      c.moveTo(0, y);
+      c.lineTo(w, y);
+      c.stroke();
+      const offset = ((y - top) / 34) % 2 ? 60 : 0;
+      for (let x = -shift + offset - 120; x < w; x += 120) {
+        c.beginPath();
+        c.moveTo(x, y);
+        c.lineTo(x, y + 34);
+        c.stroke();
+      }
+    }
+    // Battlements along the top.
+    for (let x = -shift - 240; x < w + 60; x += 60) {
+      c.fillStyle = stone[0]!;
+      c.fillRect(x, top - 30, 34, 32);
+      c.fillStyle = stone[2]!;
+      c.fillRect(x, top - 30, 34, 5);
+    }
+    // Windows (and per-castle details) every 240px.
+    for (let x = -shift - 240; x < w + 240; x += 240) {
+      const wx = x + 100;
+      c.save();
+      c.beginPath();
+      c.moveTo(wx - 22, 330);
+      c.lineTo(wx - 22, 230);
+      c.arc(wx, 230, 22, Math.PI, 0);
+      c.lineTo(wx + 22, 330);
+      c.closePath();
+      const flash = style === "citadel" && time % 6.3 > 5.9 ? 0.9 : 0;
+      c.fillStyle =
+        style === "bramble"
+          ? "#2f3b30"
+          : style === "belfry"
+            ? "#c9d7ff"
+            : `rgba(${180 + flash * 70},${190 + flash * 60},${215 + flash * 40},1)`;
+      c.fill();
+      c.strokeStyle = stone[2]!;
+      c.lineWidth = 4;
+      c.stroke();
+      c.restore();
+      if (style === "belfry") {
+        // Moonlight through the arch, and a bell hanging in the next bay.
+        c.fillStyle = "rgba(200,215,255,.12)";
+        c.beginPath();
+        c.moveTo(wx - 22, 260);
+        c.lineTo(wx + 22, 260);
+        c.lineTo(wx + 90, 430);
+        c.lineTo(wx + 10, 430);
+        c.closePath();
+        c.fill();
+        const swing = Math.sin(time * 1.4 + x * 0.01) * 0.18;
+        c.save();
+        c.translate(wx + 120, 150);
+        c.rotate(swing);
+        this.line(
+          [
+            [0, 0],
+            [0, 40],
+          ],
+          "#2a2438",
+          3,
+        );
+        c.beginPath();
+        c.moveTo(-16, 70);
+        c.quadraticCurveTo(-14, 40, 0, 38);
+        c.quadraticCurveTo(14, 40, 16, 70);
+        c.closePath();
+        c.fillStyle = "#b08a4a";
+        c.fill();
+        c.restore();
+      } else if (style === "bramble") {
+        // Thorny vines creep over the wall, and a red banner hangs.
+        c.strokeStyle = "#3f5a33";
+        c.lineWidth = 4;
+        c.beginPath();
+        c.moveTo(wx + 60, 120);
+        for (let y = 120; y < 430; y += 30)
+          c.quadraticCurveTo(
+            wx + 80,
+            y + 15,
+            wx + 60 + Math.sin(y) * 14,
+            y + 30,
+          );
+        c.stroke();
+        this.rounded(wx + 130, 150, 34, 90, 3, "#a8423f", "#7a2c2a");
+        this.ellipse(wx + 147, 190, 9, 9, "#e9c46a");
+      } else {
+        // A storm flag snapping in the wind.
+        this.line(
+          [
+            [wx + 130, 100],
+            [wx + 130, 200],
+          ],
+          "#3a3f4a",
+          3,
+        );
+        c.beginPath();
+        c.moveTo(wx + 130, 104);
+        for (let i = 0; i <= 4; i++)
+          c.lineTo(wx + 130 - i * 12, 110 + Math.sin(time * 9 + i) * 5);
+        c.lineTo(wx + 82, 128);
+        c.lineTo(wx + 130, 126);
+        c.closePath();
+        c.fillStyle = "#e0b84a";
+        c.fill();
+      }
+    }
+  }
+
+  /** Thorn beds and lightning marks: dormant, warning, then striking. */
+  private trapArt(
+    game: Game,
+    trap: NonNullable<Game["level"]["traps"]>[number],
+    time: number,
+  ) {
+    if (!this.visible(trap.x + trap.w / 2, trap.w / 2 + 40)) return;
+    const c = this.ctx;
+    const t = game.trapCycle(trap);
+    const striking = t < trap.active;
+    const warning = !striking && trap.period - t < 0.7;
+    if (trap.kind === "thorns") {
+      // A bed of brambles that rustles, then bursts up into spikes.
+      const rise = striking
+        ? Math.min(1, t / 0.12)
+        : warning
+          ? 0.15 + Math.abs(Math.sin(time * 30)) * 0.1
+          : 0.08;
+      this.rounded(
+        trap.x - 4,
+        trap.y - 8,
+        trap.w + 8,
+        10,
+        4,
+        "#4c6b3a",
+        "#2f4a26",
+      );
+      c.save();
+      for (let x = trap.x + 6; x < trap.x + trap.w - 4; x += 14) {
+        const height = 34 * rise * (0.8 + ((x * 7) % 5) / 20);
+        c.beginPath();
+        c.moveTo(x - 6, trap.y - 6);
+        c.lineTo(x, trap.y - 6 - height);
+        c.lineTo(x + 6, trap.y - 6);
+        c.closePath();
+        c.fillStyle = striking ? "#7a5232" : "#5d7a45";
+        c.fill();
+        c.strokeStyle = "#3a2a1a";
+        c.lineWidth = 1.2;
+        c.stroke();
+      }
+      if (warning)
+        this.ellipse(
+          trap.x + trap.w / 2,
+          trap.y - 4,
+          trap.w / 2 + 8,
+          6,
+          `rgba(255,120,80,${0.25 + Math.sin(time * 20) * 0.15})`,
+        );
+      c.restore();
+    } else {
+      const cx = trap.x + trap.w / 2;
+      // A glowing mark on the flagstones; brighter as the strike nears.
+      const glow = striking
+        ? 0.9
+        : warning
+          ? 0.5 + Math.sin(time * 24) * 0.3
+          : 0.18;
+      this.ellipse(
+        cx,
+        trap.y - 3,
+        trap.w / 2 + 6,
+        6,
+        `rgba(255,226,122,${glow})`,
+      );
+      if (striking) {
+        c.save();
+        c.fillStyle = "rgba(255,250,210,.35)";
+        c.fillRect(trap.x - 8, trap.y - 520, trap.w + 16, 520);
+        c.strokeStyle = "#fffbe0";
+        c.lineWidth = 5;
+        c.lineJoin = "round";
+        c.beginPath();
+        let bx = cx;
+        c.moveTo(bx, trap.y - 520);
+        for (let y = trap.y - 520; y < trap.y; y += 40) {
+          bx = cx + (hash(y + Math.floor(time * 20)) - 0.5) * 22;
+          c.lineTo(bx, y + 40);
+        }
+        c.stroke();
+        c.strokeStyle = "#ffe27a";
+        c.lineWidth = 2;
+        c.stroke();
+        c.restore();
+      }
+    }
+  }
+
+  /** A cracked castle stone (or rotten board in the belfry) that shakes,
+   * then falls away, and settles back later. */
+  private castleStone(r: Game["platforms"][number], time: number) {
+    if (r.crumbleRemaining === 0) return;
+    const c = this.ctx;
+    const shaking = r.crumbleRemaining > 0;
+    const dx = shaking ? Math.sin(time * 45) * 1.6 : 0;
+    const board = r.id?.startsWith("castle.belfry.");
+    c.save();
+    c.translate(dx, 0);
+    this.rounded(
+      r.x,
+      r.y,
+      r.w,
+      r.h + 6,
+      4,
+      board ? "#7a5a40" : "#8a8f86",
+      board ? "#4d3626" : "#55594f",
+    );
+    c.strokeStyle = board ? "#4d3626" : "#4a4e45";
+    c.lineWidth = 2;
+    c.beginPath();
+    if (board)
+      for (let x = r.x + 30; x < r.x + r.w; x += 30) {
+        c.moveTo(x, r.y + 2);
+        c.lineTo(x, r.y + r.h + 4);
+      }
+    else {
+      c.moveTo(r.x + r.w * 0.35, r.y);
+      c.lineTo(r.x + r.w * 0.45, r.y + 10);
+      c.lineTo(r.x + r.w * 0.38, r.y + r.h + 5);
+      c.moveTo(r.x + r.w * 0.7, r.y);
+      c.lineTo(r.x + r.w * 0.62, r.y + 12);
+    }
+    c.stroke();
+    c.restore();
+  }
+
+  /** A loose roof shingle, for the belfry's rafters. */
+  private shingleArt(x: number, y: number, shaking: boolean, time: number) {
+    const c = this.ctx;
+    const dx = shaking ? Math.sin(time * 50) * 2 : 0;
+    c.save();
+    c.translate(x + dx, y + 14);
+    c.rotate(shaking ? Math.sin(time * 40) * 0.1 : 0.05);
+    this.rounded(-12, -14, 24, 28, 3, "#6a5a6e", "#3d3346");
+    this.line(
+      [
+        [-12, 0],
+        [12, 0],
+      ],
+      "#4d4256",
+      1.5,
+    );
+    c.restore();
+  }
+
   private icicleArt(x: number, y: number, shaking: boolean, time: number) {
     const c = this.ctx;
     const dx = shaking ? Math.sin(time * 50) * 2 : 0;

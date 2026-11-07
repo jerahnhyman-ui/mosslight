@@ -9,6 +9,7 @@ import {
 } from "./nightglow-level";
 import { createFinaleRun, finaleFor } from "./boss-level";
 import { fightBoss } from "./boss-bot";
+import { moonlitBelfry } from "./castles";
 
 // Real directional and jump input only.
 const idle: GameInput = {
@@ -216,7 +217,8 @@ describe("Nightglow Woods", () => {
     toLastLantern(g);
     walk(g, NIGHTGLOW_FINALE_X + 20);
     expect(g.deaths).toBe(0);
-    expect(finaleFor(g)).toBe(gloomwingLevel);
+    // The trail hands over to the Moonlit Belfry, which leads to Gloomwing.
+    expect(finaleFor(g)).toBe(moonlitBelfry);
   });
 
   it("hides fireflies on the Moth perch, the Glowroot branch and the last treetop", () => {
