@@ -670,11 +670,11 @@ try {
   await checkLayout(desktop, "desktop title");
   await screenshot(desktop, "desktop-title");
   await desktop
-    .getByRole("button", { name: "Mute sound effects", exact: true })
+    .getByRole("button", { name: "Mute all sound", exact: true })
     .click();
   await desktop.reload();
   await expect(
-    desktop.getByRole("button", { name: "Enable sound effects", exact: true }),
+    desktop.getByRole("button", { name: "Turn sound on", exact: true }),
   ).toBeVisible();
   await desktop
     .getByRole("button", { name: "How to play", exact: true })
@@ -1172,9 +1172,9 @@ try {
   await mobile.locator('[data-menu-world="2"]').click();
   await expect(mobile.locator("#world-label")).toHaveText("Cloudtop Crossing");
   await mobile.getByRole("button", { name: "Game menu", exact: true }).click();
-  await mobile.getByRole("button", { name: "Effects on", exact: true }).click();
+  await mobile.getByRole("button", { name: "Sound on", exact: true }).click();
   await expect(
-    mobile.getByRole("button", { name: "Effects off", exact: true }),
+    mobile.getByRole("button", { name: "Sound off", exact: true }),
   ).toBeVisible();
   await mobile.locator(".menu-help").click();
   await expect(
