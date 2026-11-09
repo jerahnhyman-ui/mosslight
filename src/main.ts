@@ -181,7 +181,7 @@ $("#app").innerHTML = `
   <header class="topbar">
     <button class="brand" aria-label="Choose a world">${icon("leaf")}<span>Mosslight<span class="brand-dot">.</span></span></button>
     <div class="world-location"><span class="world-number">01</span><span id="world-label">Sunlit Meadow</span></div>
-    <div class="toolbar-actions"><button class="round-button sound-button" aria-label="Mute sound effects" title="Sound effects"></button><button class="round-button help-button" aria-label="How to play" title="How to play">${icon("help")}</button><button class="round-button" id="pause-button" aria-label="Pause game" title="Pause (P)">${icon("pause")}</button><button class="round-button" id="menu-button" aria-label="Game menu" title="Worlds and settings">${icon("menu")}</button></div>
+    <div class="toolbar-actions"><button class="round-button sound-button" aria-label="Mute all sound" title="Sound"></button><button class="round-button help-button" aria-label="How to play" title="How to play">${icon("help")}</button><button class="round-button" id="pause-button" aria-label="Pause game" title="Pause (P)">${icon("pause")}</button><button class="round-button" id="menu-button" aria-label="Game menu" title="Worlds and settings">${icon("menu")}</button></div>
   </header>
   <div class="hud" hidden>
     <div class="collectibles"><span class="hud-pill coin-meter" title="50 coins = an extra life, up to 3"><span class="seed-symbol" aria-hidden="true"></span><b id="coin-count">00</b><span id="coin-total">/ 50</span></span><span class="hud-pill stars-pill fireflies-pill" title="Rescue three hidden fireflies to restore this world"><span class="firefly-symbol" aria-hidden="true">${icon("firefly")}</span><b id="star-count"><span id="firefly-count">0</span></b><span>/ 3</span></span><span class="hud-pill acorn-pill" hidden title="Five hidden acorns in this world"><span aria-hidden="true">🌰</span><b id="acorn-count">0</b><span>/ 5</span></span></div>
@@ -972,14 +972,16 @@ $("#play-mode").addEventListener("change", () => {
   chooseWorld(selected);
 });
 function updateSound() {
-  $(".sound-button").innerHTML = icon(audio.enabled ? "sound" : "muted");
+  // The speaker button is a master mute: music and sound effects together.
+  const anySound = audio.enabled || audio.musicEnabled;
+  $(".sound-button").innerHTML = icon(anySound ? "sound" : "muted");
   $(".sound-button").setAttribute(
     "aria-label",
-    audio.enabled ? "Mute sound effects" : "Enable sound effects",
+    anySound ? "Mute all sound" : "Turn sound on",
   );
-  $(".sound-button").setAttribute("aria-pressed", String(audio.enabled));
+  $(".sound-button").setAttribute("aria-pressed", String(anySound));
   $(".menu-sound").innerHTML =
-    `${icon(audio.enabled ? "sound" : "muted")} Effects ${audio.enabled ? "on" : "off"}`;
+    `${icon(anySound ? "sound" : "muted")} Sound ${anySound ? "on" : "off"}`;
   $<HTMLInputElement>("#sfx-toggle").checked = audio.enabled;
   $<HTMLInputElement>("#music-toggle").checked = audio.musicEnabled;
   $<HTMLInputElement>("#haptics-toggle").checked = audio.hapticsEnabled;
@@ -1311,8 +1313,10 @@ $(".help-button").addEventListener("click", showHelp);
 $(".dialog-close").addEventListener("click", hideHelp);
 $(".close-guide").addEventListener("click", hideHelp);
 function toggleSound() {
-  audio.enabled = !audio.enabled;
-  save.sound = audio.enabled;
+  // Mute silences everything; unmuting brings back both music and effects.
+  const on = !(audio.enabled || audio.musicEnabled);
+  audio.enabled = save.sound = on;
+  audio.musicEnabled = save.music = on;
   writeSave(save);
   audio.unlock();
   if (audio.enabled) audio.play("coin");
