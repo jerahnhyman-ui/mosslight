@@ -912,8 +912,13 @@ export class Renderer {
           );
         }
       }
-      // Glide wings sit behind Pip, so they are drawn first.
-      if (game.hasWindFeather && game.glideArmed && !player.grounded)
+      // While flying (rising or gliding), small feather wings sit behind
+      // Pip, so they are drawn first.
+      if (
+        game.hasWindFeather &&
+        !player.grounded &&
+        (game.glideArmed || game.liftActive)
+      )
         this.glideWings(center, feet, size, player.facing || 1, time);
       this.hero(
         center,
@@ -954,7 +959,6 @@ export class Renderer {
         game.character,
       );
       c.restore();
-      this.windSprite(game, center, feet, size, time, dt);
       if (game.starPowerRemaining > 0)
         this.starAura(center, feet, size, game.starPowerRemaining, time, true);
       this.powerEffects(game, center, feet, size, time);
@@ -6332,7 +6336,7 @@ export class Renderer {
       this.ellipse(-17, -23, flutter, 7, "rgba(226,255,224,.72)", "#92c9a2", 1);
       this.ellipse(14, -23, flutter, 7, "rgba(226,255,224,.72)", "#92c9a2", 1);
     }
-    // The Wind Feather is drawn as its own little companion (windSprite).
+    // While flying, the Wind Feather shows as small wings (glideWings).
     // A streaming scarf makes direction and speed easy to read.
     c.beginPath();
     c.moveTo(-9, -26 + bob);
@@ -6517,7 +6521,6 @@ export class Renderer {
       this.ellipse(-7, -43 + bob, 4, 4, "#fff0b3");
       this.ellipse(-5, -44 + bob, 3.3, 3.3, outfitColor);
     }
-    if (size > 1.1) this.grownFront(bob, time, danger);
     this.hatArt(bob - (danger ? 3 : 0), time);
     // A slightly tucked pose communicates rising/falling without moving the feet origin.
     if (!grounded && vy < -100) {
@@ -6588,7 +6591,7 @@ export class Renderer {
       this.ellipse(-17, -23, flutter, 7, "rgba(255,239,242,.72)", "#d79bab", 1);
       this.ellipse(14, -23, flutter, 7, "rgba(255,239,242,.72)", "#d79bab", 1);
     }
-    // The Wind Feather is drawn as its own little companion (windSprite).
+    // While flying, the Wind Feather shows as small wings (glideWings).
     // A little scarf and satchel mark her as Pip's fellow garden explorer.
     c.beginPath();
     c.moveTo(-9, -26 + bob);
@@ -6765,30 +6768,11 @@ export class Renderer {
       );
     }
     this.ellipse(sway, -53 + crownBob, 2.5, 2.5, "#f4c65e");
-    if (size > 1.1) this.grownFront(bob, time, danger);
     this.hatArt(bob - (danger ? 3 : 0), time);
     c.restore();
   }
 
-  /** Grown (big) Pip's one signature: the sprout has grown into a taller
-   * crown of three leaves, in Pip's own greens. Nothing else is added. */
-  private grownFront(bob: number, time: number, danger: boolean) {
-    const lift = danger ? 6 : 0;
-    const sway = Math.sin(time * 3) * 0.06;
-    this.line(
-      [
-        [1, -46 + bob],
-        [1, -58 + bob - lift],
-      ],
-      "#326d4b",
-      3,
-    );
-    this.leaf(1, -56 + bob - lift, 14, -0.85 + sway, "#8bcb62");
-    this.leaf(1, -56 + bob - lift, 13, 1.05 + sway, "#398c59");
-    this.leaf(1, -58 + bob - lift, 15, 0.1 + sway, "#69b86c");
-  }
-
-  /** While gliding, the Wind Feather spreads into a pair of small feather
+  /** While flying, the Wind Feather shows as a pair of small feather
    * wings swept back from Pip's shoulders, behind the body. */
   private glideWings(
     center: number,
@@ -6830,147 +6814,6 @@ export class Renderer {
       c.restore();
     }
     c.restore();
-  }
-
-  /** The Wind Feather: a little feather sprite that follows Pip on a
-   * springy lag, blinks and bobs; it flaps above Pip to lift, and spreads
-   * into a pair of feather wings for a glide. Drawn in world space. */
-  private featherSpot = { x: 0, y: 0, vx: 0, vy: 0, ready: false };
-  private windSprite(
-    game: Game,
-    center: number,
-    feet: number,
-    size: number,
-    time: number,
-    dt: number,
-  ) {
-    const c = this.ctx;
-    const p = game.player;
-    const flight: "none" | "ready" | "lift" | "glide" = game.hasWindFeather
-      ? game.liftActive
-        ? "lift"
-        : game.glideArmed && !p.grounded
-          ? "glide"
-          : "ready"
-      : "none";
-    const spot = this.featherSpot;
-    if (flight === "none") {
-      spot.ready = false;
-      return;
-    }
-    const facing = p.facing || 1;
-    // Where it wants to be: behind Pip's shoulder, or above while lifting.
-    const anchorX = center - facing * (flight === "lift" ? 16 : 26) * size;
-    const anchorY =
-      feet - (flight === "lift" ? 92 : 54) * size + Math.sin(time * 3) * 4;
-    if (!spot.ready || Math.abs(spot.x - anchorX) > 300) {
-      Object.assign(spot, {
-        x: anchorX,
-        y: anchorY,
-        vx: 0,
-        vy: 0,
-        ready: true,
-      });
-    }
-    // A soft spring: it trails a little behind Pip's movement.
-    const k = 60,
-      damping = 10;
-    const step = Math.min(dt, 1 / 30);
-    spot.vx += ((anchorX - spot.x) * k - spot.vx * damping) * step;
-    spot.vy += ((anchorY - spot.y) * k - spot.vy * damping) * step;
-    spot.x += spot.vx * step;
-    spot.y += spot.vy * step;
-    // The sprite itself.
-    const tilt =
-      flight === "lift"
-        ? Math.sin(time * 22) * 0.6
-        : Math.max(-0.6, Math.min(0.6, spot.vx / 400)) +
-          Math.sin(time * 2) * 0.1;
-    c.save();
-    c.translate(spot.x, spot.y);
-    c.rotate(tilt);
-    c.scale(size * 0.9, size * 0.9);
-    this.ellipse(0, 0, 16, 16, "rgba(220,255,240,.18)");
-    // Feather vane and quill.
-    c.beginPath();
-    c.moveTo(0, -18);
-    c.bezierCurveTo(11, -10, 10, 8, 0, 16);
-    c.bezierCurveTo(-10, 8, -11, -10, 0, -18);
-    c.fillStyle = "#effff7";
-    c.fill();
-    c.strokeStyle = "#7cc7b6";
-    c.lineWidth = 1.4;
-    c.stroke();
-    for (const [y, l] of [
-      [-8, 6],
-      [-1, 7],
-      [6, 6],
-    ] as const) {
-      this.line(
-        [
-          [0, y],
-          [-l, y - 3],
-        ],
-        "#bfe8dc",
-        1.2,
-      );
-      this.line(
-        [
-          [0, y],
-          [l, y - 3],
-        ],
-        "#bfe8dc",
-        1.2,
-      );
-    }
-    this.line(
-      [
-        [0, -14],
-        [0, 22],
-      ],
-      "#6bbdb3",
-      1.8,
-    );
-    // A face: it blinks, and squints happily while gliding.
-    const blink = Math.sin(time * 1.3) > 0.97 || flight === "glide";
-    if (blink) {
-      this.line(
-        [
-          [-5, -4],
-          [-2, -4],
-        ],
-        "#2f5e57",
-        1.6,
-      );
-      this.line(
-        [
-          [2, -4],
-          [5, -4],
-        ],
-        "#2f5e57",
-        1.6,
-      );
-    } else {
-      this.ellipse(-3.5, -4, 1.6, 2.2, "#2f5e57");
-      this.ellipse(3.5, -4, 1.6, 2.2, "#2f5e57");
-    }
-    c.beginPath();
-    c.arc(0, 0, 2.6, 0.2, Math.PI - 0.2);
-    c.strokeStyle = "#2f5e57";
-    c.lineWidth = 1.2;
-    c.stroke();
-    c.restore();
-    if (flight === "lift")
-      // Little gusts under the flapping feather.
-      for (let i = 0; i < 3; i++)
-        this.line(
-          [
-            [spot.x - 8 + i * 8, spot.y + 22 + ((time * 120 + i * 9) % 18)],
-            [spot.x - 10 + i * 8, spot.y + 30 + ((time * 120 + i * 9) % 18)],
-          ],
-          "rgba(225,255,246,.8)",
-          2,
-        );
   }
 
   /** The worn scarf's colour, or the costume's own scarf. */
