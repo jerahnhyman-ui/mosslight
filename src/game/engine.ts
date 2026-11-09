@@ -1529,10 +1529,18 @@ export class Game {
     ) {
       const stomp = p.vy > 0 && oldBottom <= previousY + 12;
       const powered = this.starPowerRemaining > 0;
-      if ((stomp && boss.state === "recover") || powered) {
+      // Shellshock's shell is too tough for a plain stomp: only a ground
+      // pound (Down in the air) cracks it while it is dizzy.
+      const armored =
+        boss.kind === "tortoise" && this.pound !== "drop" && !powered;
+      if (((stomp && boss.state === "recover") || powered) && !armored) {
         hitBoss(boss, p, this.hazards, this.events);
         if (stomp || !powered) this.bounceOffBoss(boss);
-      } else if (stomp) this.bounceOffBoss(boss);
+      } else if (stomp) {
+        if (armored && boss.state === "recover")
+          this.events.push("boss-armored");
+        this.bounceOffBoss(boss);
+      }
       // A dazed guardian wanders slowly but is harmless until it recovers.
       else if (boss.state !== "recover" && this.hurt(boss)) return true;
     }

@@ -283,7 +283,7 @@ export const shellshockLevel: Level = {
   tutorials: [
     {
       x: 200,
-      text: "Shellshock spins across the ice and bounces off the walls. Jump over it, then stomp it while it's dizzy.",
+      text: "Shellshock's shell is too tough to stomp. Jump over it as it spins; when it's dizzy, jump above it and press Down to ground-pound it.",
     },
   ],
   boss: {

@@ -412,6 +412,8 @@ const effects: Record<string, number[]> = {
   "boss-roar": [98, 82, 73, 110],
   thunder: [70, 55, 90],
   "boss-slam": [90, 70],
+  "boss-bonk": [520, 390, 260],
+  "boss-armored": [300, 300],
   "boss-skid": [180, 140],
   "boss-defeat": [294, 392, 494, 587, 784],
   "enemy-break": [150, 105, 75],

@@ -293,7 +293,7 @@ export const grumbleLevel: Level = {
   tutorials: [
     {
       x: 200,
-      text: "Grumble slams the snow: jump the shockwaves and step off the icicle shadows. Stomp it while it's dizzy.",
+      text: "Grumble only gets dizzy when its own icicle hits it. Stand close when it slams, jump the shockwave, then step back and stomp it.",
     },
   ],
   boss: {

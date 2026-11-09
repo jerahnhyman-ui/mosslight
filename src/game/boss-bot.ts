@@ -61,6 +61,9 @@ export function fightBoss(g: Game, options: FightOptions = {}) {
     )
       // Leaving the island: from its near edge, hop the stones home.
       target = px > gaps[1]![1] + 40 ? gaps[1]![1] + 30 : rest;
+    else if (b.kind === "bear" && b.variant !== "roll")
+      // Stand close so Grumble's first icicle lands on the bear itself.
+      target = px < bx ? b.x - 55 : b.x + b.w + 55;
     else target = rest > 0 ? rest : px < bx ? bx - 300 : bx + 300;
     // A guardian rushing along the floor toward Pip: hold still and hop it.
     const charging =
@@ -208,11 +211,20 @@ export function fightBoss(g: Game, options: FightOptions = {}) {
         (atGap && p.grounded) ||
         !p.grounded) &&
       !(p.grounded && previousJump);
+    // Shellshock needs a ground pound: press Down once above the shell.
+    const pound =
+      b.kind === "tortoise" &&
+      b.state === "recover" &&
+      !p.grounded &&
+      Math.abs(px - bx) < b.w / 2 - 14 &&
+      p.y + p.h < b.y - 24 &&
+      g.pound === "none";
     const input: GameInput = {
       left: dx < -2,
       right: dx > 2,
       jump,
       jumpPressed: jump && !previousJump,
+      downPressed: pound,
     };
     const snapshot =
       options.trace || options.watch

@@ -300,6 +300,10 @@ const hash = (n: number) => {
 };
 
 /** Resolution-independent cartoon artwork, drawn locally for offline play. */
+/** Grown (big) Pip's proportions: overall scale relative to a plain
+ * scale-up, how much wider and taller the body and legs are drawn, and how
+ * far the head rides up to sit on the taller body. */
+const GROWN = { all: 0.8, wide: 1.15, tall: 1.55, neck: -13 };
 /** New costumes: body, highlight and scarf colours. */
 const COSTUMES: Record<string, [string, string, string]> = {
   "cosmetic.frost_coat": ["#8ccbe0", "#d4f1fa", "#ffffff"],
@@ -6321,6 +6325,10 @@ export class Renderer {
     c.save();
     c.translate(x, y);
     c.scale(size, size);
+    // Grown Pip is not a scaled-up small Pip: the head stays close to its
+    // small size while the body and legs grow taller.
+    const grown = size > 1.1;
+    if (grown) c.scale(GROWN.all, GROWN.all);
     if (grounded) this.ellipse(0, -0.5, 17, 3, "rgba(28,80,50,.2)");
     c.scale(facing < 0 ? -1 : 1, 1);
     // Feet remain anchored while the torso leans into a run or recoils on a hit.
@@ -6337,6 +6345,8 @@ export class Renderer {
       this.ellipse(14, -23, flutter, 7, "rgba(226,255,224,.72)", "#92c9a2", 1);
     }
     // While flying, the Wind Feather shows as small wings (glideWings).
+    c.save();
+    if (grown) c.scale(GROWN.wide, GROWN.tall);
     // A streaming scarf makes direction and speed easy to read.
     c.beginPath();
     c.moveTo(-9, -26 + bob);
@@ -6438,6 +6448,8 @@ export class Renderer {
       3.7,
       "#b8e6a0",
     );
+    c.restore();
+    if (grown) c.translate(0, GROWN.neck);
     // Cream face, leaf hood, and large eyes read well at phone scale.
     this.ellipse(0, -33 + bob, 16, 14, outfitColor, "#326d4b", 2);
     this.ellipse(2, -31 + bob, 12.5, 10.5, "#fff1c9");
@@ -6578,6 +6590,10 @@ export class Renderer {
     c.save();
     c.translate(x, y);
     c.scale(size, size);
+    // Grown Pip is not a scaled-up small Pip: the head stays close to its
+    // small size while the body and legs grow taller.
+    const grown = size > 1.1;
+    if (grown) c.scale(GROWN.all, GROWN.all);
     if (grounded) this.ellipse(0, -0.5, 17, 3, "rgba(28,80,50,.2)");
     c.scale(facing < 0 ? -1 : 1, 1);
     c.rotate(hurt ? -0.06 : running ? Math.min(0.075, Math.abs(vx) / 4000) : 0);
@@ -6592,6 +6608,8 @@ export class Renderer {
       this.ellipse(14, -23, flutter, 7, "rgba(255,239,242,.72)", "#d79bab", 1);
     }
     // While flying, the Wind Feather shows as small wings (glideWings).
+    c.save();
+    if (grown) c.scale(GROWN.wide, GROWN.tall);
     // A little scarf and satchel mark her as Pip's fellow garden explorer.
     c.beginPath();
     c.moveTo(-9, -26 + bob);
@@ -6693,6 +6711,8 @@ export class Renderer {
       "#ffe5c7",
     );
     // A petal hood and flower crown distinguish Poppy while keeping the sprite silhouette.
+    c.restore();
+    if (grown) c.translate(0, GROWN.neck);
     this.ellipse(0, -33 + bob, 16, 14, outfitColor, "#99566f", 2);
     this.ellipse(2, -31 + bob, 12.5, 10.5, "#fff1c9");
     this.ellipse(-9, -36 + bob, 3.4, 7.3, outfitLight);

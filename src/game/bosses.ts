@@ -673,7 +673,7 @@ export function stepBoss(
                 : boss.kind === "owl"
                   ? OWL_DIVE
                   : boss.kind === "bear"
-                    ? 1.1
+                    ? 2
                     : boss.kind === "tortoise"
                       ? 4
                       : boss.kind === "salamander"
@@ -844,17 +844,21 @@ export function stepBoss(
             vy: 0,
             remaining: 4,
           });
+        // The first icicle falls a step from Pip, on the bear's side: stand
+        // close and it lands on the bear. Later phases add more behind Pip,
+        // away from the bear, so backing off needs care.
+        const toward = player.x + player.w / 2 < boss.x + boss.w / 2 ? 1 : -1;
         const spots =
           boss.phase === 1
             ? [0]
             : boss.phase === 2
-              ? [-170, 170]
-              : [-220, 0, 220];
+              ? [0, -150]
+              : [0, -120, -240];
         for (const dx of spots)
           hazards.push({
             kind: "icicle",
             x: clamp(
-              player.x + player.w / 2 + dx - 10,
+              player.x + player.w / 2 + toward * (50 + dx) - 10,
               boss.minX,
               boss.maxX + boss.w,
             ),
@@ -865,6 +869,23 @@ export function stepBoss(
             vy: 0,
             remaining: 3,
           });
+      }
+      // Grumble only goes dizzy when one of its own icicles lands on it.
+      const bonk = hazards.find(
+        (h) =>
+          h.kind === "icicle" &&
+          h.remaining > 0 &&
+          h.x + h.w > boss.x - 20 &&
+          h.x < boss.x + boss.w + 20 &&
+          h.y + h.h >= boss.y,
+      );
+      if (bonk) {
+        bonk.remaining = 0;
+        events.push("boss-bonk");
+        boss.skid = 0.4;
+        recover(boss);
+        boss.stateTime += 0.6;
+        return;
       }
     } else if (boss.kind === "tortoise" && boss.variant === "volley") {
       // Braced in its shell, it flings ice shards along the floor, first one
@@ -1036,6 +1057,9 @@ export function stepBoss(
         );
         boss.state = "warning";
         boss.stateTime = 0.55;
+      } else if (boss.kind === "bear" && boss.variant !== "roll") {
+        // No icicle hit it: it shrugs off the slam and goes again.
+        warnBoss(boss, player, events, hazards);
       } else {
         if (boss.kind === "bear") restoreBear(boss);
         // The tortoise's thrown shards shatter as it goes dizzy, so the
