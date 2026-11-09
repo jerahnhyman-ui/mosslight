@@ -43,6 +43,9 @@ export type BossState = Rect & {
   /** A wall-impact shockwave waiting to roll out, and its direction. */
   pendingWave: number;
   pendingWaveDir: number;
+  /** The spider rests up on its thread, out of stomping reach, until Pip
+   * bumps it from below. */
+  hanging: boolean;
 };
 export type MillState =
   | "settle"
@@ -99,6 +102,10 @@ export const MOLE_LOCK = 0.6;
 export const MOLE_EMERGE = 0.3;
 /** Seconds the spider spends in the air on a pounce. */
 export const SPIDER_POUNCE = 0.9;
+/** How high the resting spider hangs above the floor on its thread. */
+export const SPIDER_HANG = 95;
+/** Seconds the mole stays up, looking about, after bursting out unflushed. */
+export const MOLE_PEEK = 0.5;
 /** Seconds the marsh toad spends in the air on each leap. */
 export const TOAD_LEAP = 1.05;
 
@@ -208,6 +215,7 @@ export function createBoss(spec: BossSpec): BossState {
     feinted: false,
     pendingWave: 0,
     pendingWaveDir: 0,
+    hanging: false,
     ...(spec.kind === "millkeeper"
       ? {
           millState: "settle" as const,
@@ -415,6 +423,7 @@ export function warnBoss(
   hazards: BossHazard[] = [],
 ) {
   boss.state = "warning";
+  boss.hanging = false;
   boss.feinted = false;
   boss.speed = 0;
   chooseVariant(boss);
@@ -506,6 +515,40 @@ function recover(boss: BossState) {
       boss.stateTime - 0.1 * BOSS_TIER[boss.kind],
     );
   boss.y = boss.groundY - boss.h;
+  if (boss.kind === "spider") {
+    // Silka climbs its thread to rest, out of stomping reach.
+    boss.hanging = true;
+    boss.stateTime = 3.2 - (boss.phase - 1) * 0.25;
+  }
+}
+
+/** Pip bumps the hanging spider from below: its thread snaps and it drops
+ * onto its back, open to a stomp. */
+export function knockSpider(boss: BossState, events: string[]) {
+  if (boss.kind !== "spider" || boss.state !== "recover" || !boss.hanging)
+    return false;
+  boss.hanging = false;
+  boss.stateTime = 2.2 - (boss.phase - 1) * 0.2;
+  events.push("boss-knock");
+  return true;
+}
+
+/** Pip ground-pounds the floor right above the tunnelling mole: it pops
+ * out of the ground, dazed. */
+export function flushMole(boss: BossState, player: Rect, events: string[]) {
+  const px = player.x + player.w / 2;
+  if (
+    boss.kind !== "mole" ||
+    boss.state !== "warning" ||
+    boss.y < boss.groundY - 20 ||
+    px < boss.x - 12 ||
+    px > boss.x + boss.w + 12
+  )
+    return false;
+  recover(boss);
+  boss.skid = 0.4;
+  events.push("boss-flushed");
+  return true;
 }
 
 export function stepBoss(
@@ -555,6 +598,9 @@ export function stepBoss(
   if (boss.stateTime < 1e-9) boss.stateTime = 0;
   const towardPlayer = player.x + player.w / 2 < boss.x + boss.w / 2 ? -1 : 1;
   if (boss.state === "warning") {
+    // The spider lowers itself from its thread before it attacks again.
+    if (boss.kind === "spider" && boss.y < boss.groundY - boss.h)
+      boss.y = approach(boss.y, boss.groundY - boss.h, 250 * dt);
     if (boss.kind === "moth")
       boss.y = approach(boss.y, boss.groundY - boss.h - 90, 180 * dt);
     // Guardians keep moving while they telegraph. Each attack still starts
@@ -679,7 +725,7 @@ export function stepBoss(
                       : boss.kind === "salamander"
                         ? 1.2
                         : boss.kind === "mole"
-                          ? MOLE_EMERGE
+                          ? MOLE_EMERGE + MOLE_PEEK
                           : boss.kind === "crab"
                             ? CRAB_SCUTTLE
                             : 1.3;
@@ -1006,6 +1052,10 @@ export function stepBoss(
       boss.x = boss.attackTargetX;
       const fraction = clamp(boss.attackElapsed / MOLE_EMERGE, 0, 1);
       boss.y = boss.groundY + 6 - (boss.h + 6) * fraction;
+      if (fraction === 1 && boss.shotsFired === 0) {
+        boss.shotsFired = 1;
+        toadSplash(boss, hazards);
+      }
     } else if (boss.kind === "toad") {
       // A high, readable leap onto the marked spot.
       const fraction = clamp(boss.attackElapsed / TOAD_LEAP, 0, 1);
@@ -1040,7 +1090,6 @@ export function stepBoss(
     if (boss.stateTime === 0 && boss.state === "attack") {
       if (
         boss.kind === "toad" ||
-        boss.kind === "mole" ||
         boss.kind === "owl" ||
         (boss.kind === "spider" && boss.variant === "pounce")
       )
@@ -1057,8 +1106,12 @@ export function stepBoss(
         );
         boss.state = "warning";
         boss.stateTime = 0.55;
-      } else if (boss.kind === "bear" && boss.variant !== "roll") {
-        // No icicle hit it: it shrugs off the slam and goes again.
+      } else if (
+        (boss.kind === "bear" && boss.variant !== "roll") ||
+        boss.kind === "mole"
+      ) {
+        // No icicle hit the bear: it shrugs off the slam and goes again.
+        // Nobody pounded the mole out of its tunnel: it digs straight back in.
         warnBoss(boss, player, events, hazards);
       } else {
         if (boss.kind === "bear") restoreBear(boss);
@@ -1079,7 +1132,12 @@ export function stepBoss(
     // (The crab lies still on its shell.)
     const before = boss.x;
     // (The crab lies on its shell; the salamander basks where it surfaced.)
-    if (boss.kind !== "crab" && boss.kind !== "salamander")
+    if (boss.kind === "spider") {
+      // Hanging on its thread, or dropping onto its back once knocked.
+      boss.y = boss.hanging
+        ? approach(boss.y, boss.groundY - boss.h - SPIDER_HANG, 320 * dt)
+        : approach(boss.y, boss.groundY - boss.h, 700 * dt);
+    } else if (boss.kind !== "crab" && boss.kind !== "salamander")
       roam(boss, dt, -towardPlayer * (22 + boss.phase * 8));
     // Arena guardians never stagger into a wall, so there is always room
     // to land beside them after a stomp.

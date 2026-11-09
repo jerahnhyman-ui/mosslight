@@ -2750,6 +2750,16 @@ export class Renderer {
       return;
     }
     this.ellipse(cx, b.groundY - 1, b.w * 0.46, 5, "rgba(38,60,53,.2)");
+    // The spider's silk thread, whenever it is off the floor to rest.
+    if (b.kind === "spider" && recovering && feet < b.groundY - 4)
+      this.line(
+        [
+          [cx, b.y + 8],
+          [cx, b.y - 520],
+        ],
+        "rgba(240,244,255,.85)",
+        2,
+      );
     if (warning) {
       const direction = b.facing;
       const start = cx + direction * b.w * 0.55;

@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { createBoss, hitBoss, stepBoss, type BossHazard } from "./bosses";
+import {
+  createBoss,
+  hitBoss,
+  knockSpider,
+  stepBoss,
+  SPIDER_HANG,
+  type BossHazard,
+} from "./bosses";
 import type { BossSpec } from "./levels";
 
 const player = { x: 300, y: 392, w: 28, h: 38 };
@@ -180,5 +187,28 @@ describe("Guardians are beaten in different ways", () => {
     const pound = drop(true);
     expect(pound.events).toContain("boss-hit");
     expect(pound.health).toBe(4);
+  });
+});
+
+describe("Silka's thread", () => {
+  it("rests out of stomping reach until it is bumped down", () => {
+    const b = createBoss(spec("spider"));
+    const hazards: BossHazard[] = [];
+    const events: string[] = [];
+    for (let i = 0; i < 120 * 20 && b.state !== "recover"; i++)
+      stepBoss(b, 1 / 120, player, hazards, events);
+    expect(b.state).toBe("recover");
+    expect(b.hanging).toBe(true);
+    for (let i = 0; i < 120; i++) stepBoss(b, 1 / 120, player, hazards, events);
+    // Higher than a plain jump can land on.
+    expect(b.groundY - (b.y + b.h)).toBe(SPIDER_HANG);
+    expect(b.groundY - b.y).toBeGreaterThan(145);
+    expect(knockSpider(b, events)).toBe(true);
+    expect(events).toContain("boss-knock");
+    for (let i = 0; i < 60; i++) stepBoss(b, 1 / 120, player, hazards, events);
+    expect(b.state).toBe("recover");
+    expect(b.y + b.h).toBe(b.groundY);
+    // A second bump does nothing: it is already down.
+    expect(knockSpider(b, events)).toBe(false);
   });
 });
