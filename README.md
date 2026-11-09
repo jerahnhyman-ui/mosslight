@@ -118,6 +118,12 @@ animated characters, and collectible/landing effects.
   chips only while held (with seconds left); the reserve Sunseed is a faint
   seed until filled. In world, castle and boss runs the second row is just the
   section name.
+- **Big Pip:** grown Pip has its own proportions (a taller body and longer
+  legs under a head close to its small size), with no added accessories.
+- **Different ways to win:** not every guardian is a wait-then-stomp fight.
+  Grumble, the Snow Bear, only goes dizzy when one of its own icicles lands on
+  it: stand close as it slams, then step back. Shellshock's shell shrugs off a
+  plain stomp and needs a ground pound (Down in the air) while it is dizzy.
 - **Difficulty ramp:** guardians are tiered by how far into the adventure they
   are met (`BOSS_TIER`): later ones warn for less time, rest for less time and
   move faster.

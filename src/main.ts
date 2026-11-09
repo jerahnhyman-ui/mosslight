@@ -1517,22 +1517,32 @@ function updateHUD() {
       `${boss.health} of ${boss.maxHealth} health`,
     );
     const instruction =
-      boss.kind === "heartwood"
+      boss.kind === "bear"
         ? boss.state === "recover"
-          ? "The crown is glowing — jump on top!"
-          : "Thorn seeds are coming — jump over them!"
-        : boss.state === "warning"
-          ? boss.kind === "stag"
-            ? "A charge and ground wave are coming — get ready to jump!"
-            : boss.kind === "spider"
-              ? "Watch the web — keep moving!"
-              : "A gust is coming — find your footing!"
-          : boss.state === "recover"
-            ? boss.kind === "stag" &&
-              game.hazards.some((hazard) => hazard.kind === "gust")
-              ? "Jump over the wave, then land on the guardian!"
-              : "Now! Jump on the guardian’s back!"
-            : "Stay clear and wait for an opening";
+          ? "Bonk! Jump on Grumble while it's dizzy!"
+          : boss.variant === "roll"
+            ? "It's rolling — jump over it!"
+            : "Stand close so its icicle falls on Grumble, then step back!"
+        : boss.kind === "tortoise"
+          ? boss.state === "recover"
+            ? "Its shell is too tough to stomp — jump, then press Down to pound it!"
+            : "Jump over the spinning shell!"
+          : boss.kind === "heartwood"
+            ? boss.state === "recover"
+              ? "The crown is glowing — jump on top!"
+              : "Thorn seeds are coming — jump over them!"
+            : boss.state === "warning"
+              ? boss.kind === "stag"
+                ? "A charge and ground wave are coming — get ready to jump!"
+                : boss.kind === "spider"
+                  ? "Watch the web — keep moving!"
+                  : "A gust is coming — find your footing!"
+              : boss.state === "recover"
+                ? boss.kind === "stag" &&
+                  game.hazards.some((hazard) => hazard.kind === "gust")
+                  ? "Jump over the wave, then land on the guardian!"
+                  : "Now! Jump on the guardian’s back!"
+                : "Stay clear and wait for an opening";
     setText("#boss-instruction", instruction);
   }
   setText("#player-form", game.player.form === "big" ? "Big" : "Small");
@@ -1824,6 +1834,12 @@ function frame(now: number) {
         "leaf",
       ],
       ["boss-hit", "A perfect opening!", "pip"],
+      [
+        "boss-armored",
+        "The shell is too tough! Jump, then press Down (or drag down) to ground-pound it.",
+        "pip",
+      ],
+      ["boss-bonk", "Bonk! Its own icicle dazed it — jump on it now!", "pip"],
       ["boss-roar", "It's getting angry! New attacks ahead.", "pip"],
       ["boss-start", "Watch the warning. Jump when the guardian rests!", "pip"],
       ["awaken", "Your glow woke a new path!", "leaf"],

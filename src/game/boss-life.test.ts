@@ -122,3 +122,63 @@ describe("Guardian difficulty climbs through the worlds", () => {
     expect(warning("bear")).toBeLessThan(warning("stag"));
   });
 });
+
+describe("Guardians are beaten in different ways", () => {
+  it("Grumble only goes dizzy when its own icicle lands on it", async () => {
+    const { createFinaleRun } = await import("./boss-level");
+    const { grumbleLevel } = await import("./snow-level");
+    const idle = { left: false, right: false, jump: false, jumpPressed: false };
+    // Far from the bear, its icicles miss it and it never rests.
+    const far = createFinaleRun(grumbleLevel, "relaxed");
+    let rested = false,
+      bonked = false;
+    for (let i = 0; i < 120 * 20; i++) {
+      const b = far.boss!;
+      const away = far.player.x + 14 < b.x - 330;
+      far.update(1 / 120, {
+        ...idle,
+        right: b.state === "dormant" || away,
+        left: !away && far.player.x + 14 > b.x - 300,
+        jump: far.hazards.some(
+          (h) => h.vy === 0 && Math.abs(h.x - far.player.x) < 70,
+        ),
+        jumpPressed: far.player.grounded,
+      });
+      if (b.state === "recover" && b.variant !== "roll") rested = true;
+      if (far.events.includes("boss-bonk")) bonked = true;
+    }
+    expect(bonked).toBe(false);
+    expect(rested).toBe(false);
+  });
+
+  it("Shellshock shrugs off a plain stomp and needs a ground pound", async () => {
+    const { Game } = await import("./engine");
+    const { shellshockLevel } = await import("./ice-level");
+    const idle = { left: false, right: false, jump: false, jumpPressed: false };
+    const drop = (pound: boolean) => {
+      const g = new Game(0, { level: shellshockLevel });
+      const b = g.boss!;
+      g.player.x = b.minX + 10;
+      g.update(1 / 120, idle);
+      b.state = "recover";
+      b.stateTime = 5;
+      b.stagger = 0;
+      g.player.x = b.x + b.w / 2 - g.player.w / 2;
+      g.player.y = b.y - g.player.h - 90;
+      g.player.vy = 0;
+      g.player.grounded = false;
+      const events: string[] = [];
+      for (let i = 0; i < 90; i++) {
+        g.update(1 / 120, { ...idle, downPressed: pound && i === 2 });
+        events.push(...g.events);
+      }
+      return { events, health: b.health };
+    };
+    const stomp = drop(false);
+    expect(stomp.events).toContain("boss-armored");
+    expect(stomp.health).toBe(5);
+    const pound = drop(true);
+    expect(pound.events).toContain("boss-hit");
+    expect(pound.health).toBe(4);
+  });
+});
