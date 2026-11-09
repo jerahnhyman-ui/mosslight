@@ -54,8 +54,9 @@ animated characters, and collectible/landing effects.
 - **Glimmerdeep Caverns** opens after finishing Reedwater Marsh. Ride crystals
   that slide or rise and fall, cross cracked crystals before they shatter, and
   bounce on glowcaps to three hidden perches. Rumble, the Crystal Mole, tunnels
-  toward Pip and bursts up where the floor cracks; step away, jump its shards,
-  and stomp it while it is dazed.
+  toward Pip and never rests on its own: stand over the moving rubble and
+  ground-pound (Down in the air) to pop it out dazed, then stomp it. Miss the
+  moment and it bursts up where the floor cracks; step away and jump its shards.
 - **Tidewell Depths** opens after Glimmerdeep Caverns. It is almost entirely
   underwater, under a rock ceiling: tap Jump to kick upward, glide between
   strokes, and hold Jump to slow your sink. Bubble columns lift
@@ -166,6 +167,8 @@ animated characters, and collectible/landing effects.
   clues suggest optional routes around giant garden landmarks.
 - Charging beetles break marked barriers, and hoppers bounce on mushrooms.
 - The first three worlds end with a stag beetle, spider, or storm moth guardian.
+  Silka the spider rests up on its thread, out of stomping reach: jump up and
+  bump it from below so it drops, then stomp it.
   Windmill Garden leads to a separate final encounter with Briarheart, the
   Thorn King. Watch warnings, avoid attacks, and stomp during recovery. A
   checkpoint and recovery power blocks precede the final arena.

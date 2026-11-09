@@ -36,6 +36,13 @@ export function fightBoss(g: Game, options: FightOptions = {}) {
     const bx = b.x + b.w / 2;
     const bvx = (b.x - previousBx) * 120;
     previousBx = b.x;
+    // Rumble is only caught by pounding the floor above its tunnel, with
+    // time to spare before it bursts up.
+    const poundMole =
+      b.kind === "mole" &&
+      b.state === "warning" &&
+      b.y > b.groundY - 20 &&
+      (b.stateTime > 0.7 || !p.grounded);
     let target: number;
     if (b.state === "defeated") target = g.level.goal.x + 20;
     else if (
@@ -61,6 +68,12 @@ export function fightBoss(g: Game, options: FightOptions = {}) {
     )
       // Leaving the island: from its near edge, hop the stones home.
       target = px > gaps[1]![1] + 40 ? gaps[1]![1] + 30 : rest;
+    else if (poundMole)
+      // Stand over the tunnelling mole, ready to pound it out.
+      target = bx;
+    else if (b.kind === "mole")
+      // Too late to pound: wait just clear of the crack for the next dig.
+      target = px < bx ? b.attackTargetX - 50 : b.attackTargetX + b.w + 50;
     else if (b.kind === "bear" && b.variant !== "roll")
       // Stand close so Grumble's first icicle lands on the bear itself.
       target = px < bx ? b.x - 55 : b.x + b.w + 55;
@@ -96,6 +109,7 @@ export function fightBoss(g: Game, options: FightOptions = {}) {
       // A guardian leaping or diving onto a marked spot.
       if (
         (b.state === "warning" || b.state === "attack") &&
+        !poundMole &&
         (b.kind === "toad" ||
           b.kind === "owl" ||
           b.kind === "mole" ||
@@ -208,17 +222,23 @@ export function fightBoss(g: Game, options: FightOptions = {}) {
         )) ||
         incoming ||
         hop ||
+        (poundMole && Math.abs(px - bx) < b.w / 2 - 6) ||
         (atGap && p.grounded) ||
         !p.grounded) &&
       !(p.grounded && previousJump);
     // Shellshock needs a ground pound: press Down once above the shell.
     const pound =
-      b.kind === "tortoise" &&
-      b.state === "recover" &&
-      !p.grounded &&
-      Math.abs(px - bx) < b.w / 2 - 14 &&
-      p.y + p.h < b.y - 24 &&
-      g.pound === "none";
+      (b.kind === "tortoise" &&
+        b.state === "recover" &&
+        !p.grounded &&
+        Math.abs(px - bx) < b.w / 2 - 14 &&
+        p.y + p.h < b.y - 24 &&
+        g.pound === "none") ||
+      (poundMole &&
+        !p.grounded &&
+        Math.abs(px - bx) < b.w / 2 &&
+        p.y + p.h < b.groundY - 40 &&
+        g.pound === "none");
     const input: GameInput = {
       left: dx < -2,
       right: dx > 2,

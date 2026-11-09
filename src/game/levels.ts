@@ -1131,7 +1131,7 @@ const guardians: {
     kind: "spider",
     name: "Silka, the Web Weaver",
     section: "The Silken Gate",
-    hint: "Jump over Silka's webs. When the weaving stops, land on its head.",
+    hint: "Jump over Silka's webs. When it climbs its thread to rest, jump up and bump it down, then land on it.",
   },
   {
     kind: "moth",

@@ -10,6 +10,8 @@ import {
   createBoss,
   stepBoss,
   hitBoss,
+  knockSpider,
+  flushMole,
   retryBoss,
   type BossState,
   type BossHazard,
@@ -201,6 +203,8 @@ export class Game {
   swimStroke = 0;
   /** Ground pound state: hanging before the drop, or dropping. */
   pound: "none" | "hang" | "drop" = "none";
+  /** A ground pound landed on the floor this step. */
+  private poundLanded = false;
   private poundTimer = 0;
   /** Which side a wall touched Pip on (−1 left, 1 right) and for how long. */
   wallSide = 0;
@@ -871,6 +875,7 @@ export class Game {
           if (tile.kind !== "mushroom") {
             this.events.push("pound");
             this.poundShockwave(tile.y);
+            this.poundLanded = true;
           }
         }
         if (tile.kind === "mushroom") {
@@ -1515,6 +1520,11 @@ export class Game {
     if (!boss) return false;
     const p = this.player;
     const previousY = boss.y;
+    // A pound on the floor above the tunnelling mole pops it out, dazed,
+    // and tosses Pip up above it.
+    if (this.poundLanded && flushMole(boss, p, this.events))
+      this.bounceOffBoss(boss);
+    this.poundLanded = false;
     stepBoss(boss, STEP, p, this.hazards, this.events, {
       hasFeather: this.hasWindFeather,
       flightActivated: this.glideArmed,
@@ -1533,7 +1543,11 @@ export class Game {
       // pound (Down in the air) cracks it while it is dizzy.
       const armored =
         boss.kind === "tortoise" && this.pound !== "drop" && !powered;
-      if (((stomp && boss.state === "recover") || powered) && !armored) {
+      // A bump from below snaps the resting spider's thread.
+      if (p.vy < 0 && !powered && knockSpider(boss, this.events)) {
+        p.vy = 60;
+        this.jumpCanShorten = false;
+      } else if (((stomp && boss.state === "recover") || powered) && !armored) {
         hitBoss(boss, p, this.hazards, this.events);
         if (stomp || !powered) this.bounceOffBoss(boss);
       } else if (stomp) {

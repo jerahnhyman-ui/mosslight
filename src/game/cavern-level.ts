@@ -223,7 +223,7 @@ export const cavernLevel: Level = withRewardBlocks({
     },
     {
       x: CAVERN_FINAL_CHECKPOINT,
-      text: "Rumble tunnels toward you and bursts up where the floor cracks. Step away, jump its shards, then stomp it.",
+      text: "Rumble tunnels toward you. Stand over the moving rubble, jump and press Down to pound it out, then stomp it. Too slow? Step away and jump its shards.",
     },
   ],
   boss: {

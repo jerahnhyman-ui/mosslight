@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { Game, type GameInput } from "./engine";
 import { levels } from "./levels";
+import { fightBoss } from "./boss-bot";
 import { CAVERN_FINAL_CHECKPOINT, cavernLevel } from "./cavern-level";
 import {
   createBoss,
+  flushMole,
   stepBoss,
   MOLE_BURROW,
   MOLE_LOCK,
@@ -181,50 +183,13 @@ function runTrail(g: Game) {
   walk(g, CAVERN_FINAL_CHECKPOINT + 20);
 }
 
-/** Read Rumble's crack mark, stay clear, hop its shards, stomp it when dazed. */
+/** Stand over the tunnelling mole, pound it out of the ground, stomp it. */
 function defeatRumble(g: Game) {
-  const hits: number[] = [];
-  const phases = new Set<number>();
-  let previousJump = false;
-  for (let frame = 0; frame < 120 * 180 && g.state === "playing"; frame++) {
-    const b = g.boss!,
-      p = g.player;
-    phases.add(b.phase);
-    const px = p.x + p.w / 2;
-    const mark = b.attackTargetX + b.w / 2;
-    const lo = b.minX + 20,
-      hi = b.maxX + b.w;
-    let target: number;
-    if (b.state === "defeated") target = g.level.goal.x + 20;
-    else if (b.state === "recover") target = b.x + b.w / 2;
-    else {
-      const left = mark - 220,
-        right = mark + 220;
-      target = left < lo ? right : right > hi ? left : px < mark ? left : right;
-    }
-    const dx = target - px - (p.vx * Math.abs(p.vx)) / 3700;
-    const incoming = g.hazards.some(
-      (h) =>
-        (h.vx > 0 && h.x + h.w < p.x + 6 && p.x - (h.x + h.w) < 34) ||
-        (h.vx < 0 && h.x > p.x + p.w - 6 && h.x - (p.x + p.w) < 34),
-    );
-    const jump: boolean =
-      ((b.state === "recover" && Math.abs(px - (b.x + b.w / 2)) < 70) ||
-        incoming ||
-        !p.grounded) &&
-      !(p.grounded && previousJump);
-    step(g, {
-      left: dx < -2,
-      right: dx > 2,
-      jump,
-      jumpPressed: jump && !previousJump,
-    });
-    previousJump = jump;
-    if (g.events.includes("boss-hit")) hits.push(g.boss!.health);
-  }
+  const { hits, phases, events } = fightBoss(g, { seconds: 180 });
   expect(g.state, `Rumble fight hits: ${hits.join(", ")}`).toBe("won");
   expect(hits).toEqual([3, 2, 1, 0]);
   expect(phases).toEqual(new Set([1, 2, 3]));
+  expect(events.has("boss-flushed")).toBe(true);
 }
 const rescued = (g: Game) => g.fireflies.filter((f) => f.collected).length;
 
@@ -289,7 +254,7 @@ describe("Glimmerdeep Caverns", () => {
         ).toBe(true);
   });
 
-  it("can be crossed with ordinary jumps, and Rumble defeated by stomping", () => {
+  it("can be crossed with ordinary jumps, and Rumble pounded out of its tunnel", () => {
     const g = fresh();
     runTrail(g);
     expect(g.activeCheckpointIndex).toBe(cavernLevel.checkpoints.length - 1);
@@ -357,10 +322,24 @@ describe("Rumble, the Crystal Mole", () => {
     expect(boss.attackTargetX).toBe(locked);
     while (boss.state === "attack")
       stepBoss(boss, 1 / 120, player, hazards, events);
-    expect(boss.state).toBe("recover");
+    // Nobody pounded it out: it never rests, and digs straight back in.
+    expect(boss.state).toBe("warning");
     expect(boss.x).toBe(locked);
-    expect(boss.y + boss.h).toBe(boss.groundY);
     expect(hazards).toHaveLength(2);
     for (const h of hazards) expect(h.h).toBeLessThanOrEqual(24);
+  });
+
+  it("is only dazed by a ground pound on the floor above its tunnel", () => {
+    const boss = createBoss(spec);
+    const events: string[] = [];
+    const player = { x: 8500, y: 392, w: 28, h: 38 };
+    stepBoss(boss, 1 / 120, player, [], events);
+    for (let i = 0; i < 120; i++) stepBoss(boss, 1 / 120, player, [], events);
+    // A pound far from the mound does nothing.
+    expect(flushMole(boss, { ...player, x: boss.x + 300 }, events)).toBe(false);
+    expect(flushMole(boss, { ...player, x: boss.x + 30 }, events)).toBe(true);
+    expect(boss.state).toBe("recover");
+    expect(boss.y + boss.h).toBe(boss.groundY);
+    expect(events).toContain("boss-flushed");
   });
 });
