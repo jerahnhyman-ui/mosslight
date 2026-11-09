@@ -184,7 +184,10 @@ export function fightBoss(g: Game, options: FightOptions = {}) {
             h.x - (p.x + p.w) < 30 + (p.vx - h.vx) * 0.11)),
     );
     const gap = Math.abs(px - bx) - b.w / 2 - p.w / 2;
-    const hop = charging && gap < Math.max(40, Math.abs(bvx) * 0.16);
+    // A stutter-charge digs in partway: don't be drawn into jumping early.
+    const feinting = b.variant === "stutter" && !b.feinted;
+    const hop =
+      charging && gap < (feinting ? 36 : Math.max(40, Math.abs(bvx) * 0.2));
     const atGap = gaps.some(
       ([a, z]) =>
         (dx > 0 && px > a - 34 && px < a) || (dx < 0 && px < z + 34 && px > z),

@@ -89,3 +89,36 @@ describe("Living guardians", () => {
     expect(b.x).toBeLessThan(start - 20);
   });
 });
+
+describe("Guardian difficulty climbs through the worlds", () => {
+  it("later guardians warn for less time, rest for less time and move faster", async () => {
+    const { BOSS_TIER } = await import("./bosses");
+    // Tiers never go down from one world to the next.
+    const order = [
+      "stag",
+      "spider",
+      "moth",
+      "heartwood",
+      "toad",
+      "mole",
+      "crab",
+      "owl",
+      "bear",
+      "tortoise",
+      "salamander",
+      "ram",
+    ] as const;
+    for (let i = 1; i < order.length; i++)
+      expect(BOSS_TIER[order[i]!]).toBeGreaterThanOrEqual(
+        BOSS_TIER[order[i - 1]!],
+      );
+    expect(BOSS_TIER.ram).toBeGreaterThan(BOSS_TIER.stag);
+    // Same kind of charger, first world against last: a shorter warning.
+    const warning = (kind: BossSpec["kind"]) => {
+      const b = createBoss(spec(kind));
+      stepBoss(b, 1 / 120, player, [], []);
+      return b.stateTime;
+    };
+    expect(warning("bear")).toBeLessThan(warning("stag"));
+  });
+});

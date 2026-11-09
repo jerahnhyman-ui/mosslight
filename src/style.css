@@ -3622,3 +3622,104 @@ select:focus-visible {
   width: 16px;
   height: 16px;
 }
+
+/* A slimmer HUD: icons over labels, and pickups shown only when held. */
+.hud-pill {
+  padding-left: 10px;
+  padding-right: 10px;
+  gap: 6px;
+}
+.acorn-pill > span:first-child {
+  font-size: 15px;
+  color: inherit;
+}
+/* Small Pip needs no label; big Pip shows a bright "BIG" chip. */
+#player-form {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 11px;
+}
+.power-state[data-form="small"] #player-form {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+/* The reserve slot is a faint seed until it holds one; no caption. */
+.diamond-reserve {
+  border-left: 0;
+  padding-left: 0;
+  opacity: 0.45;
+}
+.diamond-reserve[data-filled="true"] {
+  opacity: 1;
+}
+.diamond-reserve small {
+  display: none;
+}
+.power-state {
+  gap: 7px;
+  min-width: 34px;
+  justify-content: center;
+}
+.power-chip {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  padding: 3px 7px;
+  border-radius: 9px;
+  color: #fff;
+  white-space: nowrap;
+}
+.power-chip[hidden] {
+  display: none;
+}
+.power-chip[data-power="magnet"] {
+  background: #d9605f;
+}
+.power-chip[data-power="spring"] {
+  background: #6f9a3a;
+}
+.power-chip[data-power="shield"] {
+  background: #4f95c8;
+}
+.power-chip[data-expiring="true"] {
+  animation: chip-expiring 0.5s steps(2) infinite;
+}
+@keyframes chip-expiring {
+  50% {
+    opacity: 0.45;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .power-chip[data-expiring="true"] {
+    animation: none;
+  }
+}
+/* In world, castle and boss runs the second row is just the section name:
+ * numbered flags already show checkpoints, and the mode was chosen on the
+ * map. Challenge rooms and the grove keep their target or tally. */
+.game-app[data-run-kind="world"] #checkpoint-count,
+.game-app[data-run-kind="world"] #run-mode,
+.game-app[data-run-kind="boss"] #checkpoint-count,
+.game-app[data-run-kind="boss"] #run-mode,
+.game-app[data-run-kind="secret"] #checkpoint-count {
+  display: none;
+}
+#lives small {
+  display: none;
+}
+#feather-label {
+  display: none;
+}
+@media (min-width: 1000px) and (min-height: 600px) {
+  #feather-label {
+    display: inline;
+  }
+}
+/* Phones in landscape: drop the "/ 50" style suffixes to save width. */
+@media (max-width: 760px) {
+  .collectibles .hud-pill > span:last-child {
+    display: none;
+  }
+}

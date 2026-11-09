@@ -341,7 +341,8 @@ describe("Rumble, the Crystal Mole", () => {
     const player = { x: 8500, y: 392, w: 28, h: 38 };
     stepBoss(boss, 1 / 120, player, hazards, events);
     expect(boss.state).toBe("warning");
-    expect(boss.stateTime).toBeCloseTo(MOLE_BURROW, 1);
+    // A world-6 guardian warns a little quicker than the early ones.
+    expect(boss.stateTime).toBeCloseTo(MOLE_BURROW * 0.93, 1);
     // Underground it cannot touch Pip.
     for (let i = 0; i < 60; i++)
       stepBoss(boss, 1 / 120, player, hazards, events);
