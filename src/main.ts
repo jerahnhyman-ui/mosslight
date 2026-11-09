@@ -184,8 +184,8 @@ $("#app").innerHTML = `
     <div class="toolbar-actions"><button class="round-button sound-button" aria-label="Mute sound effects" title="Sound effects"></button><button class="round-button help-button" aria-label="How to play" title="How to play">${icon("help")}</button><button class="round-button" id="pause-button" aria-label="Pause game" title="Pause (P)">${icon("pause")}</button><button class="round-button" id="menu-button" aria-label="Game menu" title="Worlds and settings">${icon("menu")}</button></div>
   </header>
   <div class="hud" hidden>
-    <div class="collectibles"><span class="hud-pill coin-meter" title="50 coins = an extra life, up to 3"><span class="seed-symbol" aria-hidden="true"></span><b id="coin-count">00</b><span id="coin-total">/ 50</span></span><span class="hud-pill stars-pill fireflies-pill" title="Rescue three hidden fireflies to restore this world"><span class="firefly-symbol" aria-hidden="true">${icon("firefly")}</span><b id="star-count"><span id="firefly-count">0</span></b><span>/ 3</span></span></div>
-    <div class="power-state hud-pill" data-form="small" data-powered="false"><span id="player-form">Small</span><b id="star-power" hidden></b><span id="feather-meter" hidden><span aria-hidden="true">➶</span><span class="feather-segments" aria-hidden="true">▰▰▰▰</span><small id="feather-label">Ready</small></span><span id="diamond-reserve" class="diamond-reserve" data-filled="false" role="img" aria-label="Reserve Sunseed: empty" title="Reserve Sunseed: empty">${icon("diamond")}<small aria-hidden="true">RESERVE</small></span></div>
+    <div class="collectibles"><span class="hud-pill coin-meter" title="50 coins = an extra life, up to 3"><span class="seed-symbol" aria-hidden="true"></span><b id="coin-count">00</b><span id="coin-total">/ 50</span></span><span class="hud-pill stars-pill fireflies-pill" title="Rescue three hidden fireflies to restore this world"><span class="firefly-symbol" aria-hidden="true">${icon("firefly")}</span><b id="star-count"><span id="firefly-count">0</span></b><span>/ 3</span></span><span class="hud-pill acorn-pill" hidden title="Five hidden acorns in this world"><span aria-hidden="true">🌰</span><b id="acorn-count">0</b><span>/ 5</span></span></div>
+    <div class="power-state hud-pill" data-form="small" data-powered="false"><span id="player-form">Small</span><b id="star-power" hidden></b><b class="power-chip" id="magnet-chip" data-power="magnet" hidden></b><b class="power-chip" id="spring-chip" data-power="spring" hidden></b><b class="power-chip" id="shield-chip" data-power="shield" hidden>◍</b><span id="feather-meter" hidden><span aria-hidden="true">➶</span><span class="feather-segments" aria-hidden="true">▰▰▰▰</span><small id="feather-label">Ready</small></span><span id="diamond-reserve" class="diamond-reserve" data-filled="false" role="img" aria-label="Reserve Sunseed: empty" title="Reserve Sunseed: empty">${icon("diamond")}<small aria-hidden="true">RESERVE</small></span></div>
     <div class="vitals"><span id="lives" aria-label="3 lives remaining">${icon("pip")}<span>× <b id="life-count">3</b></span><small>LIVES</small></span><span id="timer">00:00</span></div>
     <div class="trail-track" aria-label="Trail progress"><span></span></div>
     <div class="section-status"><span id="section-name"></span><span id="checkpoint-count"></span><span id="run-mode"></span></div>
@@ -1382,6 +1382,31 @@ function updateHUD() {
     "aria-label",
     `${rescued} of 3 hidden fireflies rescued`,
   );
+  // Hidden acorns found in this world (saved as they are found).
+  $(".acorn-pill").hidden = runKind !== "world";
+  if (runKind === "world") {
+    const acorns = save.progress[selected].acorns.length;
+    setText("#acorn-count", String(acorns));
+    $(".acorn-pill").setAttribute(
+      "aria-label",
+      `${acorns} of 5 hidden acorns found`,
+    );
+  }
+  // Timed pickups appear only while they are active, each with its seconds.
+  const chip = (id: string, glyph: string, seconds: number, name: string) => {
+    const el = $(id);
+    const shown = Math.ceil(seconds);
+    if (el.hidden !== (shown === 0)) el.hidden = shown === 0;
+    if (shown === 0) return;
+    setText(id, `${glyph} ${shown}s`);
+    el.dataset.expiring = String(shown <= 3);
+    el.setAttribute("aria-label", `${name}: ${shown} seconds remaining`);
+  };
+  chip("#magnet-chip", "⊃", game.magnetRemaining, "Coin magnet");
+  chip("#spring-chip", "⌇", game.springRemaining, "Spring shoes");
+  const shield = $("#shield-chip");
+  if (shield.hidden === game.shield) shield.hidden = !game.shield;
+  shield.setAttribute("aria-label", "Bubble shield: ready");
   const sectionIndex = Math.max(
     0,
     game.level.sections.reduce(

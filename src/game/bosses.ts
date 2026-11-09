@@ -126,6 +126,26 @@ function chooseVariant(boss: BossState) {
   const fresh = options.filter((v) => v === "main" || v !== boss.variant);
   boss.variant = fresh[Math.floor(rand(boss) * fresh.length)] ?? "main";
 }
+/** How far into the adventure each guardian is met: later guardians warn
+ * for less time, rest for less time and move faster, so the fights get
+ * harder world by world (0: worlds 1–3, up to 3: worlds 10–12). */
+export const BOSS_TIER: Record<BossSpec["kind"], number> = {
+  stag: 0,
+  spider: 0,
+  moth: 0,
+  millkeeper: 1,
+  heartwood: 1,
+  toad: 1,
+  mole: 1,
+  crab: 2,
+  owl: 2,
+  bear: 2,
+  tortoise: 3,
+  salamander: 3,
+  ram: 3,
+};
+const pace = (boss: BossState) => 1 + 0.06 * BOSS_TIER[boss.kind];
+
 /** Guardians that walk the arena floor stalk Pip between attacks. */
 const STALKERS = new Set<BossSpec["kind"]>(["stag", "spider", "bear", "ram"]);
 
@@ -453,6 +473,8 @@ export function warnBoss(
   }
   boss.attackElapsed = 0;
   boss.shotsFired = 0;
+  // Later guardians telegraph for a little less time.
+  boss.stateTime *= 1 - 0.07 * BOSS_TIER[boss.kind];
   events.push("boss-warning");
 }
 
@@ -469,6 +491,20 @@ function recover(boss: BossState) {
           boss.kind === "salamander"
           ? 3.2 - (boss.phase - 1) * 0.1
           : 2.2 - (boss.phase - 1) * 0.25;
+  // Later guardians shake it off sooner (the salamander's island already
+  // costs Pip the time of two lava hops).
+  // The tortoise stops far away at a wall and the crab is fought swimming,
+  // so those two keep their full rest and get harder through speed alone.
+  if (
+    boss.kind !== "salamander" &&
+    boss.kind !== "tortoise" &&
+    boss.kind !== "crab"
+  )
+    // Never so short that a guardian resting at the far wall is out of reach.
+    boss.stateTime = Math.max(
+      Math.min(boss.stateTime, 1.9),
+      boss.stateTime - 0.1 * BOSS_TIER[boss.kind],
+    );
   boss.y = boss.groundY - boss.h;
 }
 
@@ -685,7 +721,8 @@ export function stepBoss(
       // Rearing in place.
     } else if (boss.kind === "stag" || boss.kind === "ram") {
       const top =
-        boss.kind === "ram" ? 280 + boss.phase * 50 : 290 + boss.phase * 55;
+        (boss.kind === "ram" ? 280 + boss.phase * 50 : 290 + boss.phase * 55) *
+        pace(boss);
       const charging =
         boss.kind === "ram"
           ? boss.attackElapsed - RAM_REAR
@@ -778,7 +815,11 @@ export function stepBoss(
         boss.shotsFired++;
       }
     } else if (boss.kind === "bear" && boss.variant === "roll") {
-      boss.speed = approach(boss.speed, 300 + boss.phase * 30, 700 * dt);
+      boss.speed = approach(
+        boss.speed,
+        (300 + boss.phase * 30) * pace(boss),
+        700 * dt,
+      );
       boss.x += boss.facing * boss.speed * dt;
       if (boss.x <= boss.minX || boss.x >= boss.maxX) {
         boss.x = clamp(boss.x, boss.minX, boss.maxX) - boss.facing * 12;
@@ -848,7 +889,7 @@ export function stepBoss(
     } else if (boss.kind === "tortoise") {
       // Spinning in its shell, it slides across the ice and rebounds off the
       // walls (more times each phase), chipping off a shard at each wall.
-      boss.x += boss.facing * (330 + boss.phase * 40) * dt;
+      boss.x += boss.facing * (330 + boss.phase * 40) * pace(boss) * dt;
       if (boss.x <= boss.minX || boss.x >= boss.maxX) {
         boss.x = clamp(boss.x, boss.minX, boss.maxX);
         boss.facing *= -1;
@@ -918,7 +959,7 @@ export function stepBoss(
     } else if (boss.kind === "crab") {
       // It scuttles sideways along the seabed, puffing bubbles that drift
       // up through the water. Swim around them; it tires at the wall.
-      boss.x += boss.facing * (200 + boss.phase * 40) * dt;
+      boss.x += boss.facing * (200 + boss.phase * 40) * pace(boss) * dt;
       if (
         boss.shotsFired < boss.phase + 2 &&
         boss.attackElapsed >= 0.15 + boss.shotsFired * 0.3
@@ -999,7 +1040,7 @@ export function stepBoss(
         if (boss.kind === "bear") restoreBear(boss);
         // The tortoise's thrown shards shatter as it goes dizzy, so the
         // stomp window on slippery ice is never a dodge as well.
-        if (boss.kind === "tortoise" && boss.variant === "volley")
+        if (boss.kind === "tortoise")
           for (const h of hazards) if (h.kind === "shard") h.remaining = 0;
         // Likewise the spider's webs snap once it is dizzy.
         if (boss.kind === "spider")

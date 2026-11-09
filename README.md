@@ -113,6 +113,14 @@ animated characters, and collectible/landing effects.
   rising and sliding bells; the Storm Citadel (Thunderhorn) has wind and
   lightning that strikes marked flagstones on a rolling beat. Each castle has
   its own stone walls, windows and banners. Castles replay from the journal.
+- **HUD:** fireflies and hidden acorns for the current world are always on
+  screen; the coin magnet, spring shoes, bubble shield and star appear as small
+  chips only while held (with seconds left); the reserve Sunseed is a faint
+  seed until filled. In world, castle and boss runs the second row is just the
+  section name.
+- **Difficulty ramp:** guardians are tiered by how far into the adventure they
+  are met (`BOSS_TIER`): later ones warn for less time, rest for less time and
+  move faster.
 - **Living guardians:** every guardian stalks Pip between attacks, steps back
   to wind up, builds speed into a charge and skids into the wall (its
   shockwave rolls out a beat later). Hits make it flinch, and each new phase
