@@ -6,7 +6,7 @@ import {
   type OutfitId,
 } from "./engine";
 import type { Rect } from "./levels";
-import { CREATURES } from "./creatures";
+import { CREATURES, FRIENDS, type FriendKind } from "./creatures";
 import { ghostAt } from "../ghost";
 
 type Theme =
@@ -1942,6 +1942,240 @@ export class Renderer {
       )
         this.creature(creature.kind, creature.x, creature.y, time);
     }
+    for (const friend of FRIENDS) {
+      if (
+        friend.contentId === game.level.contentId &&
+        !game.rescuedCreatures.includes(friend.id) &&
+        this.visible(friend.x, 60)
+      ) {
+        // A soft glow marks a friend still waiting to be found.
+        this.ellipse(friend.x, friend.y, 34, 32, "rgba(255,246,190,.22)");
+        this.friend(friend.kind, friend.x, friend.y, time);
+      }
+    }
+  }
+
+  /** One of the six forest friends, about 48px tall, feet at y + 22. */
+  private friend(kind: FriendKind, x: number, y: number, time: number) {
+    const c = this.ctx;
+    const bob = Math.sin(time * 2.2 + x * 0.01);
+    c.save();
+    c.translate(x, y + (kind === "bat" ? bob * 4 : 0));
+    const eyes = (ex: number, ey: number, gap: number, r = 2.6) => {
+      for (const side of [-1, 1]) {
+        this.ellipse(ex + side * gap, ey, r, r * 1.15, "#2f3b36");
+        this.ellipse(ex + side * gap + 0.8, ey - 1, r * 0.35, r * 0.35, "#fff");
+      }
+    };
+    const smile = (sx: number, sy: number, color: string) =>
+      this.line(
+        [
+          [sx - 3, sy],
+          [sx, sy + 2.5],
+          [sx + 3, sy],
+        ],
+        color,
+        1.6,
+      );
+    if (kind !== "bat") this.ellipse(0, 23, 17, 3.5, "rgba(38,60,53,.18)");
+    if (kind === "mouse") {
+      const brown = "#c9925e",
+        edge = "#8a5f3d";
+      // Tail, body, big ears, and a leaf hood.
+      this.line(
+        [
+          [-10, 16],
+          [-22, 18],
+          [-24, 8],
+        ],
+        "#e9a9a0",
+        2.5,
+      );
+      this.ellipse(0, 12, 11, 11, brown, edge);
+      this.ellipse(0, 14, 6.5, 7, "#f6e3c4");
+      for (const side of [-1, 1]) {
+        this.ellipse(side * 13, -8, 8, 9, brown, edge);
+        this.ellipse(side * 13, -8, 5, 6, "#f1b3a8");
+      }
+      this.ellipse(0, -3, 12, 11, brown, edge);
+      this.leaf(0, -7, 15, 0.25 + bob * 0.03, "#6fae5c");
+      this.ellipse(0, 1, 7, 5, "#f6e3c4");
+      eyes(0, -3, 5);
+      this.ellipse(0, 1, 1.4, 1.1, "#8a5f3d");
+      smile(0, 3, edge);
+      // A glowing seed held up high.
+      this.line(
+        [
+          [9, 9],
+          [19, -12 + bob],
+        ],
+        brown,
+        3.5,
+      );
+      this.ellipse(20, -16 + bob, 7, 7, "rgba(255,236,150,.4)");
+      this.ellipse(20, -16 + bob, 3, 4.2, "#ffd95e", "#d9a233", 1);
+    } else if (kind === "bat") {
+      const lilac = "#b99ad8",
+        edge = "#8667a8";
+      const flap = Math.sin(time * 7) * 5;
+      for (const side of [-1, 1]) {
+        c.beginPath();
+        c.moveTo(side * 6, 2);
+        c.quadraticCurveTo(side * 18, -14 - flap, side * 30, -4 - flap);
+        c.quadraticCurveTo(side * 25, 2, side * 24, 8);
+        c.quadraticCurveTo(side * 18, 4, side * 15, 10);
+        c.quadraticCurveTo(side * 11, 6, side * 6, 10);
+        c.closePath();
+        c.fillStyle = lilac;
+        c.fill();
+        c.strokeStyle = edge;
+        c.lineWidth = 1.5;
+        c.stroke();
+        this.ellipse(side * 22, 2 - flap * 0.4, 1.2, 1.2, "#ffe9b0");
+        this.ellipse(side * 17, 4 - flap * 0.3, 1, 1, "#ffe9b0");
+        // Tall ears.
+        c.beginPath();
+        c.moveTo(side * 3, -10);
+        c.quadraticCurveTo(side * 7, -26, side * 12, -22);
+        c.quadraticCurveTo(side * 12, -13, side * 9, -7);
+        c.closePath();
+        c.fillStyle = lilac;
+        c.fill();
+        c.stroke();
+      }
+      this.ellipse(0, 10, 7, 9, "#9fd0cf", edge, 1.5);
+      this.ellipse(0, 4, 8, 5, "#fbf3ea");
+      this.ellipse(0, -4, 10.5, 9.5, "#fbf3ea", "#cdb9c9", 1.5);
+      eyes(0, -4, 4.5);
+      this.ellipse(-7, -1, 2, 1.3, "rgba(240,160,170,.6)");
+      this.ellipse(7, -1, 2, 1.3, "rgba(240,160,170,.6)");
+      smile(0, -1, edge);
+    } else if (kind === "hedgehog") {
+      // A coat of autumn leaves instead of spines.
+      const leaves = ["#6fae5c", "#e3b545", "#8cc06a", "#d99a3c", "#5d9a54"];
+      for (let i = 0; i < 9; i++) {
+        const a = Math.PI * (1.02 + (i / 8) * 0.96);
+        this.leaf(
+          Math.cos(a) * 9,
+          2 + Math.sin(a) * 7,
+          13,
+          a + Math.PI / 2 + Math.sin(time * 1.5 + i) * 0.04,
+          leaves[i % leaves.length]!,
+        );
+      }
+      this.ellipse(0, 9, 14, 13, "#8a6a4c", "#5f4835");
+      this.ellipse(0, 11, 11, 11, "#f3dfbd");
+      for (const side of [-1, 1])
+        this.ellipse(side * 10, -1, 3.5, 3.5, "#d9b18a", "#8a6a4c", 1.2);
+      eyes(0, 4, 4.5);
+      this.ellipse(0, 8, 1.8, 1.4, "#6b4a38");
+      smile(0, 10, "#6b4a38");
+      for (const side of [-1, 1]) {
+        this.ellipse(side * 5, 15, 2.5, 2, "#d9b18a");
+        this.ellipse(side * 6, 22, 4, 2, "#b08a66");
+      }
+      // A tiny mushroom tucked in the leaves.
+      this.rounded(9, -15, 3, 6, 1.5, "#f3e6cf");
+      this.ellipse(10.5, -16, 5, 3, "#d9744a", "#a9522f", 1);
+    } else if (kind === "otter") {
+      const teal = "#5d9a98",
+        edge = "#3f6f73";
+      // A flat paddle tail, then the upright body.
+      c.save();
+      c.translate(-10, 16);
+      c.rotate(-0.25);
+      this.ellipse(-8, 2, 10, 5, teal, edge);
+      c.restore();
+      this.ellipse(0, 10, 10, 13, teal, edge);
+      this.ellipse(1, 12, 6, 9, "#f4ead2");
+      for (const side of [-1, 1]) {
+        this.ellipse(side * 6, 22, 4.5, 2, teal, edge, 1.2);
+        this.ellipse(side * 9, -13, 2.6, 2.6, teal, edge, 1.2);
+      }
+      this.ellipse(0, -7, 11, 9.5, teal, edge);
+      this.ellipse(0, -3, 7, 5, "#f4ead2");
+      eyes(0, -8, 4.5);
+      this.ellipse(0, -5, 1.8, 1.3, "#2f3b36");
+      smile(0, -2.5, edge);
+      // A glow-pebble held in both paws.
+      this.ellipse(4, 8 + bob * 0.5, 7, 7, "rgba(255,236,150,.35)");
+      this.ellipse(4, 8 + bob * 0.5, 3, 3.6, "#ffe9a3", "#d9b45a", 1);
+      this.ellipse(-1, 9, 2.6, 2, teal, edge, 1);
+      this.ellipse(8, 10, 2.6, 2, teal, edge, 1);
+    } else if (kind === "snail") {
+      const body = "#f2c764",
+        edge = "#c8923a";
+      // Soft body, eye stalks, and a mossy shell with a glowing spiral.
+      c.beginPath();
+      c.moveTo(-20, 22);
+      c.quadraticCurveTo(-4, 14, 12, 16);
+      c.quadraticCurveTo(13, 4, 18, 2);
+      c.quadraticCurveTo(25, 4, 23, 14);
+      c.quadraticCurveTo(22, 21, 26, 22);
+      c.closePath();
+      c.fillStyle = body;
+      c.fill();
+      c.strokeStyle = edge;
+      c.lineWidth = 1.5;
+      c.stroke();
+      for (const side of [-1, 1]) {
+        const tip = 19 + side * 4 + bob * 0.6;
+        this.line(
+          [
+            [19 + side * 2, 3],
+            [tip, -8],
+          ],
+          body,
+          2.5,
+        );
+        this.ellipse(tip, -10, 3, 3, "#fff", edge, 1);
+        this.ellipse(tip + 0.5, -10, 1.4, 1.4, "#2f3b36");
+      }
+      smile(19, 10, edge);
+      this.ellipse(-4, 5, 16, 15, "#8fb46e", "#5e8650");
+      this.ellipse(-4, 5, 11, 10, "#a5c482");
+      const glow = 0.5 + Math.sin(time * 3) * 0.2;
+      this.ellipse(-4, 6, 6, 5.5, `rgba(255,232,140,${glow})`);
+      this.ellipse(-4, 6, 2.2, 2.2, "#fff3b8");
+      // A sprout growing from a pinch of soil on top.
+      this.ellipse(-4, -10, 6, 2.5, "#7a5a40");
+      this.leaf(-4, -11, 6, -0.6 + bob * 0.05, "#7cc061");
+      this.leaf(-4, -11, 6, 0.6 + bob * 0.05, "#7cc061");
+    } else {
+      const brown = "#b9774d",
+        edge = "#83502f";
+      // Sorrel: one ear up, one flopped; a fluffy tail; a green bandana.
+      this.ellipse(-12, 15, 5, 5, "#f6e3c4");
+      c.save();
+      c.translate(-4, -12);
+      c.rotate(-0.15 + bob * 0.03);
+      this.ellipse(0, -11, 4.5, 12, brown, edge);
+      this.ellipse(0, -11, 2.2, 8.5, "#f1b3a8");
+      c.restore();
+      c.save();
+      c.translate(6, -13);
+      c.rotate(1.15);
+      this.ellipse(0, -9, 4.5, 11, brown, edge);
+      c.restore();
+      this.ellipse(0, 12, 10.5, 11, brown, edge);
+      this.ellipse(1, 14, 5.5, 7, "#f6e3c4");
+      for (const side of [-1, 1])
+        this.ellipse(side * 6.5, 22, 5.5, 2.2, "#f6e3c4", edge, 1.2);
+      this.ellipse(0, -5, 11, 10, brown, edge);
+      this.ellipse(0, -1, 6.5, 4.5, "#f6e3c4");
+      eyes(0, -6, 4.8);
+      this.ellipse(0, -2.5, 1.6, 1.2, "#e08c8c");
+      smile(0, -0.5, edge);
+      c.beginPath();
+      c.moveTo(-9, 3);
+      c.lineTo(9, 3);
+      c.lineTo(3, 12);
+      c.closePath();
+      c.fillStyle = "#6fae5c";
+      c.fill();
+      this.ellipse(2, 6.5, 1.6, 1.6, "#e9d86a");
+    }
+    c.restore();
   }
 
   private homeGrove(game: Game, time: number) {
@@ -2093,6 +2327,18 @@ export class Renderer {
       if (game.rescuedCreatures.includes(creature.id) && this.visible(x, 45))
         this.creature(creature.kind, x, 410, time);
     });
+    for (const friend of FRIENDS)
+      if (
+        game.rescuedCreatures.includes(friend.id) &&
+        this.visible(friend.homeX, 60)
+      )
+        this.friend(
+          friend.kind,
+          friend.homeX,
+          // Wisp flutters above the grass; everyone else stands on it.
+          friend.kind === "bat" ? 372 : 408,
+          time,
+        );
   }
 
   private hiveBell(x: number, y: number, completed: boolean, time: number) {
