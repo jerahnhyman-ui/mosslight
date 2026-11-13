@@ -231,7 +231,8 @@ export class Game {
   hat: string | null = null;
   /** The rescued friend brought along, by id; each lends one small perk. */
   helper: string | null = null;
-  character: "pip" | "poppy" = "pip";
+  /** "pip", "poppy", or the id of a rescued friend; looks only. */
+  character: string = "pip";
   groveDecorations: string[] = [];
   rescuedTotal = 0;
   /** Stable resident IDs copied between a trail and its secret detour. */

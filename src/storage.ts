@@ -302,7 +302,19 @@ export const CREATURE_IDS = [
   "button",
 ] as const;
 export type CreatureId = (typeof CREATURE_IDS)[number];
-export type CharacterId = "pip" | "poppy";
+/** Pip, Poppy, or a rescued forest friend. Everyone plays the same. */
+export const PLAYABLE_FRIEND_IDS = [
+  "tansy",
+  "brindle",
+  "sorrel",
+  "rill",
+  "wisp",
+  "button",
+] as const satisfies readonly CreatureId[];
+export type CharacterId =
+  | "pip"
+  | "poppy"
+  | (typeof PLAYABLE_FRIEND_IDS)[number];
 export type GardenActivityResult =
   | { kind: "matching"; moves: number }
   | { kind: "falling"; score: number; lines: number };
@@ -680,6 +692,11 @@ export function readSave(): Save {
       defaults.helper = defaults.rescuedCreatures.includes(raw.helper)
         ? raw.helper
         : null;
+      if (
+        PLAYABLE_FRIEND_IDS.includes(raw.selectedCharacter) &&
+        defaults.rescuedCreatures.includes(raw.selectedCharacter)
+      )
+        defaults.selectedCharacter = raw.selectedCharacter;
       defaults.claimedRewards = [
         "cosmetic.bee_scarf",
         "cosmetic.pinwheel_garland",
@@ -971,6 +988,9 @@ export function selectHelper(save: Save, id: CreatureId | null): boolean {
 
 export function selectCharacter(save: Save, id: CharacterId): boolean {
   if (save.selectedCharacter === id) return false;
+  // A friend can only be played once it has been rescued.
+  if (id !== "pip" && id !== "poppy" && !save.rescuedCreatures.includes(id))
+    return false;
   save.selectedCharacter = id;
   return true;
 }

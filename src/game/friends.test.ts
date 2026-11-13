@@ -3,6 +3,8 @@ import { FRIENDS } from "./creatures";
 import { levels } from "./levels";
 import {
   CREATURE_IDS,
+  PLAYABLE_FRIEND_IDS,
+  selectCharacter,
   rescueCreature,
   selectHelper,
   type Save,
@@ -115,5 +117,40 @@ describe("bringing a friend along", () => {
 
   it("gives every friend its own perk line", () => {
     expect(new Set(FRIENDS.map((f) => f.perk)).size).toBe(FRIENDS.length);
+  });
+});
+
+describe("playing as a friend", () => {
+  it("needs the friend to be rescued first", () => {
+    const save = {
+      selectedCharacter: "pip",
+      rescuedCreatures: [],
+    } as unknown as Save;
+    expect(selectCharacter(save, "button")).toBe(false);
+    expect(save.selectedCharacter).toBe("pip");
+    rescueCreature(save, "button");
+    expect(selectCharacter(save, "button")).toBe(true);
+    expect(save.selectedCharacter).toBe("button");
+    expect(selectCharacter(save, "poppy")).toBe(true);
+  });
+
+  it("offers every forest friend, and they all play alike", () => {
+    expect([...PLAYABLE_FRIEND_IDS].sort()).toEqual(
+      FRIENDS.map((f) => f.id).sort(),
+    );
+    const run = (character: string) => {
+      const g = new Game(0);
+      g.character = character;
+      const right = {
+        left: false,
+        right: true,
+        jump: true,
+        jumpPressed: false,
+      };
+      for (let i = 0; i < 240; i++)
+        g.update(1 / 120, { ...right, jumpPressed: i === 20 });
+      return [g.player.x, g.player.y, g.player.w, g.player.h];
+    };
+    expect(run("wisp")).toEqual(run("pip"));
   });
 });

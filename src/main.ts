@@ -224,16 +224,37 @@ const groveDialog = $<HTMLDialogElement>("#grove-dialog");
 let activityOpen = false;
 const characterChoice = document.createElement("div");
 characterChoice.className = "mode-choice";
-characterChoice.innerHTML = `<label for="character-choice">Play as</label><select id="character-choice"><option value="pip">Pip</option><option value="poppy">Poppy — garden sprite</option></select><small>Both friends have the same moves and abilities.</small>`;
+characterChoice.innerHTML = `<label for="character-choice">Play as</label><select id="character-choice"></select><small>Everyone has the same moves and abilities. Outfits, scarves and hats are Pip's and Poppy's.</small>`;
 $(".adventure-choices").prepend(characterChoice);
 const characterSelect = $<HTMLSelectElement>("#character-choice");
-characterSelect.value = save.selectedCharacter;
+/** The name of whoever is being played. */
+function heroName() {
+  return (
+    FRIENDS.find((f) => f.id === save.selectedCharacter)?.name ??
+    (save.selectedCharacter === "poppy" ? "Poppy" : "Pip")
+  );
+}
+function updateCharacterChoice() {
+  characterSelect.innerHTML =
+    `<option value="pip">Pip</option><option value="poppy">Poppy — garden sprite</option>` +
+    FRIENDS.filter((f) => save.rescuedCreatures.includes(f.id))
+      .map((f) => `<option value="${f.id}">${f.name} — rescued friend</option>`)
+      .join("");
+  characterSelect.value = save.selectedCharacter;
+}
+updateCharacterChoice();
 characterSelect.addEventListener("change", () => {
-  const choice = characterSelect.value === "poppy" ? "poppy" : "pip";
+  const friend = FRIENDS.find((f) => f.id === characterSelect.value);
+  const choice = friend
+    ? friend.id
+    : characterSelect.value === "poppy"
+      ? "poppy"
+      : "pip";
   if (selectCharacter(save, choice)) {
     dressGame(game);
     writeSave(save);
   }
+  updateCharacterChoice();
 });
 // Bring one rescued friend along for its small perk.
 const helperChoice = document.createElement("div");
@@ -242,6 +263,7 @@ helperChoice.innerHTML = `<label for="helper-choice">Bring a friend</label><sele
 characterChoice.after(helperChoice);
 const helperSelect = $<HTMLSelectElement>("#helper-choice");
 function updateHelperChoice() {
+  updateCharacterChoice();
   const home = FRIENDS.filter((f) => save.rescuedCreatures.includes(f.id));
   helperSelect.innerHTML =
     `<option value="">Nobody</option>` +
@@ -1248,7 +1270,7 @@ function updateUI() {
     return;
   }
   if (mode === "title") {
-    overlay.innerHTML = `<div class="title-content"><p class="eyebrow"><span class="eyebrow-dot"></span> THE SUNSEED TRAILS</p><h1>A little hero.<br><span>A wild adventure.</span></h1><p class="title-description">Find a Wind Feather. Take flight.<br>Bring the garden’s tiny lights back home.</p><button class="primary-button" id="start-button">${icon("play")}<span>Play ${game.level.name}</span></button><div class="title-footnote">${icon("firefly")} ${modeName(save.playMode)} · 3 fireflies · a garden guardian</div></div><div class="hero-callout"><span>Hey, I’m Pip!</span><svg viewBox="0 0 70 50" aria-hidden="true"><path d="M5 5q42-6 48 32m-12-7 13 10 7-15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg></div>`;
+    overlay.innerHTML = `<div class="title-content"><p class="eyebrow"><span class="eyebrow-dot"></span> THE SUNSEED TRAILS</p><h1>A little hero.<br><span>A wild adventure.</span></h1><p class="title-description">Find a Wind Feather. Take flight.<br>Bring the garden’s tiny lights back home.</p><button class="primary-button" id="start-button">${icon("play")}<span>Play ${game.level.name}</span></button><div class="title-footnote">${icon("firefly")} ${modeName(save.playMode)} · 3 fireflies · a garden guardian</div></div><div class="hero-callout"><span>Hey, I’m ${heroName()}!</span><svg viewBox="0 0 70 50" aria-hidden="true"><path d="M5 5q42-6 48 32m-12-7 13 10 7-15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg></div>`;
     $("#start-button").addEventListener("click", start);
   } else if (mode === "boss-intro") {
     overlay.innerHTML = `<div class="result-panel"><p class="eyebrow">${replayArena ? "GUARDIAN REMATCH" : game.level.castle ? "CASTLE" : "BOSS LEVEL"}</p><h2>${game.level.name}</h2><p>${replayArena ? `${game.boss?.name ?? "The guardian"} waits ahead. Power blocks are ready before the fight.` : game.level.castle ? `${game.level.subtitle} A checkpoint waits at the guardian's door.` : `${game.boss?.name.split(",")[0] ?? "The guardian"} waits ahead. A checkpoint and power blocks are ready before the fight.`}</p><button class="primary-button" id="boss-start">${replayArena ? "Start the rematch" : game.level.castle ? "Enter the castle" : "Enter the arena"} ${icon("arrow")}</button><div class="panel-links"><button id="home-button">Choose a world</button></div></div>`;
