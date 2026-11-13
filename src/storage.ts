@@ -287,6 +287,12 @@ export const EXPLORATION_SECRET_IDS = [
   "secret.sky-meadow",
   "secret.sky-hollow",
   "secret.sky-cloudtop",
+  "secret.hideaway-tansy",
+  "secret.hideaway-brindle",
+  "secret.hideaway-sorrel",
+  "secret.hideaway-rill",
+  "secret.hideaway-wisp",
+  "secret.hideaway-button",
 ] as const;
 export type ExplorationSecretId = (typeof EXPLORATION_SECRET_IDS)[number];
 export type SecretRecord = { discovered: boolean; completed: boolean };

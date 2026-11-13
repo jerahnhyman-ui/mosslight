@@ -1,3 +1,4 @@
+import { withHideawayRoute } from "./hideaways";
 import type { Level, Platform } from "./levels";
 import { withRewardBlocks } from "./reward-layouts";
 
@@ -63,167 +64,169 @@ const sail = (
 // An entirely new fourth adventure: ground runs alternate with moving sail
 // crossings and optional high routes. All gaps have a nearby checkpoint and
 // are passable with ordinary jumping; the feather offers another route.
-export const windmillLevel: Level = withRewardBlocks({
-  id: 4,
-  contentId: "world.windmill-garden",
-  name: "Windmill Garden",
-  subtitle: "Ride the wind through a wild garden of moving sails.",
-  kind: "world",
-  theme: "windmill",
-  width: 15180,
-  spawn: { x: 80, y: 392 },
-  platforms: [
-    // Flowerbank: a calm entrance with a high path and room to learn.
-    floor(0, 0, 430, 960),
-    shelf(0, 300, 350, 160),
-    shelf(0, 560, 300, 160),
-    // Clover Crossing: a short moving bridge over the first gap.
-    floor(1, 0, 430, 360),
-    floor(1, 560, 430, 400),
-    sail("clover", 1, 360, 380, 150, 55, 4.8),
-    shelf(1, 700, 350, 160),
-    // Sail Run: two adjacent traversable heights, with a longer lower gap.
-    floor(2, 0, 430, 360),
-    floor(2, 660, 430, 300),
-    shelf(2, 200, 300, 120),
-    sail("meadow", 2, 400, 350, 150, 65, 4.4),
-    shelf(2, 670, 310, 170),
-    // Bellflower Rise: the upper firefly route branches off the main trail.
-    floor(3, 0, 430, 960),
-    shelf(3, 220, 350, 160),
-    shelf(3, 470, 250, 190),
-    shelf(3, 730, 330, 160),
-    // Lily Hollow: a low garden dip with an independently sliding leaf.
-    floor(4, 0, 430, 250),
-    floor(4, 250, 490, 450),
-    floor(4, 700, 430, 260),
-    shelf(4, 230, 360, 140),
-    sail("lily", 4, 430, 380, 150, 60, 5.2),
-    shelf(4, 690, 350, 170),
-    // Fern Run: a ground route, with a hidden firefly near a lower fern.
-    floor(5, 0, 430, 960),
-    shelf(5, 260, 350, 160),
-    shelf(5, 590, 300, 160),
-    shelf(5, 800, 350, 160),
-    // Millstream: an open-air moving sail over the widest gap.
-    floor(6, 0, 430, 340),
-    floor(6, 700, 430, 260),
-    shelf(6, 160, 300, 120),
-    sail("millstream", 6, 400, 350, 150, 75, 4.6),
-    shelf(6, 700, 300, 160),
-    // Honeybloom: climb visible ledges to the optional beehive entrance.
-    floor(7, 0, 430, 960),
-    shelf(7, 260, 350, 160),
-    shelf(7, 480, 310, 150),
-    shelf(7, 700, 270, 240),
-    // Sunpetal Crossing: a second sliding sail with an enemy on the far side.
-    floor(8, 0, 430, 290),
-    floor(8, 600, 430, 360),
-    shelf(8, 170, 300, 120),
-    sail("sunpetal", 8, 340, 360, 150, 65, 4.1),
-    shelf(8, 650, 350, 160),
-    // High Canopy: the last firefly rewards the elevated route.
-    floor(9, 0, 430, 960),
-    shelf(9, 220, 350, 160),
-    shelf(9, 420, 250, 190),
-    shelf(9, 710, 320, 170),
-    // The final trail leads to the Thorn King's grove on solid ground. A
-    // higher sliding sail is an optional route, not a required detour.
-    floor(10, 0, 430, 960),
-    shelf(10, 280, 350, 150),
-    sail("windward", 10, 570, 300, 150, 55, 4.3),
-    shelf(10, 820, 350, 140),
-    // A safe approach leads to the separate fourth-world boss encounter.
-    floor(11, 0, 430, 820),
-    floor(11, 820, 470, 140),
-    floor(12, 0, 470, 960),
-    floor(13, 0, 470, 2700),
-    shelf(12, 280, 390, 140),
-    shelf(12, 540, 390, 140),
-  ],
-  coins: [
-    ...pts(0, 340, 318, 3),
-    ...pts(0, 650, 398, 4),
-    ...pts(1, 610, 398, 3),
-    ...pts(2, 690, 278, 3),
-    ...pts(3, 480, 218, 4),
-    ...pts(4, 420, 458, 3),
-    ...pts(5, 400, 398, 3),
-    ...pts(6, 730, 268, 3),
-    ...pts(7, 520, 278, 3),
-    ...pts(8, 680, 318, 3),
-    ...pts(9, 445, 218, 4),
-    ...pts(10, 100, 398, 3),
-    ...pts(10, 300, 318, 3),
-    ...pts(10, 700, 398, 3),
-    ...pts(11, 200, 398, 3),
-    ...pts(11, 500, 398, 3),
-  ],
-  stars: [],
-  diamonds: [],
-  fireflies: [
-    { x: 3390, y: 218, id: "windmill.firefly.rafters" },
-    { x: 5455, y: 268, id: "windmill.firefly.reeds" },
-    { x: 9140, y: 218, id: "windmill.firefly.canopy" },
-  ],
-  enemies: [
-    { kind: "beetle", x: 780, y: 402, minX: 700, maxX: 860 },
-    { kind: "hopper", x: 1760, y: 402, minX: 1700, maxX: 1830 },
-    { kind: "beetle", x: 3260, y: 402, minX: 3170, maxX: 3350 },
-    { kind: "hopper", x: 3650, y: 402, minX: 3570, maxX: 3720 },
-    { kind: "charger", x: 5500, y: 402, minX: 5420, maxX: 5600 },
-    { kind: "beetle", x: 8360, y: 402, minX: 8290, maxX: 8490 },
-    { kind: "hopper", x: 8900, y: 402, minX: 8830, maxX: 8980 },
-    { kind: "charger", x: 10100, y: 402, minX: 10000, maxX: 10150 },
-    { kind: "hopper", x: 10830, y: 402, minX: 10760, maxX: 10900 },
-  ],
-  checkpoints: cp,
-  portals: [
-    {
-      id: "portal.beehive",
-      x: 7464,
-      y: 270,
-      w: 80,
-      target: "beehive",
-      requires: "discovery",
-    },
-  ],
-  sections: [
-    "Flowerbank",
-    "Clover Crossing",
-    "Sail Run",
-    "Bellflower Rise",
-    "Lily Hollow",
-    "Fern Run",
-    "Millstream",
-    "Honeybloom",
-    "Sunpetal Crossing",
-    "High Canopy",
-    "Garden Trail",
-    "Heartwood Approach",
-    "Thorn King's Gate",
-  ].map((name, i) => ({ x: i * 960, name })),
-  tutorials: [
-    { x: 120, text: "Bump glowing blocks from below to earn a power." },
-    {
-      x: 1100,
-      text: "Bump the feather block. Jump, let go, then hold Jump again to fly.",
-    },
-    { x: 1250, text: "Ride the sliding sail, then jump onto the far bank." },
-    { x: 3000, text: "Explore the high leaves to find a hidden firefly." },
-    { x: 5832, text: "Wait for the sail, then ride it across Millstream." },
-    { x: 7200, text: "The high honeybloom path leads to a hidden beehive." },
-    { x: 9672, text: "Follow the path right to the Thorn King's grove." },
-    {
-      x: 11300,
-      text: "Briarheart waits ahead. Prepare for the final guardian.",
-    },
-  ],
-  // The app transfers this run to Briarheart before the end of the trail.
-  // Keep the ordinary goal beyond the reachable world so this source run
-  // cannot report victory if the transition is delayed.
-  goal: { x: 15180, y: 470 },
-});
+export const windmillLevel: Level = withHideawayRoute(
+  withRewardBlocks({
+    id: 4,
+    contentId: "world.windmill-garden",
+    name: "Windmill Garden",
+    subtitle: "Ride the wind through a wild garden of moving sails.",
+    kind: "world",
+    theme: "windmill",
+    width: 15180,
+    spawn: { x: 80, y: 392 },
+    platforms: [
+      // Flowerbank: a calm entrance with a high path and room to learn.
+      floor(0, 0, 430, 960),
+      shelf(0, 300, 350, 160),
+      shelf(0, 560, 300, 160),
+      // Clover Crossing: a short moving bridge over the first gap.
+      floor(1, 0, 430, 360),
+      floor(1, 560, 430, 400),
+      sail("clover", 1, 360, 380, 150, 55, 4.8),
+      shelf(1, 700, 350, 160),
+      // Sail Run: two adjacent traversable heights, with a longer lower gap.
+      floor(2, 0, 430, 360),
+      floor(2, 660, 430, 300),
+      shelf(2, 200, 300, 120),
+      sail("meadow", 2, 400, 350, 150, 65, 4.4),
+      shelf(2, 670, 310, 170),
+      // Bellflower Rise: the upper firefly route branches off the main trail.
+      floor(3, 0, 430, 960),
+      shelf(3, 220, 350, 160),
+      shelf(3, 470, 250, 190),
+      shelf(3, 730, 330, 160),
+      // Lily Hollow: a low garden dip with an independently sliding leaf.
+      floor(4, 0, 430, 250),
+      floor(4, 250, 490, 450),
+      floor(4, 700, 430, 260),
+      shelf(4, 230, 360, 140),
+      sail("lily", 4, 430, 380, 150, 60, 5.2),
+      shelf(4, 690, 350, 170),
+      // Fern Run: a ground route, with a hidden firefly near a lower fern.
+      floor(5, 0, 430, 960),
+      shelf(5, 260, 350, 160),
+      shelf(5, 590, 300, 160),
+      shelf(5, 800, 350, 160),
+      // Millstream: an open-air moving sail over the widest gap.
+      floor(6, 0, 430, 340),
+      floor(6, 700, 430, 260),
+      shelf(6, 160, 300, 120),
+      sail("millstream", 6, 400, 350, 150, 75, 4.6),
+      shelf(6, 700, 300, 160),
+      // Honeybloom: climb visible ledges to the optional beehive entrance.
+      floor(7, 0, 430, 960),
+      shelf(7, 260, 350, 160),
+      shelf(7, 480, 310, 150),
+      shelf(7, 700, 270, 240),
+      // Sunpetal Crossing: a second sliding sail with an enemy on the far side.
+      floor(8, 0, 430, 290),
+      floor(8, 600, 430, 360),
+      shelf(8, 170, 300, 120),
+      sail("sunpetal", 8, 340, 360, 150, 65, 4.1),
+      shelf(8, 650, 350, 160),
+      // High Canopy: the last firefly rewards the elevated route.
+      floor(9, 0, 430, 960),
+      shelf(9, 220, 350, 160),
+      shelf(9, 420, 250, 190),
+      shelf(9, 710, 320, 170),
+      // The final trail leads to the Thorn King's grove on solid ground. A
+      // higher sliding sail is an optional route, not a required detour.
+      floor(10, 0, 430, 960),
+      shelf(10, 280, 350, 150),
+      sail("windward", 10, 570, 300, 150, 55, 4.3),
+      shelf(10, 820, 350, 140),
+      // A safe approach leads to the separate fourth-world boss encounter.
+      floor(11, 0, 430, 820),
+      floor(11, 820, 470, 140),
+      floor(12, 0, 470, 960),
+      floor(13, 0, 470, 2700),
+      shelf(12, 280, 390, 140),
+      shelf(12, 540, 390, 140),
+    ],
+    coins: [
+      ...pts(0, 340, 318, 3),
+      ...pts(0, 650, 398, 4),
+      ...pts(1, 610, 398, 3),
+      ...pts(2, 690, 278, 3),
+      ...pts(3, 480, 218, 4),
+      ...pts(4, 420, 458, 3),
+      ...pts(5, 400, 398, 3),
+      ...pts(6, 730, 268, 3),
+      ...pts(7, 520, 278, 3),
+      ...pts(8, 680, 318, 3),
+      ...pts(9, 445, 218, 4),
+      ...pts(10, 100, 398, 3),
+      ...pts(10, 300, 318, 3),
+      ...pts(10, 700, 398, 3),
+      ...pts(11, 200, 398, 3),
+      ...pts(11, 500, 398, 3),
+    ],
+    stars: [],
+    diamonds: [],
+    fireflies: [
+      { x: 3390, y: 218, id: "windmill.firefly.rafters" },
+      { x: 5455, y: 268, id: "windmill.firefly.reeds" },
+      { x: 9140, y: 218, id: "windmill.firefly.canopy" },
+    ],
+    enemies: [
+      { kind: "beetle", x: 780, y: 402, minX: 700, maxX: 860 },
+      { kind: "hopper", x: 1760, y: 402, minX: 1700, maxX: 1830 },
+      { kind: "beetle", x: 3260, y: 402, minX: 3170, maxX: 3350 },
+      { kind: "hopper", x: 3650, y: 402, minX: 3570, maxX: 3720 },
+      { kind: "charger", x: 5500, y: 402, minX: 5420, maxX: 5600 },
+      { kind: "beetle", x: 8360, y: 402, minX: 8290, maxX: 8490 },
+      { kind: "hopper", x: 8900, y: 402, minX: 8830, maxX: 8980 },
+      { kind: "charger", x: 10100, y: 402, minX: 10000, maxX: 10150 },
+      { kind: "hopper", x: 10830, y: 402, minX: 10760, maxX: 10900 },
+    ],
+    checkpoints: cp,
+    portals: [
+      {
+        id: "portal.beehive",
+        x: 7464,
+        y: 270,
+        w: 80,
+        target: "beehive",
+        requires: "discovery",
+      },
+    ],
+    sections: [
+      "Flowerbank",
+      "Clover Crossing",
+      "Sail Run",
+      "Bellflower Rise",
+      "Lily Hollow",
+      "Fern Run",
+      "Millstream",
+      "Honeybloom",
+      "Sunpetal Crossing",
+      "High Canopy",
+      "Garden Trail",
+      "Heartwood Approach",
+      "Thorn King's Gate",
+    ].map((name, i) => ({ x: i * 960, name })),
+    tutorials: [
+      { x: 120, text: "Bump glowing blocks from below to earn a power." },
+      {
+        x: 1100,
+        text: "Bump the feather block. Jump, let go, then hold Jump again to fly.",
+      },
+      { x: 1250, text: "Ride the sliding sail, then jump onto the far bank." },
+      { x: 3000, text: "Explore the high leaves to find a hidden firefly." },
+      { x: 5832, text: "Wait for the sail, then ride it across Millstream." },
+      { x: 7200, text: "The high honeybloom path leads to a hidden beehive." },
+      { x: 9672, text: "Follow the path right to the Thorn King's grove." },
+      {
+        x: 11300,
+        text: "Briarheart waits ahead. Prepare for the final guardian.",
+      },
+    ],
+    // The app transfers this run to Briarheart before the end of the trail.
+    // Keep the ordinary goal beyond the reachable world so this source run
+    // cannot report victory if the transition is delayed.
+    goal: { x: 15180, y: 470 },
+  }),
+);
 
 export const beehiveLevel: Level = withRewardBlocks({
   id: 20,
