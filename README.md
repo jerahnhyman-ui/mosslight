@@ -166,11 +166,15 @@ animated characters, and collectible/landing effects.
 - Pip's glow wakes flowers and curled leaves into platforms. Environmental
   clues suggest optional routes around giant garden landmarks.
 - Charging beetles break marked barriers, and hoppers bounce on mushrooms.
-- Six forest friends wait on ledges in six of the worlds: Tansy the mouse
-  (Sunlit Meadow), Brindle the hedgehog (Firefly Hollow), Sorrel the rabbit
-  (Windmill Garden), Rill the otter (Reedwater Marsh), Wisp the bat
-  (Glimmerdeep Caverns) and Button the snail (Nightglow Woods). Reach one to
-  bring it home to the grove for good.
+- Six forest friends each wait at the far end of their own hidden level:
+  Tansy the mouse (Seedling Burrow, from Sunlit Meadow), Brindle the hedgehog
+  (Leafpile Hollow, Firefly Hollow), Sorrel the rabbit (Clover Warren,
+  Windmill Garden), Rill the otter (Otter Holt, Reedwater Marsh), Wisp the bat
+  (Echo Roost, Glimmerdeep Caverns) and Button the snail (Dewdrop Spiral,
+  Nightglow Woods). Each entrance is concealed: above one side ledge, three
+  sleeping vines uncurl into footholds only when Pip is close, and they climb
+  to a gate above the top of the screen. The discovery journal gives a hint
+  for each. Reaching a friend brings it home to the grove for good.
 - A rescued friend can come along ("Bring a friend" on the world map) and
   lends one small perk: Tansy draws in nearby coins, Brindle gives a longer
   safe moment after a bump, Sorrel adds a little jump height, Rill swims with

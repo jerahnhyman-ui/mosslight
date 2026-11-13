@@ -14,6 +14,7 @@ import { cloudAscentPlatforms } from "./cloud-garden";
 import { withTrailChallenges } from "./challenge-balance";
 import { withRewardBlocks } from "./reward-layouts";
 import { withSkyRoute } from "./sky-secrets";
+import { withHideawayRoute, type HideawayTarget } from "./hideaways";
 export {
   windmillLevel,
   beehiveLevel,
@@ -219,7 +220,8 @@ export interface Level {
       | "moonpool"
       | "sky-meadow"
       | "sky-hollow"
-      | "sky-cloudtop";
+      | "sky-cloudtop"
+      | HideawayTarget;
     requires?: "discovery" | "completion";
   }[];
   flightTarget?: { x: number; y: number; radius: number };
@@ -1149,42 +1151,44 @@ export const levels: Level[] = [
     const guardian = guardians[index]!;
     const checkpointX = trail.goal.x - 70;
     const checkpoints = [...trail.checkpoints, { x: checkpointX, y: 430 }];
-    return withSkyRoute(
-      withRewardBlocks(
-        withTrailChallenges({
-          ...trail,
-          contentId: [
-            "world.sunlit-meadow",
-            "world.firefly-hollow",
-            "world.cloudtop-crossing",
-          ][index],
-          width: trail.width + 1100,
-          sections: [
-            ...trail.sections,
-            { x: trail.width + 100, name: guardian.section },
-          ],
-          platforms: [...trail.platforms, ground(trail.width, 1100)],
-          checkpoints,
-          diamonds: [...trail.diamonds, { x: checkpointX + 55, y: 400 }],
-          coins: [...trail.coins, ...row(trail.width + 900, 392, 4)],
-          boss: {
-            kind: guardian.kind,
-            name: guardian.name,
-            x: trail.width + 540,
-            y: 430,
-            minX: trail.width + 100,
-            maxX: trail.width + 730,
-          },
-          tutorials: [
-            ...(trail.tutorials ?? []),
-            {
-              x: [1400, 3500, 3760][index]!,
-              text: "Jump into a glowing block from below to earn its power.",
+    return withHideawayRoute(
+      withSkyRoute(
+        withRewardBlocks(
+          withTrailChallenges({
+            ...trail,
+            contentId: [
+              "world.sunlit-meadow",
+              "world.firefly-hollow",
+              "world.cloudtop-crossing",
+            ][index],
+            width: trail.width + 1100,
+            sections: [
+              ...trail.sections,
+              { x: trail.width + 100, name: guardian.section },
+            ],
+            platforms: [...trail.platforms, ground(trail.width, 1100)],
+            checkpoints,
+            diamonds: [...trail.diamonds, { x: checkpointX + 55, y: 400 }],
+            coins: [...trail.coins, ...row(trail.width + 900, 392, 4)],
+            boss: {
+              kind: guardian.kind,
+              name: guardian.name,
+              x: trail.width + 540,
+              y: 430,
+              minX: trail.width + 100,
+              maxX: trail.width + 730,
             },
-            { x: checkpointX, text: guardian.hint },
-          ],
-          goal: { x: trail.width + 940, y: 430 },
-        }),
+            tutorials: [
+              ...(trail.tutorials ?? []),
+              {
+                x: [1400, 3500, 3760][index]!,
+                text: "Jump into a glowing block from below to earn its power.",
+              },
+              { x: checkpointX, text: guardian.hint },
+            ],
+            goal: { x: trail.width + 940, y: 430 },
+          }),
+        ),
       ),
     );
   }),

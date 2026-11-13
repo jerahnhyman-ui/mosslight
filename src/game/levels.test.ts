@@ -579,7 +579,11 @@ describe("Living garden level safety", () => {
     "places discoverable light routes and landmarks in $name",
     (level) => {
       const plants = level.platforms.filter(
-        (tile) => tile.kind === "flower" || tile.kind === "curled",
+        (tile) =>
+          (tile.kind === "flower" || tile.kind === "curled") &&
+          // The hidden climb to a friend's hideaway deliberately rises
+          // off the top of the screen; friends.test.ts covers it.
+          !tile.id?.startsWith("hideaway."),
       );
       expect(plants.length).toBeGreaterThanOrEqual(2);
       expect(level.clues?.length).toBeGreaterThanOrEqual(3);

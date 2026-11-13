@@ -1,8 +1,25 @@
 import { describe, expect, it } from "vitest";
 import { FRIENDS } from "./creatures";
-import { levels } from "./levels";
+import { levels, type Level } from "./levels";
+import {
+  HIDEAWAY_ROUTES,
+  hideawayClimb,
+  hideawayFriendSpot,
+  hideawayLevels,
+} from "./hideaways";
+import {
+  crossTraps,
+  hops,
+  idle,
+  jump,
+  slideAcross,
+  step,
+  tile,
+  walk,
+} from "./route-bot";
 import {
   CREATURE_IDS,
+  EXPLORATION_SECRET_IDS,
   PLAYABLE_FRIEND_IDS,
   selectCharacter,
   rescueCreature,
@@ -11,53 +28,135 @@ import {
 } from "../storage";
 import { Game } from "./engine";
 
+const bare = (level: Level) =>
+  new Game(0, { level: { ...level, enemies: [] } });
+function reachFriend(g: Game, id: string) {
+  const friend = FRIENDS.find((f) => f.id === id)!;
+  walk(g, friend.x);
+  const p = g.player;
+  expect(Math.abs(p.x + p.w / 2 - friend.x)).toBeLessThan(32);
+  expect(Math.abs(p.y + p.h / 2 - friend.y)).toBeLessThan(34);
+  // The way home opens once the far gate is reached.
+  for (let i = 0; i < 120 * 6 && !g.secretCompleted; i++)
+    step(g, { ...idle, right: true });
+  expect(g.secretCompleted).toBe(true);
+  expect(g.deaths).toBe(0);
+}
+const chainHops = (g: Game, edge: number, landX = edge + 780) =>
+  hops(g, [
+    [edge + 110, 390],
+    [edge + 270, 370],
+    [edge + 430, 390],
+    [edge + 590, 370],
+    [landX, 430],
+  ]);
+
 describe("forest friends", () => {
-  it("are six saved residents, one per world", () => {
+  it("are six saved residents, each in its own hidden level", () => {
     expect(FRIENDS).toHaveLength(6);
-    expect(new Set(FRIENDS.map((f) => f.contentId)).size).toBe(6);
-    for (const friend of FRIENDS) expect(CREATURE_IDS).toContain(friend.id);
+    for (const friend of FRIENDS) {
+      expect(CREATURE_IDS).toContain(friend.id);
+      const level = hideawayLevels[`hideaway-${friend.id}`];
+      expect(friend.contentId).toBe(level.contentId);
+      expect(EXPLORATION_SECRET_IDS).toContain(level.contentId);
+      expect(hideawayFriendSpot(friend.id)).toEqual({
+        x: friend.x,
+        y: friend.y,
+      });
+      // Nobody waits in plain view on a world trail any more.
+      expect(levels.some((l) => l.contentId === friend.contentId)).toBe(false);
+    }
   });
 
-  it.each(FRIENDS.map((f) => [f.name, f] as const))(
-    "%s waits on a fixed ledge an ordinary jump can reach",
-    (_name, friend) => {
-      const level = levels.find((l) => l.contentId === friend.contentId)!;
-      expect(level, friend.contentId).toBeDefined();
-      const solid = level.platforms.filter(
-        (p) => (p.kind === "platform" || p.kind === "ground") && !p.motion,
-      );
-      // Standing on the ledge puts Pip's middle within reach of the friend.
-      const ledge = solid.find(
-        (p) =>
-          friend.x > p.x + 20 &&
-          friend.x < p.x + p.w - 20 &&
-          Math.abs(p.y - 24 - friend.y) < 6,
-      )!;
-      expect(ledge, `${friend.name} has no ledge`).toBeDefined();
-      // A lower step or the floor is close enough to jump up from.
-      const step = solid.find(
-        (p) =>
-          p !== ledge &&
-          p.y - ledge.y > 0 &&
-          p.y - ledge.y <= 110 &&
-          p.x < ledge.x + ledge.w + 110 &&
-          p.x + p.w > ledge.x - 110,
-      );
-      expect(step, `${friend.name} cannot be reached`).toBeDefined();
-      // Not sharing a perch with a firefly: it is its own little find.
-      for (const f of level.fireflies)
-        expect(
-          Math.abs(f.x - friend.x) > 80 || Math.abs(f.y - friend.y) > 80,
-        ).toBe(true);
-      // Clear of every enemy patrol.
-      for (const e of level.enemies)
-        expect(
-          friend.x < e.minX - 30 ||
-            friend.x > e.maxX + 30 ||
-            Math.abs(e.y - friend.y) > 60,
-        ).toBe(true);
+  it.each(Object.entries(HIDEAWAY_ROUTES))(
+    "%s hides a climb of sleeping vines to an out-of-sight gate",
+    (contentId, route) => {
+      const level = levels.find((l) => l.contentId === contentId)!;
+      const climb = hideawayClimb(route.ledge);
+      // The side ledge is part of the world, and the gate is above the
+      // top of the screen for anyone on the trail floor.
+      expect(
+        level.platforms.some(
+          (p) => p.x === route.ledge.x && p.y === route.ledge.y,
+        ),
+      ).toBe(true);
+      expect(climb.gate.y).toBeLessThan(-70);
+      const g = bare(level);
+      const first = tile(g, `hideaway.${route.friend}.first`);
+      const second = tile(g, `hideaway.${route.friend}.second`);
+      // Asleep, the vines are not footholds at all.
+      expect(first.awakened).toBe(false);
+      expect(second.awakened).toBe(false);
+      const p = g.player;
+      p.x = route.ledge.x + route.ledge.w / 2;
+      p.y = route.ledge.y - p.h;
+      for (let i = 0; i < 40; i++) step(g);
+      expect(p.grounded).toBe(true);
+      jump(g, climb.first.x + 45, climb.first.y);
+      jump(g, climb.second.x + 45, climb.second.y);
+      jump(g, climb.third.x + 45, climb.third.y);
+      jump(g, climb.gate.x + 70, climb.gate.y);
+      for (let i = 0; i < 60; i++) step(g);
+      expect(g.portalReady).toBe(`hideaway-${route.friend}`);
+      expect(g.deaths).toBe(0);
     },
   );
+
+  it("Seedling Burrow leads to Tansy", () => {
+    const g = bare(hideawayLevels["hideaway-tansy"]);
+    walk(g, 880);
+    chainHops(g, 900);
+    slideAcross(g, "hideaway.tansy.leaf", 2270, 2680);
+    reachFriend(g, "tansy");
+  });
+  it("Leafpile Hollow leads to Brindle", () => {
+    const g = bare(hideawayLevels["hideaway-brindle"]);
+    walk(g, 680);
+    chainHops(g, 700);
+    crossTraps(g, 2200);
+    walk(g, 2280);
+    chainHops(g, 2300);
+    reachFriend(g, "brindle");
+  });
+  it("Clover Warren leads to Sorrel", () => {
+    const g = bare(hideawayLevels["hideaway-sorrel"]);
+    slideAcross(g, "hideaway.sorrel.kite", 770, 1180);
+    walk(g, 1780);
+    chainHops(g, 1800, 2550);
+    hops(g, [
+      [2750, 420],
+      [2950, 430],
+    ]);
+    reachFriend(g, "sorrel");
+  });
+  it("Otter Holt leads to Rill", () => {
+    const g = bare(hideawayLevels["hideaway-rill"]);
+    slideAcross(g, "hideaway.rill.log", 870, 1280);
+    walk(g, 1980);
+    chainHops(g, 2000);
+    reachFriend(g, "rill");
+  });
+  it("Echo Roost leads to Wisp", () => {
+    const g = bare(hideawayLevels["hideaway-wisp"]);
+    walk(g, 680);
+    hops(g, [
+      [830, 420],
+      [1030, 420],
+      [1230, 420],
+      [1450, 430],
+    ]);
+    walk(g, 1960);
+    chainHops(g, 1980);
+    reachFriend(g, "wisp");
+  });
+  it("Dewdrop Spiral leads to Button", () => {
+    const g = bare(hideawayLevels["hideaway-button"]);
+    slideAcross(g, "hideaway.button.petal.a", 670, 1080);
+    slideAcross(g, "hideaway.button.petal.b", 1670, 2080);
+    walk(g, 2580);
+    chainHops(g, 2600);
+    reachFriend(g, "button");
+  });
 });
 
 describe("bringing a friend along", () => {

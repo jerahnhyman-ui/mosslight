@@ -21,6 +21,7 @@ import {
   type Level,
 } from "./game/levels";
 import { AdventureSession, type SecretTarget } from "./game/session";
+import { hideawayLevels, isHideawayTarget } from "./game/hideaways";
 import { moonpoolLevel } from "./game/moonpool-level";
 import { cloudGardenLevel } from "./game/cloud-garden";
 import { skySecretLevels } from "./game/sky-secrets";
@@ -780,6 +781,30 @@ function updateJournal() {
     "secret.sky-cloudtop": {
       level: skySecretLevels["sky-cloudtop"],
       hint: "Follow the high clouds in Cloudtop Crossing.",
+    },
+    "secret.hideaway-tansy": {
+      level: hideawayLevels["hideaway-tansy"],
+      hint: "A sleeping vine curls above a side ledge early in Sunlit Meadow.",
+    },
+    "secret.hideaway-brindle": {
+      level: hideawayLevels["hideaway-brindle"],
+      hint: "Something stirs above a high step early in Firefly Hollow.",
+    },
+    "secret.hideaway-sorrel": {
+      level: hideawayLevels["hideaway-sorrel"],
+      hint: "Climb past the widest ledge halfway through Windmill Garden.",
+    },
+    "secret.hideaway-rill": {
+      level: hideawayLevels["hideaway-rill"],
+      hint: "Look up from the middle stepping ledge in Reedwater Marsh.",
+    },
+    "secret.hideaway-wisp": {
+      level: hideawayLevels["hideaway-wisp"],
+      hint: "A vine sleeps above the crystal gallery in Glimmerdeep Caverns.",
+    },
+    "secret.hideaway-button": {
+      level: hideawayLevels["hideaway-button"],
+      hint: "Keep climbing above the last firefly perch in Nightglow Woods.",
     },
   };
   $("#journal-list").innerHTML =
@@ -2015,7 +2040,7 @@ function frame(now: number) {
     else if (
       session &&
       game.requestedPortal &&
-      (
+      ((
         [
           "beehive",
           "cloud",
@@ -2024,7 +2049,8 @@ function frame(now: number) {
           "sky-hollow",
           "sky-cloudtop",
         ] as string[]
-      ).includes(game.requestedPortal)
+      ).includes(game.requestedPortal) ||
+        isHideawayTarget(game.requestedPortal))
     ) {
       const next = session.enter(game.requestedPortal as SecretTarget);
       if (next !== game) {

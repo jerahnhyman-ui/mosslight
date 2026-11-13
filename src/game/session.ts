@@ -3,6 +3,11 @@ import { beehiveLevel } from "./levels";
 import { cloudGardenLevel } from "./cloud-garden";
 import { moonpoolLevel } from "./moonpool-level";
 import { skySecretLevels } from "./sky-secrets";
+import {
+  hideawayLevels,
+  isHideawayTarget,
+  type HideawayTarget,
+} from "./hideaways";
 
 export type SecretTarget =
   | "beehive"
@@ -10,7 +15,8 @@ export type SecretTarget =
   | "moonpool"
   | "sky-meadow"
   | "sky-hollow"
-  | "sky-cloudtop";
+  | "sky-cloudtop"
+  | HideawayTarget;
 
 /** Keeps room state and one set of run resources across a world/secret detour. */
 export class AdventureSession {
@@ -47,7 +53,9 @@ export class AdventureSession {
           ? cloudGardenLevel
           : target === "moonpool"
             ? moonpoolLevel
-            : skySecretLevels[target];
+            : isHideawayTarget(target)
+              ? hideawayLevels[target]
+              : skySecretLevels[target];
     this.returnPoint = {
       x:
         target === "beehive"
