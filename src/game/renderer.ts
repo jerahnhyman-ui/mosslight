@@ -1955,6 +1955,46 @@ export class Renderer {
     }
   }
 
+  /** A rescued friend played as the hero: the same art, given a run bob,
+   * a landing squash, a lean in the air and the hero's poses. */
+  private friendHero(
+    kind: FriendKind,
+    x: number,
+    feet: number,
+    vx: number,
+    vy: number,
+    facing: number,
+    grounded: boolean,
+    time: number,
+    landing: number,
+    size: number,
+    pose: "normal" | "hurt" | "won" | "lost",
+  ) {
+    const c = this.ctx;
+    const running = grounded && Math.abs(vx) > 15;
+    const scale = 0.84 * size;
+    const squash = grounded ? Math.min(0.18, landing * 0.5) : 0;
+    const stretch = grounded ? 0 : Math.max(-0.08, Math.min(0.1, -vy / 5000));
+    const hop =
+      pose === "won"
+        ? Math.abs(Math.sin(time * 7)) * 9
+        : running
+          ? Math.abs(Math.sin(time * 15)) * 3.5
+          : 0;
+    c.save();
+    c.translate(x, feet - hop);
+    if (pose === "lost") c.rotate(0.5);
+    else if (!grounded) c.rotate(Math.max(-0.16, Math.min(0.16, vx / 2400)));
+    else if (running) c.rotate(Math.sin(time * 15) * 0.05);
+    if (pose === "hurt") c.globalAlpha *= 0.55 + Math.sin(time * 30) * 0.25;
+    c.scale(
+      (facing < 0 ? -1 : 1) * scale * (1 + squash - stretch),
+      scale * (1 - squash + stretch),
+    );
+    this.friend(kind, 0, -22, time, true);
+    c.restore();
+  }
+
   /** Draw a friend's portrait onto a small HUD or menu canvas. */
   friendPortrait(kind: FriendKind, target: HTMLCanvasElement) {
     const context = target.getContext("2d");
@@ -6535,8 +6575,25 @@ export class Renderer {
     outfit: OutfitId = "leaf",
     danger = false,
     flight: "none" | "ready" | "lift" | "glide" = "none",
-    character: "pip" | "poppy" = "pip",
+    character: string = "pip",
   ) {
+    const playedFriend = FRIENDS.find((f) => f.id === character);
+    if (playedFriend) {
+      this.friendHero(
+        playedFriend.kind,
+        x,
+        y,
+        vx,
+        vy,
+        facing,
+        grounded,
+        time,
+        landing,
+        size,
+        pose,
+      );
+      return;
+    }
     if (character === "poppy") {
       this.poppyHero(
         x,

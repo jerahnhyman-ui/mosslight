@@ -177,6 +177,9 @@ animated characters, and collectible/landing effects.
   stronger kicks, Wisp makes star power last longer, and Button makes
   crumbling platforms hold a little longer. The friend shows as a small
   portrait on the HUD; it does not follow Pip around.
+- Rescued friends can also be played: "Play as" on the world map lists Pip,
+  Poppy and every friend brought home. Everyone has the same size, moves and
+  abilities; outfits, scarves and hats are only drawn on Pip and Poppy.
 - The first three worlds end with a stag beetle, spider, or storm moth guardian.
   Silka the spider rests up on its thread, out of stomping reach: jump up and
   bump it from below so it drops, then stomp it.
