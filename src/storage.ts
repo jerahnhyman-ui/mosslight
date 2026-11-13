@@ -290,7 +290,17 @@ export const EXPLORATION_SECRET_IDS = [
 ] as const;
 export type ExplorationSecretId = (typeof EXPLORATION_SECRET_IDS)[number];
 export type SecretRecord = { discovered: boolean; completed: boolean };
-export const CREATURE_IDS = ["frog", "cloudbird", "moth"] as const;
+export const CREATURE_IDS = [
+  "frog",
+  "cloudbird",
+  "moth",
+  "tansy",
+  "brindle",
+  "sorrel",
+  "rill",
+  "wisp",
+  "button",
+] as const;
 export type CreatureId = (typeof CREATURE_IDS)[number];
 export type CharacterId = "pip" | "poppy";
 export type GardenActivityResult =

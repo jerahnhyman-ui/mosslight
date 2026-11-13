@@ -166,6 +166,11 @@ animated characters, and collectible/landing effects.
 - Pip's glow wakes flowers and curled leaves into platforms. Environmental
   clues suggest optional routes around giant garden landmarks.
 - Charging beetles break marked barriers, and hoppers bounce on mushrooms.
+- Six forest friends wait on ledges in six of the worlds: Tansy the mouse
+  (Sunlit Meadow), Brindle the hedgehog (Firefly Hollow), Sorrel the rabbit
+  (Windmill Garden), Rill the otter (Reedwater Marsh), Wisp the bat
+  (Glimmerdeep Caverns) and Button the snail (Nightglow Woods). Reach one to
+  bring it home to the grove for good.
 - The first three worlds end with a stag beetle, spider, or storm moth guardian.
   Silka the spider rests up on its thread, out of stomping reach: jump up and
   bump it from below so it drops, then stomp it.

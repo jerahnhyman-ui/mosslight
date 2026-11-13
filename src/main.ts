@@ -37,7 +37,7 @@ import { Renderer } from "./game/renderer";
 import { Controls } from "./controls";
 import { AudioPlayer } from "./audio";
 import { openMiniGame } from "./minigames";
-import { CREATURES } from "./game/creatures";
+import { CREATURES, FRIENDS } from "./game/creatures";
 import {
   DEFAULT_CONTROLS,
   SHOP_ITEMS,
@@ -652,7 +652,7 @@ function updateAdventureChoices() {
         ? "Three lives. Beat your best full adventure time."
         : "Three lives, generous checkpoints, and your own pace.";
   $("#grove-summary").textContent =
-    `${rescuedTotal(save)} fireflies home · ${save.wallet} coins to spend`;
+    `${rescuedTotal(save)} fireflies home · ${FRIENDS.filter((f) => save.rescuedCreatures.includes(f.id)).length} of ${FRIENDS.length} friends home · ${save.wallet} coins to spend`;
   $("#challenge-list").innerHTML =
     `<h3>Firefly challenge rooms</h3>` +
     challengeLevels
@@ -1755,7 +1755,8 @@ function frame(now: number) {
         completeSecret(save, game.level.contentId as ExplorationSecretId) ||
         discoveryChanged;
     let rescuedName: string | null = null;
-    for (const creature of CREATURES) {
+    let rescuedHello = "Find your new friend in the Home Grove.";
+    for (const creature of [...CREATURES, ...FRIENDS]) {
       if (
         creature.contentId !== game.level.contentId ||
         save.rescuedCreatures.includes(creature.id)
@@ -1769,11 +1770,15 @@ function frame(now: number) {
         rescueCreature(save, creature.id)
       ) {
         rescuedName =
-          creature.kind === "bird"
-            ? "Cloud bird"
-            : creature.kind === "frog"
-              ? "Frog"
-              : "Moth";
+          "name" in creature
+            ? creature.name
+            : creature.kind === "bird"
+              ? "Cloud bird"
+              : creature.kind === "frog"
+                ? "Frog"
+                : "Moth";
+        if ("hello" in creature)
+          rescuedHello = `${creature.hello} Now it lives in your Home Grove.`;
         discoveryChanged = true;
       }
     }
@@ -1885,11 +1890,7 @@ function frame(now: number) {
     ];
     const message: [string, string, keyof typeof paths] | undefined =
       rescuedName
-        ? [
-            "creature-rescue",
-            `${rescuedName} rescued! Find your new friend in the Home Grove.`,
-            "leaf",
-          ]
+        ? ["creature-rescue", `${rescuedName} rescued! ${rescuedHello}`, "leaf"]
         : messages.find(([event]) => game.events.includes(event));
     if (message && save.messages) {
       $("#game-toast").innerHTML =
