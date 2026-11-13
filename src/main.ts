@@ -1028,7 +1028,7 @@ function renderShop() {
         $("#shop-status").textContent =
           item.kind === "decoration"
             ? `${item.name} added to your grove.`
-            : `Pip is wearing ${item.name}.`;
+            : `${heroName()} is wearing ${item.name}.`;
         renderShop();
         updateAdventureChoices();
       }
@@ -1349,7 +1349,7 @@ function updateUI() {
     });
     bindPanel();
   } else {
-    overlay.innerHTML = `<div class="result-panel"><span class="panel-badge">${icon("pip")}</span><p class="eyebrow">OUT OF LIVES</p><h2>You’ve got this, Pip.</h2><p>Try again with ${MAX_LIVES} lives. Your coins and rescued fireflies are safe at home.</p><button class="primary-button" id="retry-button">Try again ${icon("arrow")}</button><div class="panel-links"><button id="home-button">Choose a world</button></div></div>`;
+    overlay.innerHTML = `<div class="result-panel"><span class="panel-badge">${icon("pip")}</span><p class="eyebrow">OUT OF LIVES</p><h2>You’ve got this, ${heroName()}.</h2><p>Try again with ${MAX_LIVES} lives. Your coins and rescued fireflies are safe at home.</p><button class="primary-button" id="retry-button">Try again ${icon("arrow")}</button><div class="panel-links"><button id="home-button">Choose a world</button></div></div>`;
     $("#retry-button").addEventListener("click", start);
     $("#home-button").addEventListener("click", showMenu);
   }
@@ -1899,7 +1899,7 @@ function frame(now: number) {
         "leaf",
       ],
       ["extra-life", "+1 life!", "pip"],
-      ["grow", "Big Pip! One hit protected", "diamond"],
+      ["grow", `Big ${heroName()}! One hit protected`, "diamond"],
       ["star", `Star power! ${STAR_POWER_DURATION} seconds`, "leaf"],
       [
         "magnet",
