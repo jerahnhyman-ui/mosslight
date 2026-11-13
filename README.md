@@ -171,6 +171,12 @@ animated characters, and collectible/landing effects.
   (Windmill Garden), Rill the otter (Reedwater Marsh), Wisp the bat
   (Glimmerdeep Caverns) and Button the snail (Nightglow Woods). Reach one to
   bring it home to the grove for good.
+- A rescued friend can come along ("Bring a friend" on the world map) and
+  lends one small perk: Tansy draws in nearby coins, Brindle gives a longer
+  safe moment after a bump, Sorrel adds a little jump height, Rill swims with
+  stronger kicks, Wisp makes star power last longer, and Button makes
+  crumbling platforms hold a little longer. The friend shows as a small
+  portrait on the HUD; it does not follow Pip around.
 - The first three worlds end with a stag beetle, spider, or storm moth guardian.
   Silka the spider rests up on its thread, out of stomping reach: jump up and
   bump it from below so it drops, then stomp it.

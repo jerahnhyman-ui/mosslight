@@ -16,6 +16,7 @@ export const CREATURES = [
 export const FRIENDS = [
   {
     id: "tansy",
+    perk: "Nearby coins drift to you.",
     kind: "mouse",
     name: "Tansy",
     contentId: "world.sunlit-meadow",
@@ -26,6 +27,7 @@ export const FRIENDS = [
   },
   {
     id: "brindle",
+    perk: "Stay safe a little longer after a bump.",
     kind: "hedgehog",
     name: "Brindle",
     contentId: "world.firefly-hollow",
@@ -36,6 +38,7 @@ export const FRIENDS = [
   },
   {
     id: "sorrel",
+    perk: "Jump a little higher.",
     kind: "rabbit",
     name: "Sorrel",
     contentId: "world.windmill-garden",
@@ -46,6 +49,7 @@ export const FRIENDS = [
   },
   {
     id: "rill",
+    perk: "Swim with stronger kicks.",
     kind: "otter",
     name: "Rill",
     contentId: "world.reedwater-marsh",
@@ -56,6 +60,7 @@ export const FRIENDS = [
   },
   {
     id: "wisp",
+    perk: "Star power lasts longer.",
     kind: "bat",
     name: "Wisp",
     contentId: "world.glimmerdeep-caverns",
@@ -66,6 +71,7 @@ export const FRIENDS = [
   },
   {
     id: "button",
+    perk: "Crumbling platforms hold a little longer.",
     kind: "snail",
     name: "Button",
     contentId: "world.nightglow-woods",

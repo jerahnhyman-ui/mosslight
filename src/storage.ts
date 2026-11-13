@@ -330,6 +330,8 @@ export interface Save {
   hats: Hat[];
   hat: Hat | null;
   selectedCharacter: CharacterId;
+  /** The rescued forest friend brought along for its perk, if any. */
+  helper: CreatureId | null;
   decorations: Decoration[];
   challenges: ChallengeRecord[];
   unlocks: { windFeatherDiscovered: boolean };
@@ -412,6 +414,7 @@ const blank = (): Save => ({
   hats: [],
   hat: null,
   selectedCharacter: "pip",
+  helper: null,
   decorations: [],
   challenges: Array.from({ length: CHALLENGE_IDS.length }, () => ({
     ...emptyRecord(),
@@ -674,6 +677,9 @@ export function readSave(): Save {
           Array.isArray(raw.rescuedCreatures) &&
           raw.rescuedCreatures.includes(id),
       );
+      defaults.helper = defaults.rescuedCreatures.includes(raw.helper)
+        ? raw.helper
+        : null;
       defaults.claimedRewards = [
         "cosmetic.bee_scarf",
         "cosmetic.pinwheel_garland",
@@ -955,6 +961,14 @@ export function rescueCreature(save: Save, id: CreatureId): boolean {
 }
 
 /** Character choice is cosmetic; both friends share the same movement rules. */
+/** Bring a rescued friend along (or nobody). Only rescued friends can come. */
+export function selectHelper(save: Save, id: CreatureId | null): boolean {
+  if (id !== null && !save.rescuedCreatures.includes(id)) return false;
+  if (save.helper === id) return false;
+  save.helper = id;
+  return true;
+}
+
 export function selectCharacter(save: Save, id: CharacterId): boolean {
   if (save.selectedCharacter === id) return false;
   save.selectedCharacter = id;

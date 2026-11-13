@@ -120,6 +120,10 @@ export const MAGNET_DURATION = 12;
 /** Seconds spring shoes give higher jumps. */
 export const SPRING_DURATION = 15;
 const MAGNET_RADIUS = 190;
+/** Friend perks: small, always-on helps from the friend brought along. */
+export const TANSY_REACH = 80;
+export const SORREL_JUMP = 1.05;
+export const WISP_STAR_BONUS = 4;
 const SPRING_BOOST = 1.22;
 /** Bonus coins for catching every coin a ring releases. */
 export const RING_BONUS = 10;
@@ -225,6 +229,8 @@ export class Game {
   /** Scarf and hat worn over the costume (cosmetic only). */
   scarf: string | null = null;
   hat: string | null = null;
+  /** The rescued friend brought along, by id; each lends one small perk. */
+  helper: string | null = null;
   character: "pip" | "poppy" = "pip";
   groveDecorations: string[] = [];
   rescuedTotal = 0;
@@ -517,6 +523,7 @@ export class Game {
     this.outfit = source.outfit;
     this.scarf = source.scarf;
     this.hat = source.hat;
+    this.helper = source.helper;
     this.character = source.character;
     this.groveDecorations = [...source.groveDecorations];
     this.rescuedTotal = source.rescuedTotal;
@@ -703,7 +710,12 @@ export class Game {
           this.jumpBuffer = 0;
           if (this.hurtLock === 0) {
             // Each press is one swim stroke: a kick upward that fades.
-            p.vy = Math.max(SWIM_STROKE_MAX, Math.min(p.vy, 60) + SWIM_STROKE);
+            // Rill the otter lends a stronger kick.
+            const kick = this.helper === "rill" ? 1.18 : 1;
+            p.vy = Math.max(
+              SWIM_STROKE_MAX * kick,
+              Math.min(p.vy, 60) + SWIM_STROKE * kick,
+            );
             p.grounded = false;
             this.swimStroke = 0.32;
             this.events.push("swim-stroke");
@@ -887,7 +899,9 @@ export class Game {
           this.cancelFlightForBounce();
           this.events.push("bounce");
         } else if (tile.kind === "crumble" && tile.crumbleRemaining < 0) {
-          tile.crumbleRemaining = CRUMBLE_WARNING;
+          // Button the snail is in no hurry: crumbling footing holds longer.
+          tile.crumbleRemaining =
+            CRUMBLE_WARNING + (this.helper === "button" ? 0.5 : 0);
           this.events.push("crumble");
         }
       } else if (solid(tile) && p.vy < 0 && oldTop >= tile.y + tile.h - 1) {
@@ -929,7 +943,9 @@ export class Game {
               this.events.push("spring");
             } else {
               this.collectedStars++;
-              this.starPowerRemaining = STAR_POWER_DURATION;
+              this.starPowerRemaining =
+                STAR_POWER_DURATION +
+                (this.helper === "wisp" ? WISP_STAR_BONUS : 0);
               this.events.push("star");
             }
           }
@@ -964,10 +980,14 @@ export class Game {
       pcy = p.y + p.h / 2;
     for (const coin of this.coins) {
       if (coin.collected) continue;
-      if (
-        this.magnetRemaining > 0 &&
-        Math.hypot(coin.x - pcx, coin.y - pcy) < MAGNET_RADIUS
-      ) {
+      // Tansy the mouse gathers coins from a short way off.
+      const reach =
+        this.magnetRemaining > 0
+          ? MAGNET_RADIUS
+          : this.helper === "tansy"
+            ? TANSY_REACH
+            : 0;
+      if (Math.hypot(coin.x - pcx, coin.y - pcy) < reach) {
         // The magnet pulls the coin in; it stops bobbing once caught.
         coin.move = undefined;
         const d = Math.hypot(coin.x - pcx, coin.y - pcy) || 1;
@@ -1100,7 +1120,8 @@ export class Game {
       ) {
         star.collected = true;
         this.collectedStars++;
-        this.starPowerRemaining = STAR_POWER_DURATION;
+        this.starPowerRemaining =
+          STAR_POWER_DURATION + (this.helper === "wisp" ? WISP_STAR_BONUS : 0);
         this.events.push("star");
       }
     }
@@ -1502,7 +1523,8 @@ export class Game {
     if (p.form === "small") return this.loseLife();
     this.resize("small");
     if (this.reserveDiamond) this.releaseReserveDiamond(source);
-    p.invulnerable = 1.5;
+    // Brindle the hedgehog's prickles buy a longer moment of safety.
+    p.invulnerable = this.helper === "brindle" ? 2.4 : 1.5;
     this.events.push("shrink");
     p.vx = p.x + p.w / 2 < source.x + source.w / 2 ? -300 : 300;
     p.vy = -290;
@@ -2011,7 +2033,9 @@ export class Game {
     this.player.vy =
       (input.jump ? JUMP : SHORT_JUMP) *
       (this.riding ? MOUNT_JUMP_BOOST : 1) *
-      (this.springRemaining > 0 ? SPRING_BOOST : 1);
+      (this.springRemaining > 0 ? SPRING_BOOST : 1) *
+      // Sorrel the rabbit puts a little extra spring in every jump.
+      (this.helper === "sorrel" ? SORREL_JUMP : 1);
     this.player.grounded = false;
     this.coyote = 0;
     this.jumpBuffer = 0;
