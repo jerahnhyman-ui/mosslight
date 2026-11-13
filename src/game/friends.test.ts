@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { FRIENDS } from "./creatures";
 import { levels } from "./levels";
-import { CREATURE_IDS } from "../storage";
+import {
+  CREATURE_IDS,
+  rescueCreature,
+  selectHelper,
+  type Save,
+} from "../storage";
+import { Game } from "./engine";
 
 describe("forest friends", () => {
   it("are six saved residents, one per world", () => {
@@ -50,4 +56,64 @@ describe("forest friends", () => {
         ).toBe(true);
     },
   );
+});
+
+describe("bringing a friend along", () => {
+  const apex = (helper: string | null) => {
+    const g = new Game(0);
+    g.helper = helper;
+    const idle = { left: false, right: false, jump: false, jumpPressed: false };
+    for (let i = 0; i < 30; i++) g.update(1 / 120, idle);
+    const floor = g.player.y;
+    let top = floor;
+    for (let i = 0; i < 120; i++) {
+      g.update(1 / 120, { ...idle, jump: true, jumpPressed: i === 0 });
+      top = Math.min(top, g.player.y);
+    }
+    return floor - top;
+  };
+
+  it("Sorrel adds a little height to every jump, and nothing else does", () => {
+    const plain = apex(null);
+    expect(apex("sorrel")).toBeGreaterThan(plain + 8);
+    expect(apex("sorrel")).toBeLessThan(plain + 25);
+    expect(apex("tansy")).toBeCloseTo(plain, 5);
+  });
+
+  it("Tansy draws in a coin from a short way off", () => {
+    const pulled = (helper: string | null) => {
+      const g = new Game(0);
+      g.helper = helper;
+      const p = g.player;
+      const coin = g.coins[0]!;
+      coin.move = undefined;
+      coin.x = p.x + p.w / 2 + 60;
+      coin.y = p.y + p.h / 2;
+      const idle = {
+        left: false,
+        right: false,
+        jump: false,
+        jumpPressed: false,
+      };
+      for (let i = 0; i < 60; i++) g.update(1 / 120, idle);
+      return coin.collected;
+    };
+    expect(pulled(null)).toBe(false);
+    expect(pulled("tansy")).toBe(true);
+  });
+
+  it("only lets a rescued friend come along", () => {
+    const save = { helper: null, rescuedCreatures: [] } as unknown as Save;
+    expect(selectHelper(save, "wisp")).toBe(false);
+    expect(save.helper).toBeNull();
+    rescueCreature(save, "wisp");
+    expect(selectHelper(save, "wisp")).toBe(true);
+    expect(save.helper).toBe("wisp");
+    expect(selectHelper(save, null)).toBe(true);
+    expect(save.helper).toBeNull();
+  });
+
+  it("gives every friend its own perk line", () => {
+    expect(new Set(FRIENDS.map((f) => f.perk)).size).toBe(FRIENDS.length);
+  });
 });

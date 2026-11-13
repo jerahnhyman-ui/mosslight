@@ -320,7 +320,7 @@ const SCARVES: Record<string, [string, string]> = {
 };
 export class Renderer {
   readonly canvas: HTMLCanvasElement;
-  readonly ctx: CanvasRenderingContext2D;
+  private ctx: CanvasRenderingContext2D;
   viewportWidth = WIDTH;
   viewportHeight = HEIGHT;
   cameraX = 0;
@@ -1955,8 +1955,27 @@ export class Renderer {
     }
   }
 
+  /** Draw a friend's portrait onto a small HUD or menu canvas. */
+  friendPortrait(kind: FriendKind, target: HTMLCanvasElement) {
+    const context = target.getContext("2d");
+    if (!context) return;
+    const own = this.ctx;
+    this.ctx = context;
+    const scale = target.width / 64;
+    context.setTransform(scale, 0, 0, scale, 0, 0);
+    context.clearRect(0, 0, 64, 64);
+    this.friend(kind, 32, 36, 0, true);
+    this.ctx = own;
+  }
+
   /** One of the six forest friends, about 48px tall, feet at y + 22. */
-  private friend(kind: FriendKind, x: number, y: number, time: number) {
+  private friend(
+    kind: FriendKind,
+    x: number,
+    y: number,
+    time: number,
+    portrait = false,
+  ) {
     const c = this.ctx;
     const bob = Math.sin(time * 2.2 + x * 0.01);
     c.save();
@@ -1977,7 +1996,8 @@ export class Renderer {
         color,
         1.6,
       );
-    if (kind !== "bat") this.ellipse(0, 23, 17, 3.5, "rgba(38,60,53,.18)");
+    if (kind !== "bat" && !portrait)
+      this.ellipse(0, 23, 17, 3.5, "rgba(38,60,53,.18)");
     if (kind === "mouse") {
       const brown = "#c9925e",
         edge = "#8a5f3d";

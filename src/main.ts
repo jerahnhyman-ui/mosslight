@@ -67,6 +67,7 @@ import {
   completeSecret,
   rescueCreature,
   selectCharacter,
+  selectHelper,
   recordGardenActivity,
   type ExplorationSecretId,
   type Save,
@@ -128,6 +129,7 @@ function dressGame(next: Game) {
   next.rescuedTotal = rescuedTotal(save);
   next.rescuedCreatures = [...save.rescuedCreatures];
   next.character = save.selectedCharacter;
+  next.helper = save.helper;
 }
 function createGame(index: number) {
   const next = new Game(index, {
@@ -185,7 +187,7 @@ $("#app").innerHTML = `
   </header>
   <div class="hud" hidden>
     <div class="collectibles"><span class="hud-pill coin-meter" title="50 coins = an extra life, up to 3"><span class="seed-symbol" aria-hidden="true"></span><b id="coin-count">00</b><span id="coin-total">/ 50</span></span><span class="hud-pill stars-pill fireflies-pill" title="Rescue three hidden fireflies to restore this world"><span class="firefly-symbol" aria-hidden="true">${icon("firefly")}</span><b id="star-count"><span id="firefly-count">0</span></b><span>/ 3</span></span><span class="hud-pill acorn-pill" hidden title="Five hidden acorns in this world"><span aria-hidden="true">🌰</span><b id="acorn-count">0</b><span>/ 5</span></span></div>
-    <div class="power-state hud-pill" data-form="small" data-powered="false"><span id="player-form">Small</span><b id="star-power" hidden></b><b class="power-chip" id="magnet-chip" data-power="magnet" hidden></b><b class="power-chip" id="spring-chip" data-power="spring" hidden></b><b class="power-chip" id="shield-chip" data-power="shield" hidden>◍</b><span id="feather-meter" hidden><span aria-hidden="true">➶</span><span class="feather-segments" aria-hidden="true">▰▰▰▰</span><small id="feather-label">Ready</small></span><span id="diamond-reserve" class="diamond-reserve" data-filled="false" role="img" aria-label="Reserve Sunseed: empty" title="Reserve Sunseed: empty">${icon("diamond")}<small aria-hidden="true">RESERVE</small></span></div>
+    <div class="power-state hud-pill" data-form="small" data-powered="false"><span id="player-form">Small</span><b id="star-power" hidden></b><b class="power-chip" id="magnet-chip" data-power="magnet" hidden></b><b class="power-chip" id="spring-chip" data-power="spring" hidden></b><b class="power-chip" id="shield-chip" data-power="shield" hidden>◍</b><canvas id="helper-chip" width="64" height="64" role="img" hidden></canvas><span id="feather-meter" hidden><span aria-hidden="true">➶</span><span class="feather-segments" aria-hidden="true">▰▰▰▰</span><small id="feather-label">Ready</small></span><span id="diamond-reserve" class="diamond-reserve" data-filled="false" role="img" aria-label="Reserve Sunseed: empty" title="Reserve Sunseed: empty">${icon("diamond")}<small aria-hidden="true">RESERVE</small></span></div>
     <div class="vitals"><span id="lives" aria-label="3 lives remaining">${icon("pip")}<span>× <b id="life-count">3</b></span><small>LIVES</small></span><span id="timer">00:00</span></div>
     <div class="trail-track" aria-label="Trail progress"><span></span></div>
     <div class="section-status"><span id="section-name"></span><span id="checkpoint-count"></span><span id="run-mode"></span></div>
@@ -232,6 +234,43 @@ characterSelect.addEventListener("change", () => {
     dressGame(game);
     writeSave(save);
   }
+});
+// Bring one rescued friend along for its small perk.
+const helperChoice = document.createElement("div");
+helperChoice.className = "mode-choice";
+helperChoice.innerHTML = `<label for="helper-choice">Bring a friend</label><select id="helper-choice"></select><small id="helper-description"></small>`;
+characterChoice.after(helperChoice);
+const helperSelect = $<HTMLSelectElement>("#helper-choice");
+function updateHelperChoice() {
+  const home = FRIENDS.filter((f) => save.rescuedCreatures.includes(f.id));
+  helperSelect.innerHTML =
+    `<option value="">Nobody</option>` +
+    home.map((f) => `<option value="${f.id}">${f.name}</option>`).join("");
+  helperSelect.value = save.helper ?? "";
+  const friend = FRIENDS.find((f) => f.id === save.helper);
+  $("#helper-description").textContent = friend
+    ? `${friend.name}: ${friend.perk}`
+    : home.length
+      ? "Pick a rescued friend. Each one lends a small helping hand."
+      : "Find forest friends in the worlds; they can come along and help.";
+  const chip = $<HTMLCanvasElement>("#helper-chip");
+  chip.hidden = !friend;
+  if (friend) {
+    renderer.friendPortrait(friend.kind, chip);
+    chip.title = `${friend.name}: ${friend.perk}`;
+    chip.setAttribute(
+      "aria-label",
+      `${friend.name} is helping. ${friend.perk}`,
+    );
+  }
+}
+helperSelect.addEventListener("change", () => {
+  const friend = FRIENDS.find((f) => f.id === helperSelect.value);
+  if (selectHelper(save, friend ? friend.id : null)) {
+    dressGame(game);
+    writeSave(save);
+  }
+  updateHelperChoice();
 });
 const activities = document.createElement("section");
 activities.className = "journal-list";
@@ -1785,6 +1824,7 @@ function frame(now: number) {
     if (discoveryChanged) {
       writeSave(save);
       updateJournal();
+      updateHelperChoice();
       dressGame(game);
     }
     for (const event of game.events) {
@@ -2011,6 +2051,7 @@ function frame(now: number) {
 }
 syncSettings();
 updateWorlds();
+updateHelperChoice();
 updateSound();
 updateUI();
 requestAnimationFrame(frame);

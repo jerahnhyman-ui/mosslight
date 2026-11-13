@@ -3723,3 +3723,14 @@ select:focus-visible {
     display: none;
   }
 }
+
+#helper-chip {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #fff6d8;
+  box-shadow: 0 0 0 1.5px #c9a86a;
+}
+#helper-chip[hidden] {
+  display: none;
+}
