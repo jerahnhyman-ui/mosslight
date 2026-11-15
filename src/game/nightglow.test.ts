@@ -196,9 +196,12 @@ describe("Nightglow Woods", () => {
     expect(gloomwingLevel.checkpoints[0]!.x).toBeLessThan(
       gloomwingLevel.boss!.minX,
     );
-    expect(gloomwingLevel.platforms.filter((p) => p.rewardPower)).toHaveLength(
-      2,
-    );
+    // One recovery Sunseed; wings are not handed out at a guardian's gate.
+    expect(
+      gloomwingLevel.platforms
+        .filter((p) => p.rewardPower)
+        .map((p) => p.rewardPower),
+    ).toEqual(["diamond"]);
   });
 
   it("lights each lantern as Pip passes, and keeps it lit after a lost life", () => {

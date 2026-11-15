@@ -225,7 +225,7 @@ export const cavernLevel: Level = withHideawayRoute(
       },
       {
         x: CAVERN_FINAL_CHECKPOINT,
-        text: "Rumble tunnels toward you. Stand over the moving rubble, jump and press Down to pound it out, then stomp it. Too slow? Step away and jump its shards.",
+        text: "Rumble tunnels toward you. Stand over the moving rubble, jump and press ↓ Pound to pound it out, then stomp it. Too slow? Step away and jump its shards.",
       },
     ],
     boss: {

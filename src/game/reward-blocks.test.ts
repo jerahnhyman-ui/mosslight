@@ -119,24 +119,33 @@ describe("head-knocker power blocks", () => {
     expect(game.hasWindFeather).toBe(true);
   });
 
-  it.each(["diamond", "feather"] as const)(
-    "reopens %s blocks on retry without duplicating released diamonds",
-    (power) => {
-      const game = rewardGame(power);
-      bump(game);
-      expect(block(game).rewardUsed).toBe(true);
-      game.player.y = 700;
-      tick(game);
-      expect(game.deaths).toBe(1);
-      expect(block(game).rewardUsed).toBe(false);
-      expect(game.diamonds).toHaveLength(0);
-      tick(game, idle, 5);
-      bump(game);
-      expect(block(game).rewardUsed).toBe(true);
-      if (power === "diamond") {
-        expect(game.diamonds).toHaveLength(1);
-        expect(game.player.form).toBe("big");
-      } else expect(game.hasWindFeather).toBe(true);
-    },
-  );
+  it("reopens a Sunseed block on retry without duplicating released diamonds", () => {
+    const game = rewardGame("diamond");
+    bump(game);
+    expect(block(game).rewardUsed).toBe(true);
+    game.player.y = 700;
+    tick(game);
+    expect(game.deaths).toBe(1);
+    expect(block(game).rewardUsed).toBe(false);
+    expect(game.diamonds).toHaveLength(0);
+    tick(game, idle, 5);
+    bump(game);
+    expect(block(game).rewardUsed).toBe(true);
+    expect(game.diamonds).toHaveLength(1);
+    expect(game.player.form).toBe("big");
+  });
+
+  it("takes the wings away on a lost life and keeps the feather block spent", () => {
+    const game = rewardGame("feather");
+    bump(game);
+    expect(game.hasWindFeather).toBe(true);
+    game.player.y = 700;
+    tick(game);
+    expect(game.deaths).toBe(1);
+    expect(game.hasWindFeather).toBe(false);
+    expect(block(game).rewardUsed).toBe(true);
+    tick(game, idle, 5);
+    bump(game);
+    expect(game.hasWindFeather).toBe(false);
+  });
 });

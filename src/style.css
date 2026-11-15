@@ -3734,3 +3734,53 @@ select:focus-visible {
 #helper-chip[hidden] {
   display: none;
 }
+
+/* The Pound button: a ground pound in the air, beside Jump. */
+.touch-pound {
+  position: absolute;
+  right: calc(100% + 14px);
+  bottom: calc(10px + var(--jump-total, 87px) * 0.2);
+  width: calc(var(--jump-total, 87px) * 0.72);
+  height: calc(var(--jump-total, 87px) * 0.72);
+  min-width: 52px;
+  min-height: 52px;
+  border-radius: 50%;
+  border: 3px solid #e6f1ff;
+  background: linear-gradient(#a9cdf2, #6f9fd6);
+  box-shadow:
+    0 4px 0 #46699a,
+    0 8px 18px #23324c2e;
+  color: #1f3557;
+  touch-action: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  opacity: 0.6;
+  transition: opacity 0.12s;
+}
+.touch-pound[hidden] {
+  display: none;
+}
+.touch-pound[data-ready="true"] {
+  opacity: 1;
+}
+.touch-pound b {
+  font-size: 22px;
+  pointer-events: none;
+}
+.touch-pound span {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  pointer-events: none;
+}
+.touch-pound.pressed {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 #46699a;
+}
+.game-app[data-controls-swapped="true"] .touch-pound {
+  right: auto;
+  left: calc(100% + 14px);
+}

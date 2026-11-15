@@ -261,20 +261,24 @@ iOS plugin when supported.
 - **Earn power-ups by bumping marked blocks from below.** Either friend, small or big, can
   both hit these blocks. Feather and star blocks grant their powers when hit;
   seed blocks release a golden Sunseed to collect.
-- **Wind Feathers let Pip fly in every world.** Bump a feather-marked block on the opening path; the Home Grove has one for practice too. Jump, release, then hold Jump again to rise. Release to glide and land to refill. The camera follows high flights. Shrinking retains the feather; losing a life drops it and makes feather blocks available again. Challenge rooms keep their original jumping rules.
+- **Wind Feathers are rare.** One feather-marked block sits early in each of the first four worlds (their sky routes need it), and the Home Grove has one for practice. Later worlds and the guardians' gates offer none. Jump, release, then hold Jump again to rise. Release to glide and land to refill. The camera follows high flights. Shrinking retains the feather; losing a life takes it away, and on a trail the spent feather block stays spent (the grove and hidden places hand it out again). Challenge rooms keep their original jumping rules.
 - **Sunseeds make Pip big.** Bump a seed-marked block and collect its Sunseed. A bug hit then shrinks Pip without taking a life.
   A hit while small costs a life. A brief grace period after shrinking or
   respawning prevents one collision from counting as several hits.
-- **Every 50 coins earns one life, up to 3.** The counter rolls over at 50 even
-  when lives are full. Coins stay collected after a death, so the same coins
-  cannot be collected repeatedly for extra lives.
+- **Extra lives come at 50, 150 and 200 coins in a run, up to 6 lives at once.**
+  A run starts with 3. Coins stay collected after a death, so the same coins
+  cannot be collected repeatedly. Relaxed (unlimited) mode earns none.
+- **Ground pound:** press Down in the air on a keyboard or gamepad, or the
+  ↓ Pound button beside Jump on a touch screen.
+- **Star power** makes the hero glow and flash through gold, mint and pink,
+  with soft twinkles, blinking faster as it runs out.
 - **Land on a bug to squash it** and bounce upward. Squashed bugs no longer hurt.
 - **Stars give 10 seconds of star power:** bump a star-marked block to activate it.
   Bugs cannot hurt Pip and touching them squashes them. Another star refreshes the timer. Pausing freezes the timer;
   falling still costs a life.
 - Losing a life returns small Pip to the checkpoint, or the start if no checkpoint
-  is active, and clears star power. Seed and feather blocks reset after a lost
-  life; spent star blocks stay spent for the run.
+  is active, and clears star power. Seed blocks reset after a lost
+  life (feather blocks do not); spent star blocks stay spent for the run.
   Zero lives ends a Classic or Timed run. Relaxed mode keeps checkpoint retries
   available. Restarting or choosing another trail starts fresh.
 
