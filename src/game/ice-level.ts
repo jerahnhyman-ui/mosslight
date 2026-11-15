@@ -263,15 +263,6 @@ export const shellshockLevel: Level = {
       kind: "brick",
       rewardPower: "diamond",
     },
-    {
-      id: "shellshock.retry.feather",
-      x: 280,
-      y: 340,
-      w: 48,
-      h: 32,
-      kind: "brick",
-      rewardPower: "feather",
-    },
   ],
   coins: [],
   stars: [],
@@ -283,7 +274,7 @@ export const shellshockLevel: Level = {
   tutorials: [
     {
       x: 200,
-      text: "Shellshock's shell is too tough to stomp. Jump over it as it spins; when it's dizzy, jump above it and press Down to ground-pound it.",
+      text: "Shellshock's shell is too tough to stomp. Jump over it as it spins; when it's dizzy, jump above it and press ↓ Pound to ground-pound it.",
     },
   ],
   boss: {

@@ -201,7 +201,6 @@ describe("Reedwater Marsh", () => {
     expect(rewards.map((t) => t.rewardPower).sort()).toEqual([
       "diamond",
       "diamond",
-      "feather",
       "spring",
       "star",
     ]);

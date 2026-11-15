@@ -244,15 +244,6 @@ export const gloomwingLevel: Level = {
       kind: "brick",
       rewardPower: "diamond",
     },
-    {
-      id: "gloomwing.retry.feather",
-      x: 280,
-      y: 340,
-      w: 48,
-      h: 32,
-      kind: "brick",
-      rewardPower: "feather",
-    },
   ],
   lanterns: [
     { x: 400, y: 470, lit: true },

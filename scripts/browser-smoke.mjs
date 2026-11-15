@@ -593,10 +593,12 @@ try {
       () => flight.locator("#feather-meter").isVisible(),
       `${label}: feather block`,
     );
+    // Check the toast at once: walking on may reach 50 coins, whose
+    // extra-life message would replace it.
+    await expect(flight.locator("#game-toast")).toContainText("Wind Feather!");
     await walkToX(flight, bumpX - 70, goalX);
     await expect(flight.locator("#feather-label")).toHaveText("Ready");
     await expect(flight.locator(".feather-segments")).toHaveText("▰▰▰▰");
-    await expect(flight.locator("#game-toast")).toContainText("Wind Feather!");
     const beforeFlight = await trailProgress(flight);
 
     if (touchFlight)
@@ -1046,9 +1048,10 @@ try {
   await walkToMeadowX(secrets, 3970);
   await secrets.clock.runFor(400);
   await secrets.keyboard.up("Space");
+  // No life lost; the route may have earned the 50-coin extra life.
   await expect(secrets.locator("#lives")).toHaveAttribute(
     "aria-label",
-    "3 lives remaining",
+    /^[34] lives remaining$/,
   );
   await secrets.screenshot({
     path: "artifacts/adventure-mushroom-grove.png",

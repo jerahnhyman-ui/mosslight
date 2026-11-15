@@ -112,8 +112,16 @@ export const MOUNT_SIZE = { w: 52, h: 26 };
 export const TONGUE_REACH = 130;
 const MOUNT_JUMP_BOOST = 1.12;
 
+/** Lives a run starts (and restarts) with. */
 export const MAX_LIVES = 3;
-export const COINS_PER_LIFE = 50;
+/** The most lives that can be held at once. */
+export const LIFE_CAP = 6;
+/** An extra life is earned when a run's coins reach each of these totals. */
+export const EXTRA_LIFE_COINS = [50, 150, 200] as const;
+export const COINS_PER_LIFE = EXTRA_LIFE_COINS[0];
+/** The next coin total that earns a life, if any are left. */
+export const nextLifeAt = (coins: number) =>
+  EXTRA_LIFE_COINS.find((total) => total > coins) ?? null;
 export const STAR_POWER_DURATION = 10;
 /** Seconds a coin magnet pulls in nearby coins. */
 export const MAGNET_DURATION = 12;
@@ -249,6 +257,7 @@ export class Game {
   state: "playing" | "won" | "lost" = "playing";
   lives = MAX_LIVES;
   collectedCoins = 0;
+  /** Coins gathered this run, counted toward the extra-life totals. */
   coinsTowardLife = 0;
   collectedStars = 0;
   collectedFireflies = 0;
@@ -2013,12 +2022,16 @@ export class Game {
       this.collectedCoins++;
       this.coinsTowardLife++;
       this.events.push("coin");
-      if (this.coinsTowardLife === COINS_PER_LIFE) {
-        this.coinsTowardLife = 0;
-        if (this.lives < MAX_LIVES) {
-          this.lives++;
-          this.events.push("extra-life");
-        }
+      // Unlimited (Relaxed) runs have no lives to earn.
+      if (
+        (EXTRA_LIFE_COINS as readonly number[]).includes(
+          this.coinsTowardLife,
+        ) &&
+        this.mode !== "relaxed" &&
+        this.lives < LIFE_CAP
+      ) {
+        this.lives++;
+        this.events.push("extra-life");
       }
     }
   }
@@ -2338,8 +2351,16 @@ export class Game {
       (diamond) => !diamond.fromRewardBlock && !diamond.reserveDrop,
     );
     for (const diamond of this.diamonds) diamond.collected = false;
+    // Losing a life takes the wings away for good on a trail: a spent
+    // feather block stays spent. Only the grove and the hidden places, where
+    // flying is the way through, hand the feather out again.
+    const featherReturns =
+      this.level.kind === "grove" || this.level.kind === "secret";
     for (const tile of this.platforms)
-      if (tile.rewardPower === "diamond" || tile.rewardPower === "feather")
+      if (
+        tile.rewardPower === "diamond" ||
+        (tile.rewardPower === "feather" && featherReturns)
+      )
         tile.rewardUsed = false;
   }
 }

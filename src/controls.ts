@@ -27,6 +27,8 @@ export class Controls {
   private downPointers = new Set<number>();
   private downWas = false;
   private actionPressed = false;
+  /** The on-screen Pound button was tapped since the last read. */
+  private poundTapped = false;
 
   constructor(
     private movementPad: HTMLElement,
@@ -35,7 +37,19 @@ export class Controls {
     private unlock: () => void,
     private togglePause: () => void,
     private actionButton?: HTMLButtonElement,
+    poundButton?: HTMLButtonElement,
   ) {
+    poundButton?.addEventListener("pointerdown", (event) => {
+      if (!this.active()) return;
+      event.preventDefault();
+      this.poundTapped = true;
+      poundButton.classList.add("pressed");
+      this.unlock();
+    });
+    for (const type of ["pointerup", "pointercancel", "pointerleave"])
+      poundButton?.addEventListener(type, () =>
+        poundButton.classList.remove("pressed"),
+      );
     actionButton?.addEventListener("pointerdown", (event) => {
       if (!this.active()) return;
       event.preventDefault();
@@ -184,6 +198,7 @@ export class Controls {
     this.jumps.clear();
     this.jumpEdges = [];
     this.actionPressed = false;
+    this.poundTapped = false;
     // Sample even if rendering stopped while the page was hidden.
     const pad = navigator.getGamepads?.().find((item) => item?.connected);
     this.padJump = !!pad?.buttons[0]?.pressed;
@@ -237,8 +252,9 @@ export class Controls {
       [...this.keys].some((key) => downKeys.has(key)) ||
       !!pad?.buttons[13]?.pressed ||
       (pad?.axes[1] ?? 0) > 0.6;
-    result.downPressed = down && !this.downWas;
+    result.downPressed = (down && !this.downWas) || this.poundTapped;
     this.downWas = down;
+    this.poundTapped = false;
     this.jumpEdges = [];
     this.actionPressed = false;
     return result;

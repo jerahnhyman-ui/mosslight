@@ -365,7 +365,10 @@ describe.each(worlds)(
       expect(checkpoint).toBeLessThan(finale);
       expect(level.checkpoints.at(-1)!.x).toBe(checkpoint);
       expect(arena.checkpoints[0]!.x).toBeLessThan(arena.boss!.minX);
-      expect(arena.platforms.filter((p) => p.rewardPower)).toHaveLength(2);
+      // One recovery Sunseed; wings are not handed out at a guardian's gate.
+      expect(
+        arena.platforms.filter((p) => p.rewardPower).map((p) => p.rewardPower),
+      ).toEqual(["diamond"]);
     });
 
     it("can be crossed with ordinary jumps, rescuing all three fireflies", () => {
@@ -559,7 +562,7 @@ describe("Thunderhead Heights", () => {
     );
     expect(
       thunderhornLevel.platforms.filter((p) => p.rewardPower),
-    ).toHaveLength(2);
+    ).toHaveLength(1);
     // Gusts only blow over solid ground and ledges, never over lifts or
     // crumbling stones.
     for (const zone of stormLevel.windZones!)

@@ -206,7 +206,7 @@ describe("Glimmerdeep Caverns", () => {
         .filter((t) => t.rewardPower)
         .map((t) => t.rewardPower)
         .sort(),
-    ).toEqual(["diamond", "diamond", "feather", "shield", "star"]);
+    ).toEqual(["diamond", "diamond", "shield", "star"]);
   });
 
   it("puts a checkpoint on solid floor before every chasm", () => {

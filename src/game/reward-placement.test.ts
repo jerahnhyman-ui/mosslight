@@ -85,7 +85,8 @@ describe("Authored reward blocks", () => {
     "keeps $name guardian recovery available at its final checkpoint",
     (level) => {
       const cp = level.checkpoints.at(-1)!;
-      for (const power of ["diamond", "feather"] as const) {
+      // A Sunseed only: wings are not handed out at a guardian's gate.
+      for (const power of ["diamond"] as const) {
         const block = level.platforms.find(
           (p) =>
             p.rewardPower === power && Math.abs(p.x + p.w / 2 - cp.x) <= 300,

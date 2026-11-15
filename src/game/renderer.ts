@@ -6249,32 +6249,50 @@ export class Renderer {
       );
       glow.addColorStop(1, "rgba(255,242,155,0)");
       this.ellipse(x, centerY, radius, radius, glow);
-      // Short, jagged sparks crackle out from the body and re-form a few
-      // times a second, like static electricity.
-      const frame = Math.floor(time * 14);
-      c.save();
-      c.lineCap = "round";
-      c.lineJoin = "round";
-      c.shadowColor = urgent ? "#ffb15c" : "#fff3a0";
-      c.shadowBlur = 8;
-      for (let i = 0; i < 5; i++) {
-        const seed = frame * 7 + i * 13;
-        if (hash(seed) < 0.25) continue; // some sparks blink out
-        const angle = (i / 5) * Math.PI * 2 + hash(seed + 1) * 0.9;
-        const inner = 15 * size;
-        const outer = (27 + hash(seed + 2) * 11) * size;
-        const points: [number, number][] = [];
-        for (let k = 0; k <= 3; k++) {
-          const r = inner + ((outer - inner) * k) / 3;
-          const bend =
-            k === 0 || k === 3 ? 0 : (hash(seed + 3 + k) - 0.5) * 0.7;
-          points.push([
-            x + Math.cos(angle + bend) * r,
-            centerY + Math.sin(angle + bend) * r * 1.2,
-          ]);
-        }
-        this.line(points, urgent ? "#ffc27a" : "#fffbd2", 2.2 * size);
+      // Soft four-point twinkles drift up around the body and fade.
+      for (let i = 0; i < 6; i++) {
+        const life = (time * 0.9 + i / 6) % 1;
+        const angle = i * 2.4 + Math.floor(time * 0.9 + i / 6) * 1.7;
+        const reach = (20 + life * 16) * size;
+        const tx = x + Math.cos(angle) * reach;
+        const ty = centerY + Math.sin(angle) * reach * 1.1 - life * 10 * size;
+        const twinkle = Math.sin(life * Math.PI);
+        const r = (2 + twinkle * 3.5) * Math.sqrt(size);
+        c.save();
+        c.globalAlpha = fade * twinkle;
+        c.beginPath();
+        c.moveTo(tx, ty - r);
+        c.quadraticCurveTo(tx, ty, tx + r, ty);
+        c.quadraticCurveTo(tx, ty, tx, ty + r);
+        c.quadraticCurveTo(tx, ty, tx - r, ty);
+        c.quadraticCurveTo(tx, ty, tx, ty - r);
+        c.fillStyle = urgent ? "#ffd9a0" : "#fffbe0";
+        c.fill();
+        c.restore();
       }
+    } else {
+      // The hero flashes: a warm light washes over the body, cycling through
+      // gold, mint and pink, and blinking faster as the power runs out.
+      const beat = 0.5 + 0.5 * Math.sin(time * (urgent ? 22 : 9));
+      const tints = ["255,240,150", "180,255,235", "255,200,240"];
+      const tint = urgent
+        ? "255,205,130"
+        : tints[Math.floor(time * 5) % tints.length]!;
+      const radius = 30 * size;
+      const wash = c.createRadialGradient(
+        x,
+        centerY,
+        2 * size,
+        x,
+        centerY,
+        radius,
+      );
+      wash.addColorStop(0, `rgba(${tint},${0.28 + beat * 0.34})`);
+      wash.addColorStop(0.6, `rgba(${tint},${0.12 + beat * 0.2})`);
+      wash.addColorStop(1, `rgba(${tint},0)`);
+      c.save();
+      c.globalCompositeOperation = "lighter";
+      this.ellipse(x, centerY, radius * 0.8, radius, wash);
       c.restore();
     }
     const colors = urgent

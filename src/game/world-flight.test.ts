@@ -161,7 +161,8 @@ const openingRoutes: RouteStep[][] = [
 
 describe("feather flight throughout the garden", () => {
   // Underwater worlds have no feather: flight does not work while swimming.
-  it.each([...levels.filter((l) => !l.waterZones?.length), groveLevel])(
+  // Wings are rare: only the first four worlds and the grove offer them.
+  it.each([...levels.slice(0, 4), groveLevel])(
     "$name offers a feather on foot from a fresh start, then supports lift, glide, and recharge",
     (level) => {
       const game = new Game(0, { level });

@@ -3,6 +3,9 @@ import type { Level, Platform } from "./levels";
 type Power = NonNullable<Platform["rewardPower"]>;
 type Placement = readonly [Power, number, number];
 
+// Wind Feathers are deliberately rare: one early in each of the first four
+// worlds (their sky routes need it), the grove and the flying secrets. Later
+// worlds and the guardians' gates offer none.
 // Positions are the blocks' upper-left corners. Each sits above a reachable
 // surface, so Pip must choose to jump into it from underneath for its reward.
 const layouts: Record<string, readonly Placement[]> = {
@@ -13,7 +16,6 @@ const layouts: Record<string, readonly Placement[]> = {
     ["diamond", 4690, 300],
     ["magnet", 6860, 300],
     ["diamond", 11110, 300],
-    ["feather", 11210, 300],
   ],
   "world.firefly-hollow": [
     ["diamond", 3510, 300],
@@ -22,7 +24,6 @@ const layouts: Record<string, readonly Placement[]> = {
     ["diamond", 7200, 300],
     ["star", 9160, 300],
     ["diamond", 12310, 300],
-    ["feather", 12410, 300],
   ],
   "world.cloudtop-crossing": [
     ["diamond", 1920, 300],
@@ -31,7 +32,6 @@ const layouts: Record<string, readonly Placement[]> = {
     ["spring", 5580, 300],
     ["diamond", 7840, 300],
     ["diamond", 13500, 300],
-    ["feather", 13610, 300],
   ],
   "world.windmill-garden": [
     ["feather", 1160, 300],
@@ -50,7 +50,6 @@ const layouts: Record<string, readonly Placement[]> = {
     ["feather", 2016, 300],
   ],
   "world.reedwater-marsh": [
-    ["feather", 200, 300],
     ["diamond", 1060, 300],
     ["star", 3900, 300],
     ["spring", 7700, 300],
@@ -58,7 +57,6 @@ const layouts: Record<string, readonly Placement[]> = {
     ["diamond", 10620, 300],
   ],
   "world.glimmerdeep-caverns": [
-    ["feather", 200, 300],
     ["diamond", 2060, 300],
     ["star", 3190, 300],
     ["shield", 5460, 300],
@@ -72,7 +70,6 @@ const layouts: Record<string, readonly Placement[]> = {
     ["diamond", 5480, 360],
   ],
   "world.nightglow-woods": [
-    ["feather", 200, 300],
     ["diamond", 1800, 300],
     ["star", 3400, 300],
     ["magnet", 5350, 300],
@@ -80,7 +77,6 @@ const layouts: Record<string, readonly Placement[]> = {
     ["diamond", 8500, 300],
   ],
   "world.snowdrift-peaks": [
-    ["feather", 200, 300],
     ["diamond", 1800, 300],
     ["star", 4300, 300],
     ["magnet", 2150, 300],
@@ -89,7 +85,6 @@ const layouts: Record<string, readonly Placement[]> = {
     ["diamond", 8700, 300],
   ],
   "world.frostglass-lake": [
-    ["feather", 200, 300],
     ["diamond", 2000, 300],
     ["star", 3200, 300],
     ["spring", 4250, 300],
@@ -98,7 +93,6 @@ const layouts: Record<string, readonly Placement[]> = {
     ["diamond", 8500, 300],
   ],
   "world.ember-caldera": [
-    ["feather", 200, 300],
     ["diamond", 1800, 300],
     ["star", 3200, 300],
     ["shield", 4250, 300],
@@ -107,7 +101,6 @@ const layouts: Record<string, readonly Placement[]> = {
     ["diamond", 8820, 300],
   ],
   "world.thunderhead-heights": [
-    ["feather", 200, 300],
     ["diamond", 1800, 300],
     ["spring", 2150, 300],
     ["star", 4300, 300],

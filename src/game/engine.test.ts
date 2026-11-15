@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   Game,
-  COINS_PER_LIFE,
+  LIFE_CAP,
   MAX_LIVES,
+  nextLifeAt,
   STAR_POWER_DURATION,
   STAR_SPEED_BOOST,
   type GameInput,
@@ -640,42 +641,42 @@ describe("Mosslight simulation", () => {
     expect(game.events).toContain("grow");
   });
 
-  it("awards a life exactly at 50 coins and retains the total count", () => {
+  it("awards an extra life at 50, 150 and 200 coins, up to six lives", () => {
     const game = new Game();
-    game.player.y = 700;
-    game.update(1 / 120, idle);
-    collectCoins(game, COINS_PER_LIFE - 1);
-    expect(game.lives).toBe(2);
-    expect(game.coinsTowardLife).toBe(49);
+    collectCoins(game, 49);
+    expect(game.lives).toBe(MAX_LIVES);
     expect(game.events).not.toContain("extra-life");
     collectCoins(game, 1);
-    expect(game.lives).toBe(MAX_LIVES);
-    expect(game.coinsTowardLife).toBe(0);
-    expect(game.collectedCoins).toBe(COINS_PER_LIFE);
+    expect(game.lives).toBe(4);
+    expect(game.coinsTowardLife).toBe(50);
+    expect(game.collectedCoins).toBe(50);
     expect(game.events.filter((event) => event === "extra-life")).toHaveLength(
       1,
     );
     advance(game, 0.1);
-    expect(game.collectedCoins).toBe(COINS_PER_LIFE);
     expect(game.events).not.toContain("extra-life");
+    // Nothing at 100; the next lives come at 150 and 200.
+    collectCoins(game, 99);
+    expect(game.lives).toBe(4);
+    collectCoins(game, 1);
+    expect(game.lives).toBe(5);
+    collectCoins(game, 50);
+    expect(game.lives).toBe(LIFE_CAP);
+    expect(nextLifeAt(game.coinsTowardLife)).toBeNull();
+    collectCoins(game, 300);
+    expect(game.lives).toBe(LIFE_CAP);
   });
 
-  it("spends coin thresholds at the life cap instead of banking lives", () => {
+  it("never holds more than six lives, and earns none in unlimited mode", () => {
     const game = new Game();
-    collectCoins(game, COINS_PER_LIFE * 2 + 3);
-    expect(game.lives).toBe(MAX_LIVES);
-    expect(game.coinsTowardLife).toBe(3);
-    expect(game.collectedCoins).toBe(103);
+    game.lives = LIFE_CAP;
+    collectCoins(game, 50);
+    expect(game.lives).toBe(LIFE_CAP);
     expect(game.events).not.toContain("extra-life");
-    game.player.y = 700;
-    game.update(1 / 120, idle);
-    collectCoins(game, 46);
-    expect(game.lives).toBe(2);
-    expect(game.coinsTowardLife).toBe(49);
-    collectCoins(game, 1);
-    expect(game.lives).toBe(MAX_LIVES);
-    expect(game.coinsTowardLife).toBe(0);
-    expect(game.collectedCoins).toBe(150);
+    const relaxed = new Game(0, { mode: "relaxed" });
+    collectCoins(relaxed, 200);
+    expect(relaxed.lives).toBe(MAX_LIVES);
+    expect(relaxed.coinsTowardLife).toBe(200);
   });
 
   it("grants star power immediately, refreshes it, and expires once", () => {
@@ -1202,7 +1203,7 @@ describe("Long-adventure mechanics", () => {
     advance(game, 0.12, { ...idle, jump: true });
     expect(game.platforms[1]!.broken).toBe(true);
     expect(game.collectedCoins).toBe(54);
-    expect(game.coinsTowardLife).toBe(4);
+    expect(game.coinsTowardLife).toBe(54);
     expect(game.lives).toBe(3);
     advance(game, 1);
     expect(game.collectedCoins).toBe(54);
